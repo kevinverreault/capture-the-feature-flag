@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import type { AstroIntegration } from 'astro';
 
 /** Absolute path of the design system submodule's `src/` folder. */
-export const designSystemSrc = fileURLToPath(new URL('../../../vendor/design-system/src/', import.meta.url));
+const designSystemSrc = fileURLToPath(new URL('../../../vendor/design-system/src/', import.meta.url));
 
 /**
  * The host-side packages that design system components import. They are compiled from source by the

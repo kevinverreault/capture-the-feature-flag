@@ -28,13 +28,13 @@ pnpm nx run-many -t lint typecheck test build
 
 The workspace uses pnpm workspaces and Nx. Every project is a pnpm package whose `package.json` scripts become its Nx targets:
 
-| Target         | Convention                                                           |
-| :------------- | :------------------------------------------------------------------- |
-| `lint`         | `eslint .` (the root [eslint.config.mjs](eslint.config.mjs) applies) |
-| `typecheck`    | `tsc --noEmit` (or `astro check` for Astro apps)                     |
-| `test`         | `vitest run`                                                         |
-| `build`        | Builds into the project's `dist/`                                    |
-| `docker-build` | Projects that ship an image: `docker build` from the repo root       |
+| Target         | Convention                                                                               |
+| :------------- | :--------------------------------------------------------------------------------------- |
+| `lint`         | `eslint .` (the root [eslint.config.mjs](eslint.config.mjs) applies)                     |
+| `typecheck`    | `tsc -p tsconfig.json`, with `noEmit` in that tsconfig (or `astro check` for Astro apps) |
+| `test`         | `vitest run`                                                                             |
+| `build`        | Builds into the project's `dist/`                                                        |
+| `docker-build` | Projects that ship an image: `docker build` from the repo root                           |
 
 Run a target for one project with `pnpm nx run <project>:<target>`, for every project with `pnpm nx run-many -t <target>`, or only for projects changed since `main` with `pnpm nx affected -t <target>`.
 
@@ -49,8 +49,10 @@ Each project's `package.json` declares exactly one `type:*` tag (`app`, `lib`, `
 `@nx/enforce-module-boundaries` in [eslint.config.mjs](eslint.config.mjs) uses those tags, so `lint` fails when:
 
 - a library depends on an app,
-- `admin` depends on `core` (the admin app calls Core only over HTTP, see [ADR 0003](docs/adr/0003-admin-app-mounted-inside-core.md)),
+- any project other than `core` depends on `core`: the admin app ([ADR 0003](docs/adr/0003-admin-app-mounted-inside-core.md)), Evaluators ([ADR 0001](docs/adr/0001-evaluator-polls-core-not-the-database.md)) and everything else call Core over HTTP,
 - any project other than `core` imports Prisma.
+
+The rules cover `.astro` files too (through `eslint-plugin-astro`).
 
 The `@ctff/workspace` tests fail if a project is missing either tag, because an untagged project would escape these rules.
 
@@ -84,7 +86,7 @@ The `@ctff/workspace` tests fail if a project is missing either tag, because an 
    }
    ```
 
-4. Provide the icon folder. `Icon` loads SVGs from the host's own `src/svg/`. Copy the icons you use from `vendor/design-system/src/svg/`. The integration warns about missing icons that design system components render themselves (`info`, `circle-check`, `triangle-alert`, `circle-alert`, `x`, `chrevron-left`, `chrevron-right`, `sun`, `moon-stars`).
+4. Provide the icon folder. `Icon` loads SVGs from the host's own `src/svg/`. Copy the icons you use from `vendor/design-system/src/svg/`. The integration warns about missing icons that design system components render themselves (listed in `designSystemIcons` in [libs/design-system-host/src/index.ts](libs/design-system-host/src/index.ts)).
 
 Then import components through `@ds/*`:
 

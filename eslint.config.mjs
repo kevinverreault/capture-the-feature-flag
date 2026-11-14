@@ -1,35 +1,38 @@
 import nx from '@nx/eslint-plugin';
+import astro from 'eslint-plugin-astro';
 import globals from 'globals';
 
 /**
- * Module boundaries. Every Nx project carries exactly one `type:*` tag and one
- * `scope:*` tag (checked by the `workspace` project's tests):
- *
- * - type:app | type:lib | type:tool
- * - scope:core | scope:admin | scope:evaluator | scope:birdwatch | scope:showcase | scope:shared
+ * Module boundaries. Every Nx project carries exactly one `type:*` tag and one `scope:*` tag; the allowed
+ * values are checked by tools/workspace/test/boundary-tags.test.ts.
  */
 const prismaImports = ['prisma', '@prisma/*', '.prisma/*'];
 
-export const depConstraints = [
+const depConstraints = [
   // Libraries may not depend on apps (or tools).
   { sourceTag: 'type:lib', onlyDependOnLibsWithTags: ['type:lib'] },
   { sourceTag: 'type:app', onlyDependOnLibsWithTags: ['type:lib', 'type:app'] },
   { sourceTag: 'type:tool', onlyDependOnLibsWithTags: ['type:lib', 'type:tool'] },
-  // The admin app talks to Core only over HTTP, through core-api-client (ADR 0003).
-  { sourceTag: 'scope:admin', notDependOnLibsWithTags: ['scope:core'] },
-  // Only Core owns the database, so only Core may use Prisma.
-  { sourceTag: '/^scope:(?!core$)/', bannedExternalImports: prismaImports },
+  // Only Core owns the database, so only Core may use Prisma. Nothing else may depend on Core either, which
+  // also keeps Prisma from leaking through it: the admin app (ADR 0003), Evaluators (ADR 0001) and the rest
+  // talk to Core over HTTP.
+  {
+    sourceTag: '/^scope:(?!core$)/',
+    notDependOnLibsWithTags: ['scope:core'],
+    bannedExternalImports: prismaImports,
+  },
 ];
 
 export default [
   ...nx.configs['flat/base'],
   ...nx.configs['flat/typescript'],
   ...nx.configs['flat/javascript'],
+  ...astro.configs.recommended,
   {
     ignores: ['**/dist', '**/.astro', '**/node_modules', '**/coverage', 'vendor/**', '.nx/**'],
   },
   {
-    files: ['**/*.ts', '**/*.tsx', '**/*.cts', '**/*.mts', '**/*.js', '**/*.jsx', '**/*.cjs', '**/*.mjs'],
+    files: ['**/*.{ts,tsx,cts,mts,js,jsx,cjs,mjs,astro}'],
     languageOptions: {
       globals: { ...globals.node },
     },
