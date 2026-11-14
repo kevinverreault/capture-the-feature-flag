@@ -1,0 +1,2 @@
+# The design system is a git submodule consumed from source; it is not an Nx project.
+vendor/

@@ -1,0 +1,21 @@
+{
+  "name": "@ctff/workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Checks that keep the workspace's own conventions (such as module-boundary tags) from eroding.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "nx": {
+    "tags": [
+      "type:tool",
+      "scope:shared"
+    ]
+  },
+  "devDependencies": {
+    "@nx/devkit": "24.0.6"
+  }
+}
