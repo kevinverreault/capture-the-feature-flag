@@ -1,7 +1,7 @@
 /** Every admin page's address in one place; each key is encoded as one path segment. */
 const segment = encodeURIComponent;
 
-const flag = (project: string, flagKey: string) => `/projects/${segment(project)}/flags/${segment(flagKey)}`;
+const flagPath = (project: string, flagKey: string) => `/projects/${segment(project)}/flags/${segment(flagKey)}`;
 
 export const routes = {
   projects: () => '/projects',
@@ -16,7 +16,7 @@ export const routes = {
   /** A flag's detail page, opened on the tab of `environment` when given. */
   flag: (project: string, flagKey: string, environment?: string) =>
     environment === undefined
-      ? flag(project, flagKey)
-      : `${flag(project, flagKey)}?${new URLSearchParams({ environment }).toString()}`,
-  editFlag: (project: string, flagKey: string) => `${flag(project, flagKey)}/edit`,
+      ? flagPath(project, flagKey)
+      : `${flagPath(project, flagKey)}?${new URLSearchParams({ environment }).toString()}`,
+  editFlag: (project: string, flagKey: string) => `${flagPath(project, flagKey)}/edit`,
 };

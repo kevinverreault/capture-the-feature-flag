@@ -171,6 +171,10 @@ describe('admin app: flags', () => {
     const on = await admin.post(detail, { _action: 'targeting', environment: 'production', version: '1', on: 'on' });
     expect(on.status).toBe(303);
     expect(on.headers.get('location')).toBe(`${detail}?environment=production`);
+    // The confirmation names the environment as the page does.
+    const cookie = on.headers.get('set-cookie')?.split(';')[0] ?? '';
+    const confirmed = await fetch(`${core.baseUrl}${detail}?environment=production`, { headers: { cookie } });
+    expect(await confirmed.text()).toContain('Targeting switched on in Production');
     expect((await api.get(production)).body).toMatchObject({ on: true, version: 2 });
     expect(await servedSnapshot()).toBe(true);
     expect((await api.get(`/projects/${projectKey}/flags/kill-switch/targeting/development`)).body.on).toBe(false);
@@ -300,5 +304,9 @@ describe('admin app: flags', () => {
       on: 'on',
     });
     expect(response.status).toBe(404);
+    // There is no tab to show it in, so the page says so above the tabs.
+    const detail = await page(response);
+    expect(detail.querySelector('.targeting [role="alert"]')?.textContent).toContain('Environment production');
+    expect(detail.querySelectorAll('.tab-panel')).toHaveLength(1);
   });
 });

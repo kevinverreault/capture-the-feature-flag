@@ -2,11 +2,12 @@
 import FormField from '@ds/components/form/FormField.astro';
 import Input from '@ds/components/form/Input.astro';
 import Textarea from '@ds/components/form/Textarea.astro';
+import type { FlagFieldValues } from '../lib/flag-fields';
 import type { FormErrors } from '../lib/form-errors';
 
 interface Props {
-  /** What the inputs show: what was submitted, or the flag as it is. */
-  values: { name: string; description: string; tags: string };
+  /** What the inputs show: what was submitted, or the flag as it is (see flagFieldValues). */
+  values: FlagFieldValues;
   errors: FormErrors;
 }
 

@@ -32,9 +32,14 @@ const post = await handlePost(Astro, {
           body,
         }),
       );
+      const environment = await unwrap(
+        core.GET('/api/v1/projects/{projectKey}/environments/{environmentKey}', {
+          params: { path: { projectKey, environmentKey } },
+        }),
+      );
       return {
         location: routes.flag(projectKey, flagKey, targeting.environmentKey),
-        flash: `Targeting switched ${targeting.on ? 'on' : 'off'} in ${environmentKey}`,
+        flash: `Targeting switched ${targeting.on ? 'on' : 'off'} in ${environment.name}`,
       };
     },
   },
@@ -67,6 +72,11 @@ const tabs = environments?.flatMap((environment) => {
     },
   ];
 });
+// A rejected change for an environment without a tab (deleted since the page loaded) shows above the tabs.
+const unplaced = postedEnvironment !== undefined && !tabs?.some((tab) => tab.environment.key === postedEnvironment);
+const unplacedMessages = unplaced
+  ? [...post.errors.form, ...Object.values(post.errors.fields).filter((message) => message !== undefined)]
+  : [];
 ---
 
 {
@@ -100,6 +110,7 @@ const tabs = environments?.flatMap((environment) => {
         <h2 id="targeting-heading" class="text-xl">
           Targeting
         </h2>
+        <FormAlert messages={unplacedMessages} />
         {tabs.length === 0 ? (
           <p>
             This project has no environments yet: <a href={routes.environments(project.key)}>create one</a> to
@@ -175,13 +186,15 @@ const tabs = environments?.flatMap((environment) => {
       const selected = panels.findIndex((panel) => panel.dataset['environment'] === this.dataset['selected']);
       if (selected > 0) group.select(selected);
 
-      group.querySelector('[role="tablist"]')?.addEventListener('click', () => {
+      // However a tab is picked (click or arrow keys), it shows its panel: follow that.
+      new MutationObserver(() => {
         const shown = panels.find((panel) => !panel.hidden)?.dataset['environment'];
         if (!shown) return;
         const url = new URL(window.location.href);
+        if (url.searchParams.get('environment') === shown) return;
         url.searchParams.set('environment', shown);
         history.replaceState(history.state, '', url);
-      });
+      }).observe(group, { subtree: true, attributeFilter: ['hidden'] });
     }
   }
   customElements.define('flag-tabs', FlagTabs);

@@ -9,7 +9,7 @@ import NotFound from '../../../../components/NotFound.astro';
 import ProjectNav from '../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { coreApi } from '../../../../lib/core';
-import { filterFlags, listedTags } from '../../../../lib/flag-list';
+import { filterFlags, flagListCaption, listedTags, sameTag } from '../../../../lib/flag-list';
 import { orNotFound } from '../../../../lib/forms';
 import { routes } from '../../../../lib/routes';
 
@@ -63,7 +63,7 @@ const isOn = (flag: (typeof shown)[number], environmentKey: string) =>
                     All tags
                   </option>
                   {tags.map((listed) => (
-                    <option value={listed} selected={listed === tag}>
+                    <option value={listed} selected={sameTag(listed, tag)}>
                       {listed}
                     </option>
                   ))}
@@ -85,9 +85,7 @@ const isOn = (flag: (typeof shown)[number], environmentKey: string) =>
               <div class="table-root">
                 <table class="flags-table">
                   <caption>
-                    {filtered
-                      ? `${shown.length} of ${flags.length} flags, with targeting on or off in each environment`
-                      : `${flags.length} flags, with targeting on or off in each environment`}
+                    {flagListCaption(shown.length, flags.length, filtered)}
                   </caption>
                   <thead>
                     <tr>

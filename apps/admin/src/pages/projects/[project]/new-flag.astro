@@ -9,9 +9,9 @@ import NotFound from '../../../components/NotFound.astro';
 import ProjectNav from '../../../components/ProjectNav.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import { coreApi } from '../../../lib/core';
+import { flagFieldsBody, flagFieldValues } from '../../../lib/flag-fields';
 import { handlePost, orNotFound, textField } from '../../../lib/forms';
 import { routes } from '../../../lib/routes';
-import { parseTags } from '../../../lib/tags';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
@@ -23,9 +23,7 @@ const post = await handlePost(Astro, {
     send: async (form) => {
       const body = {
         key: textField(form, 'key'),
-        name: textField(form, 'name'),
-        description: textField(form, 'description'),
-        tags: parseTags(textField(form, 'tags')),
+        ...flagFieldsBody(form),
       };
       const flag = await unwrap(core.POST('/api/v1/projects/{projectKey}/flags', { params, body }));
       return { location: routes.flag(flag.projectKey, flag.key), flash: `Flag ${flag.name} created` };
@@ -62,11 +60,7 @@ if (!project) Astro.response.status = 404;
             <Input name="key" value={post.value('key') ?? ''} required />
           </FormField>
           <FlagFields
-            values={{
-              name: post.value('name') ?? '',
-              description: post.value('description') ?? '',
-              tags: post.value('tags') ?? '',
-            }}
+            values={flagFieldValues(post.value)}
             errors={errors}
           />
           <Button type="submit" variant="primary">
