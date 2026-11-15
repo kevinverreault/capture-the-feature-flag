@@ -25,6 +25,8 @@ docker compose up
 
 This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000>, where the [admin app](apps/admin/README.md) opens, and the [Evaluator](apps/evaluator/README.md) on <http://localhost:3001>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>. Applications evaluate flags through the Evaluator with [`@ctff/sdk`](libs/sdk/README.md), or in NestJS with [`@ctff/nestjs`](libs/nestjs/README.md). The Evaluator serves Prometheus metrics at <http://localhost:3001/metrics>, and [a k6 script](apps/evaluator/README.md#load-testing) measures its latency.
 
+On an empty database, Core seeds the `birdwatch` demo project ([the demo seed](apps/core/README.md#the-demo-seed)), used by **Birdwatch**, the birding demo: its website, [birdwatch-web](apps/birdwatch-web/README.md), is on <http://localhost:4000>, and its API, [birdwatch-api](apps/birdwatch-api/README.md), on <http://localhost:4001>. Log in as a birder, and switch the targeting of `new-sighting-form` off in the admin app (project Birdwatch, environment Development): "Log a sighting" disappears within seconds.
+
 ## Layout
 
 | Path      | Contents                                                                    |
@@ -117,6 +119,6 @@ To move the submodule to a newer design system commit: `git -C vendor/design-sys
 
 - `nx affected -t lint typecheck test build`,
 - `nx affected -t docker-build`, which builds the images of affected projects that define that target.
-- a compose smoke test: `docker compose up --build --wait`, then checks that Core and the Evaluator are healthy and run as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval (plus 500 ms for the poll's own latency) once targeting is switched on through Core's API, and still `true` after `docker compose stop core`.
+- a compose smoke test: `docker compose up --build --wait`, then checks that every service is healthy and runs as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval (plus 500 ms for the poll's own latency) once targeting is switched on through Core's API, and still `true` after `docker compose stop core`. Before stopping Core, [apps/birdwatch-api/scripts/compose-smoke.ts](apps/birdwatch-api/scripts/compose-smoke.ts) checks the Birdwatch demo and its `new-sighting-form` kill switch.
 
 Nothing is published: images are built but not pushed, and packages are not released.

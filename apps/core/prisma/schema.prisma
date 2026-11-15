@@ -206,3 +206,11 @@ model ContextAttribute {
 
   @@map("context_attributes")
 }
+
+/// The seeds Core has completed, by name (such as `birdwatch-demo`), so each runs to completion once per database.
+model CompletedSeed {
+  name        String   @id
+  completedAt DateTime @default(now()) @map("completed_at") @db.Timestamptz(3)
+
+  @@map("completed_seeds")
+}

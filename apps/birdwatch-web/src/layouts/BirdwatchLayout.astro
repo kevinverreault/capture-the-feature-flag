@@ -1,0 +1,101 @@
+---
+import '@styles/global.css';
+import '../styles/birdwatch.css';
+import Button from '@ds/components/ui/Button.astro';
+import ThemeToggle from '@ds/components/ui/ThemeToggle.astro';
+import type { Birder } from '../lib/api';
+import { countryName } from '../lib/format';
+
+interface Props {
+  title: string;
+  /** The birder this browser is logged in as, if any. */
+  birder?: Birder | undefined;
+}
+
+const { title, birder } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} · Birdwatch</title>
+  </head>
+  <body class="ff-sans-normal">
+    <header class="app-header">
+      <a href="/" class="brand ff-serif text-xl">Birdwatch</a>
+      <div class="header-actions">
+        {
+          birder && (
+            <>
+              <span class="who" data-testid="current-birder">
+                {birder.name} · {countryName(birder.country)}
+              </span>
+              <form method="post" action="/logout">
+                <Button type="submit" variant="muted" decoration="ghost" size="small">
+                  Switch birder
+                </Button>
+              </form>
+            </>
+          )
+        }
+        <ThemeToggle />
+      </div>
+    </header>
+    <main class="app-main">
+      <slot />
+    </main>
+    <footer class="app-footer text-sm">
+      A demo of Capture The Feature Flag. The birders, species and sightings are made up.
+    </footer>
+  </body>
+</html>
+
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: hsl(var(--color-background));
+    color: hsl(var(--color-on-background));
+  }
+
+  .app-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.15);
+  }
+
+  .brand {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .header-actions form {
+    margin: 0;
+  }
+
+  .app-main {
+    display: grid;
+    gap: var(--space-md);
+    max-width: var(--container-max-width);
+    margin-inline: auto;
+    padding: var(--space-md);
+  }
+
+  .app-footer {
+    padding: var(--space-md);
+    text-align: center;
+    opacity: 0.7;
+  }
+</style>

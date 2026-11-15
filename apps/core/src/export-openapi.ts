@@ -30,6 +30,7 @@ const app = await NestFactory.create(
       logLevel: 'silent',
       adminEnabled: false,
       retentionIntervalMs: 1,
+      seedDemo: false,
     },
     logger,
   ),

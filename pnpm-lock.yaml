@@ -264,6 +264,92 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  apps/birdwatch-api:
+    dependencies:
+      '@ctff/birdwatch-contract':
+        specifier: workspace:*
+        version: link:../../libs/birdwatch-contract
+      '@ctff/core-api-client':
+        specifier: workspace:*
+        version: link:../../libs/core-api-client
+      '@ctff/nestjs':
+        specifier: workspace:*
+        version: link:../../libs/nestjs
+      '@nestjs/common':
+        specifier: ^11.2.10
+        version: 11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
+      '@nestjs/core':
+        specifier: ^11.2.10
+        version: 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@11.2.10)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^11.2.10
+        version: 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@11.2.10)(supports-color@10.2.2)
+      jose:
+        specifier: ^6.2.17
+        version: 6.2.17
+      nestjs-pino:
+        specifier: ^5.3.1
+        version: 5.3.1(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@11.2.10)(pino-http@11.0.0)(pino@10.4.0)(rxjs@7.8.2)
+      pino:
+        specifier: ^10.4.0
+        version: 10.4.0
+      pino-http:
+        specifier: ^11.0.0
+        version: 11.0.0
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+
+  apps/birdwatch-web:
+    dependencies:
+      '@astrojs/node':
+        specifier: ^11.1.13
+        version: 11.1.13(astro@7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))(supports-color@10.2.2)
+      '@ctff/birdwatch-contract':
+        specifier: workspace:*
+        version: link:../../libs/birdwatch-contract
+      astro:
+        specifier: ^7.4.12
+        version: 7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
+      cva:
+        specifier: npm:class-variance-authority@^0.7.1
+        version: class-variance-authority@0.7.1
+      node-html-parser:
+        specifier: ^6.1.13
+        version: 6.1.13
+      pino:
+        specifier: ^10.4.0
+        version: 10.4.0
+      pino-http:
+        specifier: ^11.0.0
+        version: 11.0.0
+      serve-static:
+        specifier: ^2.2.1
+        version: 2.2.1(supports-color@10.2.2)
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.12
+        version: 0.9.12(prettier@3.10.1)(typescript@6.0.3)
+      '@ctff/design-system-host':
+        specifier: workspace:*
+        version: link:../../libs/design-system-host
+      '@types/serve-static':
+        specifier: ^2.2.0
+        version: 2.2.0
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+
   apps/core:
     dependencies:
       '@ctff/admin':
@@ -384,6 +470,16 @@ importers:
         version: 6.0.3
 
   apps/terraform-provider-ctff: {}
+
+  libs/birdwatch-contract:
+    dependencies:
+      '@ctff/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
 
   libs/core-api-client:
     dependencies:
@@ -3634,6 +3730,9 @@ packages:
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
     hasBin: true
+
+  jose@6.2.17:
+    resolution: {integrity: sha512-wOuK9V1yujQFH5S0ZWmLcDZN7+IKh9bUCC2ZPCf2HDlol3WWHy+PPyNjEI75FXRLMp3vDKQcupP59xhVU95hcg==}
 
   js-levenshtein@1.1.6:
     resolution: {integrity: sha512-X2BB11YZtrRqY4EnQcLX5Rh373zbK4alC1FW7D7MBhL2gtcC17cTnr6DmfHZeS0s2rTHjUTMMHfG7gO8SSdw+g==}
@@ -9003,6 +9102,8 @@ snapshots:
       '@pkgjs/parseargs': 0.11.0
 
   jiti@2.7.0: {}
+
+  jose@6.2.17: {}
 
   js-levenshtein@1.1.6: {}
 
