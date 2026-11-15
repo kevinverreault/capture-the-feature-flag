@@ -33,6 +33,7 @@
   "dependencies": {
     "@astrojs/node": "^11.1.13",
     "@ctff/core-api-client": "workspace:*",
+    "@ctff/evaluation": "workspace:*",
     "astro": "^7.4.12",
     "cva": "npm:class-variance-authority@^0.7.1",
     "node-html-parser": "^6.1.13",

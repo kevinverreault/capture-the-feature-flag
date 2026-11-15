@@ -11,12 +11,20 @@ import ConfirmDelete from '../../../../../components/ConfirmDelete.astro';
 import FormAlert from '../../../../../components/FormAlert.astro';
 import NotFound from '../../../../../components/NotFound.astro';
 import ProjectNav from '../../../../../components/ProjectNav.astro';
+import TargetingEditor from '../../../../../components/TargetingEditor.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
 import { flagVariations } from '../../../../../lib/audit';
 import { coreApi } from '../../../../../lib/core';
 import { noFormErrors } from '../../../../../lib/form-errors';
 import { type FormAction, handlePost, orNotFound, textField } from '../../../../../lib/forms';
 import { routes } from '../../../../../lib/routes';
+import {
+  readTargetingDraft,
+  targetingChange,
+  targetingChangeFields,
+  targetingDraft,
+  targetingDraftErrors,
+} from '../../../../../lib/targeting-form';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
@@ -30,29 +38,51 @@ const flagAction = (call: () => Promise<unknown>, location: string, flash: strin
     return { location, flash };
   },
 });
+/** Saves a targeting change to one environment, then goes back to its tab, saying what was done there. */
+async function saveTargeting(
+  environmentKey: string,
+  body: { version: number; on?: boolean } & Partial<ReturnType<typeof targetingChange>>,
+  done: (on: boolean) => string,
+) {
+  const targeting = await unwrap(
+    core.PATCH('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting/{environmentKey}', {
+      params: { path: { projectKey, flagKey, environmentKey } },
+      body,
+    }),
+  );
+  const environment = await unwrap(
+    core.GET('/api/v1/projects/{projectKey}/environments/{environmentKey}', {
+      params: { path: { projectKey, environmentKey } },
+    }),
+  );
+  return {
+    location: routes.flag(projectKey, flagKey, targeting.environmentKey),
+    flash: `${done(targeting.on)} in ${environment.name}`,
+  };
+}
 const post = await handlePost(Astro, {
+  'edit-targeting': {
+    fields: targetingChangeFields,
+    versioned: true,
+    send: async (form) => {
+      const { variations } = await unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }));
+      const change = targetingChange(readTargetingDraft(form, variations.length));
+      return saveTargeting(
+        textField(form, 'environment'),
+        { version: Number(textField(form, 'version')), ...change },
+        () => 'Targeting saved',
+      );
+    },
+  },
   targeting: {
     fields: ['on'],
     versioned: true,
-    send: async (form) => {
-      const environmentKey = textField(form, 'environment');
-      const body = { version: Number(textField(form, 'version')), on: form.has('on') };
-      const targeting = await unwrap(
-        core.PATCH('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting/{environmentKey}', {
-          params: { path: { projectKey, flagKey, environmentKey } },
-          body,
-        }),
-      );
-      const environment = await unwrap(
-        core.GET('/api/v1/projects/{projectKey}/environments/{environmentKey}', {
-          params: { path: { projectKey, environmentKey } },
-        }),
-      );
-      return {
-        location: routes.flag(projectKey, flagKey, targeting.environmentKey),
-        flash: `Targeting switched ${targeting.on ? 'on' : 'off'} in ${environment.name}`,
-      };
-    },
+    send: (form) =>
+      saveTargeting(
+        textField(form, 'environment'),
+        { version: Number(textField(form, 'version')), on: form.has('on') },
+        (on) => `Targeting switched ${on ? 'on' : 'off'}`,
+      ),
   },
   archive: flagAction(
     () => unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/archive', { params })),
@@ -84,20 +114,33 @@ const [projects, project, environments, flag, targeting, auditEntries] = await P
 ]);
 if (!project || !environments || !flag || !targeting) Astro.response.status = 404;
 
-/** The environment whose targeting form was just submitted and rejected, if any. */
-const postedEnvironment = post.action === 'targeting' ? post.value('environment') : undefined;
+const targetingActions = ['targeting', 'edit-targeting'];
+/** The environment whose targeting switch or editor was just submitted and rejected, if any. */
+const postedEnvironment = targetingActions.includes(post.action ?? '') ? post.value('environment') : undefined;
+const variations = flag?.variations.map(String) ?? [];
 const tabs = environments?.flatMap((environment) => {
   const current = targeting?.find((row) => row.environmentKey === environment.key);
   if (!current) return [];
   const posted = environment.key === postedEnvironment;
+  const switched = posted && post.action === 'targeting';
+  const editedForm = posted && post.action === 'edit-targeting' ? post.form : undefined;
+  const edited = editedForm !== undefined;
+  // A rejected change keeps what was submitted, and the version it was based on (see ChangedElsewhere).
+  const draft = editedForm
+    ? readTargetingDraft(editedForm, variations.length)
+    : targetingDraft(current, variations.length);
+  const currentVersion = String(current.version);
   return [
     {
       environment,
-      // A rejected change keeps what was submitted, and the version it was based on (see ChangedElsewhere).
-      on: posted ? post.value('on') !== undefined : current.on,
-      offVariation: String(flag?.variations[current.offVariation]),
-      version: posted ? (post.value('version') ?? String(current.version)) : String(current.version),
-      errors: posted ? post.errors : noFormErrors,
+      on: switched ? post.value('on') !== undefined : current.on,
+      offVariation: variations[current.offVariation],
+      switchVersion: switched ? (post.value('version') ?? currentVersion) : currentVersion,
+      switchErrors: switched ? post.errors : noFormErrors,
+      draft,
+      editorVersion: edited ? (post.value('version') ?? currentVersion) : currentVersion,
+      editorErrors: edited ? post.errors : noFormErrors,
+      editorFieldErrors: edited ? targetingDraftErrors(post.errors.fields, draft) : undefined,
     },
   ];
 });
@@ -112,7 +155,7 @@ const unplacedMessages = unplaced
  * switch flipped on a page loaded before the flag was archived (an archived flag shows no targeting tabs).
  */
 const flagMessages =
-  post.action === 'targeting'
+  targetingActions.includes(post.action ?? '')
     ? flag?.archived
       ? ['This flag was archived since this page was loaded, so the targeting change was not saved.']
       : []
@@ -190,23 +233,34 @@ const flagMessages =
             ) : (
               <flag-tabs data-selected={Astro.url.searchParams.get('environment') ?? postedEnvironment ?? ''}>
                 <Tabs label="Environments">
-                  {tabs.map(({ environment, on, offVariation, version, errors }) => (
+                  {tabs.map(
+                    ({
+                      environment,
+                      on,
+                      offVariation,
+                      switchVersion,
+                      switchErrors,
+                      draft,
+                      editorVersion,
+                      editorErrors,
+                      editorFieldErrors,
+                    }) => (
                     <TabPanel label={environment.name} data-environment={environment.key}>
-                      {errors.changedElsewhere && (
+                      {switchErrors.changedElsewhere && (
                         <ChangedElsewhere
                           what={`the targeting in ${environment.name}`}
                           reloadHref={routes.flag(project.key, flag.key, environment.key)}
                         />
                       )}
-                      <FormAlert messages={errors.form} />
+                      <FormAlert messages={switchErrors.form} />
                       <form method="post" class="targeting-switch">
                         <input type="hidden" name="_action" value="targeting" />
                         <input type="hidden" name="environment" value={environment.key} />
-                        <input type="hidden" name="version" value={version} />
+                        <input type="hidden" name="version" value={switchVersion} />
                         <label class="switch-label">
                           <Switch name="on" checked={on} aria-describedby={`served-${environment.key}`} />
                           Targeting {on ? 'on' : 'off'} in {environment.name}
-                          {errors.changedElsewhere && ' (not saved)'}
+                          {switchErrors.changedElsewhere && ' (not saved)'}
                         </label>
                         <p id={`served-${environment.key}`} class="served">
                           {on
@@ -219,8 +273,23 @@ const flagMessages =
                           </Button>
                         </noscript>
                       </form>
+                      {editorErrors.changedElsewhere && (
+                        <ChangedElsewhere
+                          what={`the targeting in ${environment.name}`}
+                          reloadHref={routes.flag(project.key, flag.key, environment.key)}
+                        />
+                      )}
+                      <FormAlert messages={editorErrors.form} />
+                      <TargetingEditor
+                        environmentKey={environment.key}
+                        version={editorVersion}
+                        variations={variations}
+                        draft={draft}
+                        errors={editorFieldErrors}
+                      />
                     </TabPanel>
-                  ))}
+                    ),
+                  )}
                 </Tabs>
               </flag-tabs>
             )}

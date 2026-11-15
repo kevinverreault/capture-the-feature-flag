@@ -24,6 +24,8 @@ export interface PostResult {
   errors: FormErrors;
   /** A submitted field, to keep what was typed; undefined when there was no submission or no such field. */
   value(name: string): string | undefined;
+  /** The whole submission, for a form with repeated fields (such as a multi-select); undefined when there was none. */
+  form?: FormData;
 }
 
 /**
@@ -42,17 +44,17 @@ export async function handlePost(astro: AstroGlobal, actions: Record<string, For
   const action = name === undefined ? undefined : actions[name];
   if (!action) {
     astro.response.status = 400;
-    return { action: name, errors: { fields: {}, form: [`This form can't do "${name ?? ''}"`] }, value };
+    return { action: name, errors: { fields: {}, form: [`This form can't do "${name ?? ''}"`] }, value, form };
   }
 
   try {
     const { location, flash } = await action.send(form);
     setFlash(astro.cookies, flash);
-    return { action: name, redirect: astro.redirect(location, 303), errors: noFormErrors, value };
+    return { action: name, redirect: astro.redirect(location, 303), errors: noFormErrors, value, form };
   } catch (error) {
     if (!(error instanceof CoreApiError)) throw error;
     astro.response.status = error.status;
-    return { action: name, errors: formErrors(error, action), value };
+    return { action: name, errors: formErrors(error, action), value, form };
   }
 }
 

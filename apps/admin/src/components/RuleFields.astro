@@ -1,0 +1,147 @@
+---
+import FormField from '@ds/components/form/FormField.astro';
+import Select from '@ds/components/form/Select.astro';
+import Textarea from '@ds/components/form/Textarea.astro';
+import Button from '@ds/components/ui/Button.astro';
+import { countryOptions } from '../lib/countries';
+import type { RuleDraft } from '../lib/targeting-form';
+
+interface Props {
+  rule: RuleDraft;
+  /** The rule's place in the list, from 1. */
+  position: number;
+  /** The flag's variations, as shown (`true`, `false`). */
+  variations: readonly string[];
+  /** Core's message about the rule, if any. */
+  error?: string | undefined;
+  /** The editor's blank rule: left without values, it is not saved. */
+  blank?: boolean;
+}
+
+const { rule, position, variations, error, blank = false } = Astro.props;
+const name = (field: string) => `rule.${rule.id}.${field}`;
+const picked = new Set(rule.countries);
+
+// One rule of the targeting editor (see TargetingEditor.astro). It lists both its user IDs and its countries, so
+// switching its attribute loses neither; the stylesheet shows only the ones its attribute tests.
+---
+
+<li class="rule" data-rule={rule.id} data-blank={blank ? '' : undefined} data-attribute={rule.attribute}>
+  <fieldset class="rule-fieldset">
+    <legend class="rule-legend">{blank ? 'New rule' : `Rule ${position}`}</legend>
+    {blank && <input type="hidden" name={name('new')} value="1" />}
+    <div class="rule-clause">
+      <FormField label="Attribute">
+        <Select name={name('attribute')} data-rule-attribute>
+          <option value="user_id" selected={rule.attribute === 'user_id'}>user_id</option>
+          <option value="country" selected={rule.attribute === 'country'}>country</option>
+        </Select>
+      </FormField>
+      <FormField label="Operator">
+        <Select name={name('operator')}>
+          <option value="in" selected={rule.operator === 'in'}>is in</option>
+          <option value="not_in" selected={rule.operator === 'not_in'}>is not in</option>
+        </Select>
+      </FormField>
+      <FormField label="Serve">
+        <Select name={name('variation')}>
+          {variations.map((variation, index) => (
+            <option value={String(index)} selected={rule.variation === index}>
+              {variation}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+    </div>
+    <FormField
+      label="User IDs"
+      hint="One per line."
+      error={rule.attribute === 'user_id' ? error : undefined}
+      class="rule-values"
+      data-values="user_id"
+    >
+      <Textarea name={name('userIds')} value={rule.userIds} rows={3} />
+    </FormField>
+    <FormField
+      label="Countries"
+      hint="ISO 3166-1 alpha-2 codes. Hold Ctrl (⌘ on a Mac) to pick several."
+      error={rule.attribute === 'country' ? error : undefined}
+      class="rule-values"
+      data-values="country"
+    >
+      <select name={name('countries')} multiple size="6" class="form-control countries">
+        {countryOptions.map((country) => (
+          <option value={country.code} selected={picked.has(country.code)}>
+            {country.name} ({country.code})
+          </option>
+        ))}
+      </select>
+    </FormField>
+    {
+      // The blank rule's buttons show on the copies scripts make of it (see TargetingEditor.astro).
+      <div class="rule-actions" hidden={blank} data-rule-actions>
+        <Button type="submit" name="ruleEdit" value={`up:${rule.id}`} variant="muted" size="small" decoration="outline">
+          Move up
+        </Button>
+        <Button
+          type="submit"
+          name="ruleEdit"
+          value={`down:${rule.id}`}
+          variant="muted"
+          size="small"
+          decoration="outline"
+        >
+          Move down
+        </Button>
+        <Button
+          type="submit"
+          name="ruleEdit"
+          value={`remove:${rule.id}`}
+          variant="danger"
+          size="small"
+          decoration="ghost"
+        >
+          Remove
+        </Button>
+      </div>
+    }
+  </fieldset>
+</li>
+
+<style>
+  .rule-fieldset {
+    display: grid;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: var(--space-sm);
+    border: 1px solid hsl(var(--color-on-background) / 0.2);
+    border-radius: 0.75rem;
+  }
+
+  .rule-legend {
+    padding-inline: 0.25em;
+    font-weight: 700;
+  }
+
+  .rule-clause {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+  }
+
+  .countries {
+    min-width: 16rem;
+  }
+
+  /* Only the values the rule's attribute tests show (with or without scripts: the selected option decides). */
+  .rule:has(:global([data-rule-attribute] option[value='country']:checked)) :global([data-values='user_id']),
+  .rule:has(:global([data-rule-attribute] option[value='user_id']:checked)) :global([data-values='country']) {
+    display: none;
+  }
+
+  .rule-actions:not([hidden]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
+</style>

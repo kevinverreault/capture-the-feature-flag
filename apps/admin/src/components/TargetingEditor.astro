@@ -1,0 +1,238 @@
+---
+import FormField from '@ds/components/form/FormField.astro';
+import Select from '@ds/components/form/Select.astro';
+import Textarea from '@ds/components/form/Textarea.astro';
+import Button from '@ds/components/ui/Button.astro';
+import type { TargetingDraft, TargetingDraftErrors } from '../lib/targeting-form';
+import RuleFields from './RuleFields.astro';
+
+interface Props {
+  /** The environment whose targeting it edits. */
+  environmentKey: string;
+  /** The version of the targeting the draft is based on. */
+  version: string;
+  /** The flag's variations, as shown (`true`, `false`). */
+  variations: readonly string[];
+  /** What it shows: what was submitted, or the targeting as it is. */
+  draft: TargetingDraft;
+  /** Core's messages about the submitted draft, placed next to its inputs. */
+  errors?: TargetingDraftErrors | undefined;
+}
+
+const { environmentKey, version, variations, draft, errors } = Astro.props;
+/** The id of the editor's blank rule: one no rule of the draft has. */
+const blankId = String(Math.max(-1, ...draft.rules.map((rule) => Number(rule.id)).filter(Number.isInteger)) + 1);
+const blankRule = {
+  id: blankId,
+  attribute: 'user_id' as const,
+  operator: 'in' as const,
+  userIds: '',
+  countries: [],
+  variation: 0,
+};
+
+// The targeting editor of one environment: individual targets, rules (in order: the first that matches wins), and
+// the default and off variations, saved together with the version they are based on (`_action=edit-targeting`).
+// Every rule button submits the form, so without scripts moving or removing a rule saves the change, and the
+// blank rule at the end of the list adds one. With scripts, the buttons move and remove rules in the page, "Add
+// rule" adds a blank one, and nothing is saved until Save.
+---
+
+<targeting-editor>
+  <form method="post" class="targeting-editor">
+    <input type="hidden" name="_action" value="edit-targeting" />
+    <input type="hidden" name="environment" value={environmentKey} />
+    <input type="hidden" name="version" value={version} />
+
+    <fieldset class="editor-section">
+      <legend class="text-lg">Individual targets</legend>
+      <p class="section-hint">While targeting is on, these user IDs always get their variation, before any rule.</p>
+      <div class="targets">
+        {variations.map((variation, index) => (
+          <FormField
+            label={`User IDs served ${variation}`}
+            hint="One per line."
+            error={errors?.targets[index]}
+            data-target={String(index)}
+          >
+            <Textarea name={`target.${index}`} value={draft.targets[index] ?? ''} rows={3} />
+          </FormField>
+        ))}
+      </div>
+    </fieldset>
+
+    <fieldset class="editor-section">
+      <legend class="text-lg">Rules</legend>
+      <p class="section-hint">
+        Tried in order after the individual targets: the first rule that matches wins. A context without the
+        attribute matches no rule, even with "is not in".
+      </p>
+      <ol class="rules">
+        {draft.rules.map((rule, index) => (
+          <RuleFields rule={rule} position={index + 1} variations={variations} error={errors?.rules[rule.id]} />
+        ))}
+        <RuleFields rule={blankRule} position={draft.rules.length + 1} variations={variations} blank />
+      </ol>
+      <div>
+        <Button type="button" variant="secondary" size="small" data-add-rule hidden>Add rule</Button>
+      </div>
+    </fieldset>
+
+    <fieldset class="editor-section variations">
+      <legend class="text-lg">Variations served</legend>
+      <FormField
+        label="Default variation"
+        hint="While targeting is on, for a context no individual target or rule matches."
+        error={errors?.defaultVariation}
+      >
+        <Select name="defaultVariation">
+          {variations.map((variation, index) => (
+            <option value={String(index)} selected={draft.defaultVariation === index}>
+              {variation}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+      <FormField label="Off variation" hint="For every context while targeting is off." error={errors?.offVariation}>
+        <Select name="offVariation">
+          {variations.map((variation, index) => (
+            <option value={String(index)} selected={draft.offVariation === index}>
+              {variation}
+            </option>
+          ))}
+        </Select>
+      </FormField>
+    </fieldset>
+
+    <div>
+      <Button type="submit" variant="primary">Save targeting</Button>
+    </div>
+  </form>
+</targeting-editor>
+
+<script>
+  /**
+   * Moves, removes and adds rules in the page rather than by saving: the order of the rules in the form is the
+   * order they are saved in. A new rule is a copy of the blank one, under a rule id and element ids of its own.
+   */
+  class TargetingEditor extends HTMLElement {
+    #nextId = 0;
+
+    connectedCallback() {
+      const list = this.querySelector<HTMLOListElement>('.rules');
+      const blank = list?.querySelector<HTMLLIElement>(':scope > [data-blank]');
+      const add = this.querySelector<HTMLButtonElement>('[data-add-rule]');
+      if (!list || !blank || !add) return;
+      this.#nextId = Number(blank.dataset['rule']) + 1;
+      blank.remove();
+      add.hidden = false;
+      add.addEventListener('click', () => {
+        const rule = this.#copy(blank);
+        list.append(rule);
+        this.#renumber(list);
+        rule.querySelector<HTMLElement>('select, textarea')?.focus();
+      });
+
+      list.addEventListener('click', (event) => {
+        const button = (event.target as Element).closest<HTMLButtonElement>('button[name="ruleEdit"]');
+        if (!button) return;
+        event.preventDefault();
+        const rule = button.closest<HTMLLIElement>('.rule');
+        if (!rule) return;
+        const [action] = button.value.split(':');
+        if (action === 'remove') rule.remove();
+        if (action === 'up' && rule.previousElementSibling) rule.after(rule.previousElementSibling);
+        if (action === 'down' && rule.nextElementSibling) rule.before(rule.nextElementSibling);
+        this.#renumber(list);
+        if (rule.isConnected) button.focus();
+      });
+    }
+
+    /** A copy of the blank rule, with the rule buttons and ids of its own. */
+    #copy(blank: HTMLLIElement): HTMLLIElement {
+      const id = String(this.#nextId++);
+      const from = `rule.${blank.dataset['rule']}.`;
+      const rule = blank.cloneNode(true) as HTMLLIElement;
+      delete rule.dataset['blank'];
+      rule.dataset['rule'] = id;
+      for (const element of rule.querySelectorAll<HTMLElement>('[name]')) {
+        const name = element.getAttribute('name') ?? '';
+        if (name.startsWith(from)) element.setAttribute('name', `rule.${id}.${name.slice(from.length)}`);
+      }
+      // Element ids (and the labels and descriptions pointing at them) must stay unique in the page.
+      for (const attribute of ['id', 'for', 'aria-describedby', 'aria-labelledby']) {
+        for (const element of rule.querySelectorAll(`[${attribute}]`)) {
+          const ids = (element.getAttribute(attribute) ?? '').split(/\s+/).filter(Boolean);
+          element.setAttribute(attribute, ids.map((value) => `${value}-r${id}`).join(' '));
+        }
+      }
+      for (const button of rule.querySelectorAll<HTMLButtonElement>('button[name="ruleEdit"]')) {
+        button.value = button.value.replace(/:.*$/, `:${id}`);
+      }
+      rule.querySelector<HTMLElement>('[data-rule-actions]')?.removeAttribute('hidden');
+      rule.querySelector('[name$=".new"]')?.remove();
+      return rule;
+    }
+
+    /** Names each rule by its place in the list, as the first that matches wins. */
+    #renumber(list: HTMLOListElement) {
+      list.querySelectorAll(':scope > .rule legend').forEach((legend, index) => {
+        legend.textContent = `Rule ${index + 1}`;
+      });
+    }
+  }
+  customElements.define('targeting-editor', TargetingEditor);
+</script>
+
+<style>
+  targeting-editor {
+    display: block;
+  }
+
+  .targeting-editor {
+    display: grid;
+    gap: var(--space-md);
+  }
+
+  .editor-section {
+    display: grid;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    border: none;
+    min-width: 0;
+  }
+
+  .editor-section legend {
+    padding: 0;
+    font-weight: 700;
+  }
+
+  .section-hint {
+    margin: 0;
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .targets {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: var(--space-sm);
+  }
+
+  .rules {
+    display: grid;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .variations {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    column-gap: var(--space-sm);
+  }
+
+  .variations legend {
+    grid-column: 1 / -1;
+  }
+</style>
