@@ -95,6 +95,8 @@ The `@ctff/workspace` tests fail if a project is missing either tag, because an 
    export default defineConfig({ integrations: [designSystem()] });
    ```
 
+   The integration also puts the design system's `ThemeInit` script in every page's `<head>`: it applies the visitor's saved theme, or the system preference, before the page paints, so a layout doesn't render `ThemeInit` itself.
+
 3. Extend the tsconfig preset, so `astro check` (`pnpm --filter <app> add -D @astrojs/check typescript@~6.0.3`) resolves the same aliases. The preset also points the submodule's own imports (`astro/types`, …) at the host's `node_modules`; without it, component props don't type-check. Because a tsconfig's `paths` replaces the inherited ones, a host that adds its own `paths` must repeat the preset's.
 
    ```json

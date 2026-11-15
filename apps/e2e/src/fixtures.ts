@@ -1,4 +1,11 @@
-import { test as base, expect, type Browser, type Locator, type Page } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContextOptions,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 import type { EvaluationReason } from '@ctff/core-api-client';
 import { birders, resetDemo, type BirderId } from './demo.js';
 import { urls, withinPollInterval } from './stack.js';
@@ -29,8 +36,13 @@ export async function reloadUntil(
 export class BirdwatchSession {
   constructor(readonly page: Page) {}
 
-  static async logIn(browser: Browser, birder: BirderId): Promise<BirdwatchSession> {
-    const context = await browser.newContext({ baseURL: urls.birdwatchWeb });
+  /** `colorScheme` is the one the browser's system prefers, which the design system's theme follows by default. */
+  static async logIn(
+    browser: Browser,
+    birder: BirderId,
+    colorScheme?: BrowserContextOptions['colorScheme'],
+  ): Promise<BirdwatchSession> {
+    const context = await browser.newContext({ baseURL: urls.birdwatchWeb, colorScheme });
     const page = await context.newPage();
     await page.goto('/login');
     await page.getByRole('button', { name: `Log in as ${birders[birder].name}` }).click();
@@ -95,10 +107,11 @@ export const test = base.extend<Fixtures>({
     },
     { auto: true },
   ],
-  birdwatch: async ({ browser }, use) => {
+  // The sessions' contexts are the fixture's own, so it hands them the test's colorScheme (`test.use`).
+  birdwatch: async ({ browser, colorScheme }, use) => {
     const sessions: BirdwatchSession[] = [];
     await use(async (birder) => {
-      const session = await BirdwatchSession.logIn(browser, birder);
+      const session = await BirdwatchSession.logIn(browser, birder, colorScheme);
       sessions.push(session);
       return session;
     });

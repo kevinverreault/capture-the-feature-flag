@@ -4,6 +4,7 @@ import { urls } from './stack.js';
 
 /** The pages of the admin app (served by Core) that the scenarios open, in Birdwatch's project and environment. */
 export const adminPages = {
+  projects: () => `${urls.core}/projects`,
   dashboard: () => `${urls.core}/projects/${projectKey}?environment=${environmentKey}`,
   newFlag: () => `${urls.core}/projects/${projectKey}/new-flag`,
   /** A flag's page, on the tab of Birdwatch's environment. */
