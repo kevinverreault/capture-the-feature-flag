@@ -51,6 +51,10 @@ describe('routes', () => {
     expect(routes.contexts('birdwatch', { environment: 'staging', search: '', context: { country: 'FR' } })).toBe(
       '/projects/birdwatch/contexts?environment=staging&country=FR',
     );
+    // How many seen contexts are listed, when more than the default.
+    expect(routes.contexts('birdwatch', { environment: 'staging', shown: 200 })).toBe(
+      '/projects/birdwatch/contexts?environment=staging&shown=200',
+    );
   });
 
   it('encodes each key as one path segment', () => {

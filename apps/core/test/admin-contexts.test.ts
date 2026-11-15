@@ -110,6 +110,57 @@ describe('admin app: contexts', () => {
     expect(html.querySelector('input[name="search"]')?.getAttribute('value')).toBe('AL');
   });
 
+  it('keeps the context being inspected through a search and its clearing', async () => {
+    const projectKey = await project();
+    const html = await page(
+      await admin.get(`/projects/${projectKey}/contexts?environment=production&search=bo&user_id=alice&country=CA`),
+    );
+    expect(rows(html.querySelector('table.seen-contexts')).map((row) => row[0])).toEqual(['bob']);
+    expect(html.querySelector('table.context-flags')).not.toBeNull();
+    const form = html.querySelector('form[role="search"]');
+    expect(form?.querySelector('input[type="hidden"][name="user_id"]')?.getAttribute('value')).toBe('alice');
+    expect(form?.querySelector('input[type="hidden"][name="country"]')?.getAttribute('value')).toBe('CA');
+    expect(form?.querySelector('a')?.getAttribute('href')).toBe(
+      `/projects/${projectKey}/contexts?environment=production&user_id=alice&country=CA`,
+    );
+  });
+
+  it('lists the newest 100 seen contexts, then 100 more at a time', async () => {
+    const projectKey = await project();
+    const sdkKey = (await api.get(`/projects/${projectKey}/environments/production`)).body.sdkKey;
+    // 147 contexts in all, with the three the project was seen with: birder-0 is the newest.
+    await api.post('/evaluator/telemetry', {
+      environments: [
+        {
+          sdkKey,
+          counts: [],
+          seenContexts: Array.from({ length: 144 }, (_, index) => ({
+            context: { user_id: `birder-${index}` },
+            lastSeen: new Date(Date.now() - index * 100).toISOString(),
+          })),
+        },
+      ],
+    });
+
+    const first = await page(await admin.get(`/projects/${projectKey}/contexts?environment=production`));
+    const listed = rows(first.querySelector('table.seen-contexts'));
+    expect(listed).toHaveLength(100);
+    expect(listed[0]?.[0]).toBe('birder-0');
+    const moreHref = first.querySelector('a.show-more')?.getAttribute('href');
+    expect(moreHref).toBe(`/projects/${projectKey}/contexts?environment=production&shown=200`);
+    // Selecting a context keeps the longer list.
+    expect(first.querySelector('table.seen-contexts tbody a')?.getAttribute('href')).toBe(
+      `/projects/${projectKey}/contexts?environment=production&user_id=birder-0`,
+    );
+
+    const second = await page(await admin.get(moreHref ?? ''));
+    expect(rows(second.querySelector('table.seen-contexts'))).toHaveLength(147);
+    expect(second.querySelector('.show-more')).toBeNull();
+    expect(second.querySelector('table.seen-contexts tbody a')?.getAttribute('href')).toBe(
+      `/projects/${projectKey}/contexts?environment=production&user_id=birder-0&shown=200`,
+    );
+  });
+
   it('shows what every flag serves the selected context, each linking to the flag', async () => {
     const projectKey = await project();
     const response = await admin.get(

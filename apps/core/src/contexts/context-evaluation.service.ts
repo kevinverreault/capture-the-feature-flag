@@ -4,7 +4,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { loadEnvironmentSnapshot } from '../evaluator/environment-snapshot.js';
 import { ProjectsService } from '../projects/projects.service.js';
-import type { ContextDto } from '../telemetry/telemetry.dto.js';
+import type { ContextDto } from '../common/context.dto.js';
 import type { ContextEvaluationDto } from './context-evaluation.dto.js';
 
 /**

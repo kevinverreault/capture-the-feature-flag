@@ -46,3 +46,27 @@ export function contextLabel(context: Context): string {
 export function sameContext(a: Context, b: Context | undefined): boolean {
   return b !== undefined && a.user_id === b.user_id && a.country?.toUpperCase() === b.country?.toUpperCase();
 }
+
+/** How many seen contexts the Contexts explorer lists at first, and how many more each "Show more" adds. */
+export const seenContextsStep = 100;
+/** The most seen contexts Core lists at once (the API's `limit` bound), and the default seen-context cap. */
+export const seenContextsMax = 1000;
+
+/**
+ * How many seen contexts to list, from the address's `shown` (absent: the first step): rounded up to a whole
+ * step, at least one step and at most what Core lists at once.
+ */
+export function seenContextsShown(shown: string | null): number {
+  const asked = Number(shown);
+  if (!Number.isFinite(asked) || asked <= 0) return seenContextsStep;
+  return Math.min(seenContextsMax, Math.ceil(asked / seenContextsStep) * seenContextsStep);
+}
+
+/**
+ * How many to list for "Show more", or undefined when there are no more to show: fewer were listed than asked
+ * for, or Core can't list more at once.
+ */
+export function moreSeenContexts(shown: number, listed: number): number | undefined {
+  if (listed < shown || shown >= seenContextsMax) return undefined;
+  return Math.min(seenContextsMax, shown + seenContextsStep);
+}

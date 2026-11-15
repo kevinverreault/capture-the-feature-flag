@@ -9,13 +9,18 @@ import Button from '@ds/components/ui/Button.astro';
 import NotFound from '../../../components/NotFound.astro';
 import ProjectNav from '../../../components/ProjectNav.astro';
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import { contextFromQuery, contextLabel, evaluationReasonText, sameContext } from '../../../lib/contexts';
+import {
+  contextFromQuery,
+  contextLabel,
+  evaluationReasonText,
+  moreSeenContexts,
+  sameContext,
+  seenContextsShown,
+} from '../../../lib/contexts';
 import { coreApi } from '../../../lib/core';
 import { orNotFound } from '../../../lib/forms';
 import { routes } from '../../../lib/routes';
 
-/** How many of the most recently seen contexts the explorer lists. */
-const seenContextsShown = 100;
 const when = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'medium', timeZone: 'UTC' });
 
 const core = coreApi(Astro.locals);
@@ -25,6 +30,8 @@ const query = Astro.url.searchParams;
 const environmentKey = query.get('environment') || undefined;
 const search = query.get('search')?.trim() ?? '';
 const selected = contextFromQuery(query);
+/** How many of the most recently seen contexts are listed: 100, and 100 more with each "Show more". */
+const shown = seenContextsShown(query.get('shown'));
 
 const [projects, project, environments] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
@@ -41,7 +48,7 @@ const environmentParams = environment && { path: { projectKey, environmentKey: e
 const seenContexts = environmentParams
   ? await unwrap(
       core.GET('/api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts', {
-        params: { ...environmentParams, query: { limit: seenContextsShown, userId: search || undefined } },
+        params: { ...environmentParams, query: { limit: shown, userId: search || undefined } },
       }),
     )
   : [];
@@ -63,8 +70,15 @@ if (environmentParams && selected) {
     evaluationErrors = error.messages;
   }
 }
+/** The default listed length is left out of addresses. */
+const shownParam = (count: number) => (count === seenContextsShown(null) ? undefined : count);
 const contextHref = (context: typeof selected) =>
-  routes.contexts(projectKey, { environment: environment?.key, search, context });
+  routes.contexts(projectKey, { environment: environment?.key, search, context, shown: shownParam(shown) });
+const more = moreSeenContexts(shown, seenContexts.length);
+const moreHref =
+  more === undefined
+    ? undefined
+    : routes.contexts(projectKey, { environment: environment?.key, search, context: selected, shown: more });
 ---
 
 {
@@ -93,6 +107,9 @@ const contextHref = (context: typeof selected) =>
               See the <a href={routes.contextAttributes()}>context attributes</a> they carry.
             </p>
             <form method="get" class="filters" role="search" aria-label="Find seen contexts">
+              {/* A new search keeps the context being inspected. */}
+              {selected?.user_id !== undefined && <input type="hidden" name="user_id" value={selected.user_id} />}
+              {selected?.country !== undefined && <input type="hidden" name="country" value={selected.country} />}
               <FormField label="Environment">
                 <Select name="environment">
                   {environments.map((listed) => (
@@ -109,7 +126,11 @@ const contextHref = (context: typeof selected) =>
                 Show
               </Button>
               {search !== '' && (
-                <Button href={routes.contexts(project.key, { environment: environment.key })} variant="muted" decoration="ghost">
+                <Button
+                  href={routes.contexts(project.key, { environment: environment.key, context: selected })}
+                  variant="muted"
+                  decoration="ghost"
+                >
                   Clear
                 </Button>
               )}
@@ -125,8 +146,8 @@ const contextHref = (context: typeof selected) =>
               <div class="data-table-root">
                 <table class="data-table seen-contexts">
                   <caption>
-                    {seenContexts.length === seenContextsShown
-                      ? `The ${seenContextsShown} contexts most recently seen in ${environment.name}`
+                    {seenContexts.length === shown
+                      ? `The ${shown} contexts most recently seen in ${environment.name}`
                       : `Contexts seen in ${environment.name}, most recent first`}
                   </caption>
                   <thead>
@@ -152,6 +173,11 @@ const contextHref = (context: typeof selected) =>
                     ))}
                   </tbody>
                 </table>
+                {moreHref && (
+                  <Button href={moreHref} variant="secondary" size="small" class="show-more">
+                    Show more
+                  </Button>
+                )}
               </div>
             )}
           </section>
@@ -240,6 +266,10 @@ const contextHref = (context: typeof selected) =>
     flex-wrap: wrap;
     gap: var(--space-sm);
     align-items: end;
+  }
+
+  .show-more {
+    margin-top: var(--space-sm);
   }
 
   .messages {

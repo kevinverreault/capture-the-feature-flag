@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { ContextAttributeType } from '../generated/prisma/enums.js';
 
-/** The types of context attribute values. */
-export const contextAttributeTypes = ['string', 'country_code'] as const;
-export type ContextAttributeTypeName = (typeof contextAttributeTypes)[number];
+/** The types of context attribute values: the values of the ContextAttributeType enum in schema.prisma, read from it. */
+const contextAttributeTypes = Object.values(ContextAttributeType);
 
 /** A named, typed field of a context that rules can test. */
 export class ContextAttributeDto {
@@ -17,7 +17,7 @@ export class ContextAttributeDto {
     enumName: 'ContextAttributeType',
     description: '`string`: any non-empty string. `country_code`: an ISO 3166-1 alpha-2 code, compared in uppercase.',
   })
-  type!: ContextAttributeTypeName;
+  type!: ContextAttributeType;
 
   @ApiProperty()
   description!: string;

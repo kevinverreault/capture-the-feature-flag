@@ -35,16 +35,23 @@ export const routes = {
   /**
    * The Contexts explorer: the seen contexts of `environment` (whose user_id contains `search`), and what every
    * flag serves `context`. The context is carried by its attributes, named as in contexts (`user_id`, `country`).
+   * `shown` is how many seen contexts are listed, when more than the default.
    */
   contexts: (
     project: string,
-    { environment, search, context }: { environment?: string; search?: string; context?: Context } = {},
+    {
+      environment,
+      search,
+      context,
+      shown,
+    }: { environment?: string; search?: string; context?: Context; shown?: number | undefined } = {},
   ) => {
     const query = new URLSearchParams();
     if (environment !== undefined) query.set('environment', environment);
     if (search) query.set('search', search);
     if (context?.user_id !== undefined) query.set('user_id', context.user_id);
     if (context?.country !== undefined) query.set('country', context.country);
+    if (shown !== undefined) query.set('shown', String(shown));
     const queryString = query.toString();
     return `/projects/${segment(project)}/contexts${queryString ? `?${queryString}` : ''}`;
   },

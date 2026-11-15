@@ -1,4 +1,4 @@
-import type { Context, EnvironmentTelemetry, EvaluationCount, SeenContext, TelemetryBatch } from '@ctff/evaluation';
+import type { EnvironmentTelemetry, EvaluationCount, SeenContext, TelemetryBatch } from '@ctff/evaluation';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -10,12 +10,11 @@ import {
   IsObject,
   IsOptional,
   IsString,
-  Matches,
   Max,
   Min,
   ValidateNested,
 } from 'class-validator';
-import { IsOmittable } from '../common/keys.js';
+import { ContextDto } from '../common/context.dto.js';
 
 // The shared telemetry types from @ctff/evaluation, with their validation and OpenAPI descriptions. `implements`
 // keeps them in step.
@@ -29,20 +28,6 @@ const maxSeenContextsListed = 1000;
 export const defaultSeenContextsListed = 100;
 /** The most evaluations one count may report: far beyond any Evaluator's minute, and well inside a 4-byte column. */
 const maxCount = 1_000_000_000;
-
-export class ContextDto implements Context {
-  @ApiProperty({ required: false, description: 'Any non-empty string.', example: 'alice' })
-  @IsOmittable()
-  @IsString()
-  @IsNotEmpty()
-  user_id?: string;
-
-  @ApiProperty({ required: false, description: 'An ISO 3166-1 alpha-2 code, in any case.', example: 'CA' })
-  @IsOmittable()
-  @IsString()
-  @Matches(/^[A-Za-z]{2}$/, { message: 'country must be an ISO 3166-1 alpha-2 code' })
-  country?: string;
-}
 
 export class EvaluationCountDto implements EvaluationCount {
   @ApiProperty({ example: 'rare-bird-alerts' })

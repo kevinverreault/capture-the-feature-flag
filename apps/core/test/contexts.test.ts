@@ -37,16 +37,19 @@ describe('context attributes', () => {
     );
   });
 
-  it('cannot change or delete a built-in context attribute', async () => {
+  it('cannot change or delete a built-in context attribute, nor create a custom one', async () => {
     const before = (await api.get('/context-attributes')).body;
     for (const response of [
       await api.patch('/context-attributes/country', { name: 'Nation' }),
       await api.request('PUT', '/context-attributes/country', { key: 'country', name: 'Nation', type: 'string' }),
       await api.delete('/context-attributes/user_id'),
-      await api.post('/context-attributes', { key: 'plan', name: 'Plan', type: 'string' }),
     ]) {
       expect(response.status).toBe(405);
+      expect(response.body.message).toContain('the built-in ones cannot be edited');
     }
+    const created = await api.post('/context-attributes', { key: 'plan', name: 'Plan', type: 'string' });
+    expect(created.status).toBe(405);
+    expect(created.body.message).toContain('V1 has only the built-in ones');
     expect((await api.get('/context-attributes/country')).status).toBe(404);
     expect((await api.get('/context-attributes')).body).toEqual(before);
   });

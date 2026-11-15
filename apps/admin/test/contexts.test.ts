@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { contextFromQuery, contextLabel, evaluationReasonText, sameContext } from '../src/lib/contexts.js';
+import {
+  contextFromQuery,
+  contextLabel,
+  evaluationReasonText,
+  moreSeenContexts,
+  sameContext,
+  seenContextsShown,
+} from '../src/lib/contexts.js';
 
 describe('evaluationReasonText', () => {
   it('says why each evaluation produced its variation', () => {
@@ -51,5 +58,31 @@ describe('sameContext', () => {
     expect(sameContext({ user_id: 'alice' }, { user_id: 'alice', country: 'CA' })).toBe(false);
     expect(sameContext({ user_id: 'alice' }, { user_id: 'Alice' })).toBe(false);
     expect(sameContext({ user_id: 'alice' }, undefined)).toBe(false);
+  });
+});
+
+describe('seenContextsShown', () => {
+  it('shows the newest 100 seen contexts by default, then 100 more at a time', () => {
+    expect(seenContextsShown(null)).toBe(100);
+    expect(seenContextsShown('200')).toBe(200);
+    expect(seenContextsShown('1000')).toBe(1000);
+  });
+
+  it('rounds what the address asks for up to a whole step, within 100 and the 1,000 Core lists at most', () => {
+    expect(seenContextsShown('150')).toBe(200);
+    expect(seenContextsShown('0')).toBe(100);
+    expect(seenContextsShown('-300')).toBe(100);
+    expect(seenContextsShown('5000')).toBe(1000);
+    expect(seenContextsShown('lots')).toBe(100);
+  });
+});
+
+describe('moreSeenContexts', () => {
+  it('offers 100 more while the list is full, up to the 1,000 Core lists at most', () => {
+    expect(moreSeenContexts(100, 100)).toBe(200);
+    expect(moreSeenContexts(900, 900)).toBe(1000);
+    // Fewer listed than asked for: there are no more.
+    expect(moreSeenContexts(100, 42)).toBeUndefined();
+    expect(moreSeenContexts(1000, 1000)).toBeUndefined();
   });
 });
