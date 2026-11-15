@@ -4,7 +4,7 @@ import { routes } from '../lib/routes';
 
 interface Props {
   project: Project;
-  current: 'dashboard' | 'flags' | 'environments' | 'audit' | 'settings';
+  current: 'dashboard' | 'flags' | 'environments' | 'contexts' | 'audit' | 'settings';
 }
 
 const { project, current } = Astro.props;
@@ -12,6 +12,7 @@ const sections = [
   { id: 'dashboard', text: 'Dashboard', path: routes.project(project.key) },
   { id: 'flags', text: 'Flags', path: routes.flags(project.key) },
   { id: 'environments', text: 'Environments', path: routes.environments(project.key) },
+  { id: 'contexts', text: 'Contexts', path: routes.contexts(project.key) },
   { id: 'audit', text: 'Audit log', path: routes.audit(project.key) },
   { id: 'settings', text: 'Settings', path: routes.settings(project.key) },
 ] as const;

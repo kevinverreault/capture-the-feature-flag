@@ -1138,6 +1138,16 @@
               "default": 100,
               "type": "number"
             }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Only the contexts whose `user_id` contains this text, ignoring case.",
+            "schema": {
+              "example": "alice",
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1326,6 +1336,84 @@
         },
         "tags": [
           "dashboard"
+        ]
+      }
+    },
+    "/api/v1/context-attributes": {
+      "get": {
+        "operationId": "ContextAttributesController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ContextAttributeDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "context-attributes"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/environments/{environmentKey}/evaluate": {
+      "post": {
+        "operationId": "ContextEvaluationController_evaluate",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environmentKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluateContextDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContextEvaluationDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A missing or malformed context."
+          },
+          "404": {
+            "description": "Unknown project or environment."
+          }
+        },
+        "tags": [
+          "contexts"
         ]
       }
     }
@@ -2565,6 +2653,169 @@
         },
         "required": [
           "thresholdDays",
+          "flags"
+        ]
+      },
+      "ContextAttributeType": {
+        "type": "string",
+        "enum": [
+          "string",
+          "country_code"
+        ],
+        "description": "`string`: any non-empty string. `country_code`: an ISO 3166-1 alpha-2 code, compared in uppercase."
+      },
+      "ContextAttributeDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Its name in contexts and rules.",
+            "example": "country"
+          },
+          "name": {
+            "type": "string",
+            "example": "Country"
+          },
+          "type": {
+            "description": "`string`: any non-empty string. `country_code`: an ISO 3166-1 alpha-2 code, compared in uppercase.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContextAttributeType"
+              }
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "builtIn": {
+            "type": "boolean",
+            "description": "Built-in attributes cannot be edited. In V1 every attribute is built in."
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "type",
+          "description",
+          "builtIn"
+        ]
+      },
+      "EvaluateContextDto": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "description": "The context to evaluate every flag for.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContextDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "context"
+        ]
+      },
+      "EvaluationReasonKind": {
+        "type": "string",
+        "enum": [
+          "OFF",
+          "TARGET_MATCH",
+          "RULE_MATCH",
+          "DEFAULT",
+          "FLAG_NOT_FOUND",
+          "ERROR"
+        ]
+      },
+      "EvaluationErrorKind": {
+        "type": "string",
+        "enum": [
+          "MALFORMED_FLAG",
+          "MALFORMED_CONTEXT"
+        ],
+        "description": "For `ERROR`: what went wrong."
+      },
+      "EvaluationReasonDto": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationReasonKind"
+              }
+            ]
+          },
+          "ruleIndex": {
+            "type": "integer",
+            "description": "For `RULE_MATCH`: the index, in the targeting’s ordered rules, of the first rule that matched."
+          },
+          "errorKind": {
+            "description": "For `ERROR`: what went wrong.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationErrorKind"
+              }
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "FlagContextEvaluationDto": {
+        "type": "object",
+        "properties": {
+          "flagKey": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "flagName": {
+            "type": "string",
+            "example": "Rare bird alerts"
+          },
+          "value": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "The variation served; null for an error."
+          },
+          "variationIndex": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Index into the flag variations; null for an error."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/EvaluationReasonDto"
+          }
+        },
+        "required": [
+          "flagKey",
+          "flagName",
+          "value",
+          "variationIndex",
+          "reason"
+        ]
+      },
+      "ContextEvaluationDto": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "description": "The context evaluated, as evaluations see it: `country` in uppercase.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContextDto"
+              }
+            ]
+          },
+          "flags": {
+            "description": "Every flag of the project that is not archived, ordered by flag key.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlagContextEvaluationDto"
+            }
+          }
+        },
+        "required": [
+          "context",
           "flags"
         ]
       }

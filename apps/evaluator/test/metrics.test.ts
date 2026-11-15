@@ -78,6 +78,7 @@ describe('Prometheus metrics', () => {
     await production.variation('no-such-flag', alice, false);
     await development.variation('rare-bird-alerts', alice, true);
     await unknown.variation('rare-bird-alerts', alice, true);
+    await production.allFlags(alice);
 
     const { contentType, samples } = await scrape(evaluator.url);
     expect(contentType).toMatch(/^text\/plain;.*version=0\.0\.4/);
@@ -86,6 +87,8 @@ describe('Prometheus metrics', () => {
     expect(requests({ project_key: 'birdwatch', environment_key: 'production', result: 'DEFAULT' })).toBe(2);
     expect(requests({ project_key: 'birdwatch', environment_key: 'production', result: 'FLAG_NOT_FOUND' })).toBe(1);
     expect(requests({ project_key: 'birdwatch', environment_key: 'development', result: 'OFF' })).toBe(1);
+    // A bulk evaluation answers several reasons at once, so it counts as one BULK request.
+    expect(requests({ project_key: 'birdwatch', environment_key: 'production', result: 'BULK' })).toBe(1);
     // An unknown SDK key names no environment, and the SDK key itself never becomes a label.
     expect(requests({ project_key: '', environment_key: '', result: 'UNKNOWN_SDK_KEY' })).toBe(1);
     expect(requests({ project_key: 'birdwatch', environment_key: 'broken', result: 'NOT_READY' })).toBe(1);
@@ -122,7 +125,9 @@ describe('Prometheus metrics', () => {
         headers: { 'content-type': 'application/json', 'content-length': '100', [sdkKeyHeader]: 'ctff-env-production' },
       });
       abandoned.on('error', () => resolve());
-      abandoned.write('{"context":', () => setTimeout(() => abandoned.destroy(), 100));
+      // The Evaluator's clock starts once its event loop gets to the request, which under load (CI runs test files
+      // in parallel) can be a while after it was sent, so it hangs up well after the 100 ms the check below needs.
+      abandoned.write('{"context":', () => setTimeout(() => abandoned.destroy(), 300));
       abandoned.on('close', () => resolve());
     });
 

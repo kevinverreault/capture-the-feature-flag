@@ -229,6 +229,9 @@ importers:
       '@ctff/core-api-client':
         specifier: workspace:*
         version: link:../../libs/core-api-client
+      '@ctff/evaluation':
+        specifier: workspace:*
+        version: link:../../libs/evaluation
       astro:
         specifier: ^7.4.12
         version: 7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
@@ -364,15 +367,23 @@ importers:
         specifier: ^7.8.2
         version: 7.8.2
     devDependencies:
+      '@ctff/nestjs':
+        specifier: workspace:*
+        version: link:../../libs/nestjs
       '@ctff/sdk':
         specifier: workspace:*
         version: link:../../libs/sdk
+      '@nestjs/testing':
+        specifier: ^11.2.10
+        version: 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@11.2.10)(@nestjs/platform-express@11.2.10)
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
       typescript:
         specifier: ~6.0.3
         version: 6.0.3
+
+  apps/terraform-provider-ctff: {}
 
   libs/core-api-client:
     dependencies:
@@ -400,6 +411,28 @@ importers:
         version: 6.1.13
 
   libs/evaluation: {}
+
+  libs/nestjs:
+    dependencies:
+      '@ctff/sdk':
+        specifier: workspace:*
+        version: link:../sdk
+    devDependencies:
+      '@nestjs/common':
+        specifier: ^11.2.10
+        version: 11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
+      '@nestjs/core':
+        specifier: ^11.2.10
+        version: 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@11.2.10)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
 
   libs/sdk:
     dependencies:
@@ -1616,6 +1649,19 @@ packages:
       class-transformer:
         optional: true
       class-validator:
+        optional: true
+
+  '@nestjs/testing@11.2.10':
+    resolution: {integrity: sha512-7rp2Zs+T5pP55yGDXDBcIP+IBYxI4CglnTi5TXfzfrp1Qr9a15rwov6VVog6OtuP8BYcGvCgvEzb1kqtHoXjfg==}
+    peerDependencies:
+      '@nestjs/common': ^11.0.0
+      '@nestjs/core': ^11.0.0
+      '@nestjs/microservices': ^11.0.0
+      '@nestjs/platform-express': ^11.0.0
+    peerDependenciesMeta:
+      '@nestjs/microservices':
+        optional: true
+      '@nestjs/platform-express':
         optional: true
 
   '@nx/devkit@24.0.6':
@@ -6682,6 +6728,14 @@ snapshots:
     optionalDependencies:
       class-transformer: 0.5.1
       class-validator: 0.15.1
+
+  '@nestjs/testing@11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@11.2.10)(@nestjs/platform-express@11.2.10)':
+    dependencies:
+      '@nestjs/common': 11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
+      '@nestjs/core': 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@11.2.10)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      tslib: 2.8.1
+    optionalDependencies:
+      '@nestjs/platform-express': 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/core@11.2.10)(supports-color@10.2.2)
 
   '@nx/devkit@24.0.6(nx@24.0.6)':
     dependencies:

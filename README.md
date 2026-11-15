@@ -23,7 +23,7 @@ pnpm nx run-many -t lint typecheck test build
 docker compose up
 ```
 
-This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000>, where the [admin app](apps/admin/README.md) opens, and the [Evaluator](apps/evaluator/README.md) on <http://localhost:3001>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>. Applications evaluate flags through the Evaluator with [`@ctff/sdk`](libs/sdk/README.md). The Evaluator serves Prometheus metrics at <http://localhost:3001/metrics>, and [a k6 script](apps/evaluator/README.md#load-testing) measures its latency.
+This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000>, where the [admin app](apps/admin/README.md) opens, and the [Evaluator](apps/evaluator/README.md) on <http://localhost:3001>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>. Applications evaluate flags through the Evaluator with [`@ctff/sdk`](libs/sdk/README.md), or in NestJS with [`@ctff/nestjs`](libs/nestjs/README.md). The Evaluator serves Prometheus metrics at <http://localhost:3001/metrics>, and [a k6 script](apps/evaluator/README.md#load-testing) measures its latency.
 
 To manage flags as code, `docker compose --profile terraform up` also builds the [Terraform provider](apps/terraform-provider-ctff/README.md) and applies its [example configuration](apps/terraform-provider-ctff/examples/birdwatch/main.tf), which declares the Birdwatch project with its environments, flags and targeting.
 

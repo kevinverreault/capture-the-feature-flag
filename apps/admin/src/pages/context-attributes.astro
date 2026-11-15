@@ -1,0 +1,85 @@
+---
+import { type ContextAttribute, unwrap } from '@ctff/core-api-client';
+import Badge from '@ds/components/ui/Badge.astro';
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { coreApi } from '../lib/core';
+import { routes } from '../lib/routes';
+
+/** How each type of context attribute value reads. */
+const typeNames: Record<ContextAttribute['type'], string> = {
+  string: 'String',
+  country_code: 'ISO 3166-1 alpha-2 country code',
+};
+
+const core = coreApi(Astro.locals);
+const [projects, attributes] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  unwrap(core.GET('/api/v1/context-attributes')),
+]);
+---
+
+<AdminLayout title="Context attributes" projects={projects}>
+  <section aria-labelledby="context-attributes-heading" class="context-attributes-page">
+    <h1 id="context-attributes-heading" class="ff-serif text-2xl">Context attributes</h1>
+    <p>
+      The attributes a context carries when a flag is evaluated for it, which rules test. They are the same in every
+      project. The built-in ones cannot be edited.
+    </p>
+    <div class="data-table-root">
+      <table class="data-table context-attributes">
+        <caption>Every context attribute</caption>
+        <thead>
+          <tr>
+            <th scope="col">Attribute</th>
+            <th scope="col">Type</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            attributes.map((attribute) => (
+              <tr data-attribute={attribute.key}>
+                <th scope="row">
+                  <span class="attribute-name">
+                    <strong>{attribute.name}</strong>
+                    {attribute.builtIn && <Badge variant="muted">Built-in</Badge>}
+                  </span>
+                  <code>{attribute.key}</code>
+                </th>
+                <td>{typeNames[attribute.type]}</td>
+                <td>{attribute.description}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">
+      See what each flag serves a context in a project's <em>Contexts</em> section, or start from
+      <a href={routes.projects()}>the projects</a>.
+    </p>
+  </section>
+</AdminLayout>
+
+<style>
+  .context-attributes-page {
+    display: grid;
+    gap: var(--space-sm);
+  }
+
+  h1,
+  p {
+    margin: 0;
+  }
+
+  .attribute-name {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
+  }
+
+  .hint {
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+</style>
