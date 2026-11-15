@@ -54,7 +54,17 @@
       },
       "post": {
         "operationId": "ProjectsController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -121,6 +131,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -156,6 +175,15 @@
             "name": "projectKey",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -210,6 +238,15 @@
             "name": "projectKey",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -297,6 +334,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -340,6 +386,15 @@
             "name": "environmentKey",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -394,6 +449,15 @@
             "name": "projectKey",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -484,6 +548,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -530,6 +603,15 @@
             "name": "flagKey",
             "required": true,
             "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -657,6 +739,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-CTFF-Actor",
+            "in": "header",
+            "description": "Who makes the change, recorded in its audit entry: a display name (percent-encoded UTF-8 for non-ASCII text), or \"terraform\". Defaults to \"anonymous\".",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -769,6 +860,67 @@
         },
         "tags": [
           "evaluator"
+        ]
+      }
+    },
+    "/api/v1/audit-entries": {
+      "get": {
+        "operationId": "AuditController_list",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": false,
+            "in": "query",
+            "description": "Only the entries of this project.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": false,
+            "in": "query",
+            "description": "Only the entries of this flag of the project (projectKey is required), including its targeting's.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "The nextCursor of the previous page: only entries older than it.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many entries to return at most.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest first, a page at a time: pass nextCursor as cursor to get the next (older) page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntryPageDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "audit"
         ]
       }
     }
@@ -1425,6 +1577,122 @@
           "projectKey",
           "environmentKey",
           "flags"
+        ]
+      },
+      "AuditTargetType": {
+        "type": "string",
+        "enum": [
+          "project",
+          "environment",
+          "flag",
+          "targeting"
+        ]
+      },
+      "AuditAction": {
+        "type": "string",
+        "enum": [
+          "create",
+          "update",
+          "archive",
+          "restore",
+          "delete"
+        ]
+      },
+      "AuditEntryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "description": "Increases with every entry: a higher id is a later entry."
+          },
+          "projectKey": {
+            "type": "string",
+            "example": "birdwatch"
+          },
+          "targetType": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuditTargetType"
+              }
+            ]
+          },
+          "targetId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The id of the project, environment, flag or targeting changed."
+          },
+          "flagKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "The flag of a flag or targeting entry."
+          },
+          "environmentKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "The environment of an environment or targeting entry."
+          },
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AuditAction"
+              }
+            ]
+          },
+          "actor": {
+            "type": "string",
+            "description": "Who made the change, from the X-CTFF-Actor header.",
+            "example": "anonymous"
+          },
+          "before": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "The target before the change; null for a create."
+          },
+          "after": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "The target after the change; null for a delete."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "projectKey",
+          "targetType",
+          "targetId",
+          "flagKey",
+          "environmentKey",
+          "action",
+          "actor",
+          "before",
+          "after",
+          "createdAt"
+        ]
+      },
+      "AuditEntryPageDto": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "description": "Newest first.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditEntryDto"
+            }
+          },
+          "nextCursor": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The cursor of the next (older) page, or null when this is the last one."
+          }
+        },
+        "required": [
+          "entries",
+          "nextCursor"
         ]
       }
     }

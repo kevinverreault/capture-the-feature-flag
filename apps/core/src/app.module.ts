@@ -2,6 +2,7 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import type { Logger } from 'pino';
 import type { CoreConfig } from './config.js';
+import { AuditModule } from './audit/audit.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EnvironmentsModule } from './environments/environments.module.js';
 import { EvaluatorModule } from './evaluator/evaluator.module.js';
@@ -25,6 +26,7 @@ export class AppModule {
         FlagsModule,
         TargetingModule,
         EvaluatorModule,
+        AuditModule,
       ],
       controllers: [HealthController],
     };

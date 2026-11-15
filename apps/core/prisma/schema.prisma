@@ -83,3 +83,47 @@ model Targeting {
   @@index([environmentId])
   @@map("targeting")
 }
+
+/// What an audit entry is about.
+enum AuditTargetType {
+  project
+  environment
+  flag
+  targeting
+}
+
+/// What was done to an audit entry's target.
+enum AuditAction {
+  create
+  update
+  archive
+  restore
+  delete
+}
+
+/// A record of one change to a project, environment, flag or targeting: who made it, when, and what changed.
+/// Entries outlive what they are about, so the ids and keys are copied in, not foreign keys.
+model AuditEntry {
+  /// Increases with every entry, so it orders entries newest first and serves as the pagination cursor.
+  id             Int             @id @default(autoincrement())
+  projectId      String          @map("project_id") @db.Uuid
+  projectKey     String          @map("project_key")
+  targetType     AuditTargetType @map("target_type")
+  /// The id of the project, environment, flag or targeting row the entry is about.
+  targetId       String          @map("target_id") @db.Uuid
+  /// The flag of a flag or targeting entry, so a flag's history includes its targeting.
+  flagId         String?         @map("flag_id") @db.Uuid
+  flagKey        String?         @map("flag_key")
+  /// The environment of an environment or targeting entry.
+  environmentKey String?         @map("environment_key")
+  action         AuditAction
+  actor          String
+  /// The target as it was before the change (null for a create) and after it (null for a delete).
+  before         Json?
+  after          Json?
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([projectId, id])
+  @@index([flagId, id])
+  @@map("audit_entries")
+}

@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { recordAudit, targetingState } from '../audit/audit-entry.js';
 import { updateAtVersion } from '../common/persistence.js';
+import { lockRow } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { FlagsService } from '../flags/flags.service.js';
@@ -40,18 +42,34 @@ export class TargetingService {
     flagKey: string,
     environmentKey: string,
     input: UpdateTargetingDto,
+    actor: string,
   ): Promise<TargetingDto> {
-    const { flag, environment, targeting } = await this.find(projectKey, flagKey, environmentKey);
-    await updateAtVersion(
-      () =>
-        this.prisma.targeting.updateMany({
-          where: { id: targeting.id, version: input.version },
-          data: { on: input.on, version: { increment: 1 } },
-        }),
-      `Targeting of ${flagKey} in ${environmentKey}`,
-      input.version,
-    );
-    const updated = await this.prisma.targeting.findUniqueOrThrow({ where: { id: targeting.id } });
+    const { project, flag, environment, targeting: found } = await this.find(projectKey, flagKey, environmentKey);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (!(await lockRow(tx, 'targeting', found.id))) throw targetingNotFound(flagKey, environmentKey);
+      const targeting = await tx.targeting.findUniqueOrThrow({ where: { id: found.id } });
+      await updateAtVersion(
+        () =>
+          tx.targeting.updateMany({
+            where: { id: targeting.id, version: input.version },
+            data: { on: input.on, version: { increment: 1 } },
+          }),
+        `Targeting of ${flagKey} in ${environmentKey}`,
+        input.version,
+      );
+      const updated = await tx.targeting.findUniqueOrThrow({ where: { id: targeting.id } });
+      await recordAudit(
+        tx,
+        { type: 'targeting', project, flag, environment, targeting: updated },
+        {
+          action: 'update',
+          actor,
+          before: targetingState(targeting),
+          after: targetingState(updated),
+        },
+      );
+      return updated;
+    });
     return toTargetingDto(flag, environment, updated);
   }
 
@@ -62,9 +80,13 @@ export class TargetingService {
     const targeting = await this.prisma.targeting.findUnique({
       where: { flagId_environmentId: { flagId: flag.id, environmentId: environment.id } },
     });
-    if (!targeting) throw new NotFoundException(`Flag ${flagKey} has no targeting in ${environmentKey}`);
-    return { flag, environment, targeting };
+    if (!targeting) throw targetingNotFound(flagKey, environmentKey);
+    return { project, flag, environment, targeting };
   }
+}
+
+function targetingNotFound(flagKey: string, environmentKey: string): NotFoundException {
+  return new NotFoundException(`Flag ${flagKey} has no targeting in ${environmentKey}`);
 }
 
 function toTargetingDto(flag: Flag, environment: Environment, targeting: Targeting): TargetingDto {
