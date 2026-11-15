@@ -4,7 +4,7 @@ import { CORE_CONFIG, type CoreConfig } from '../config.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { SettingsDto } from '../settings/settings.dto.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { trimSeenContexts } from './seen-context-cap.js';
+import { lockSeenContexts, trimSeenContexts } from './seen-context-cap.js';
 
 const day = 24 * 60 * 60_000;
 
@@ -58,7 +58,14 @@ export class RetentionService implements OnApplicationBootstrap, OnApplicationSh
       const expired = await this.prisma.seenContext.deleteMany({
         where: { lastSeen: { lt: new Date(now - seenContextRetentionDays * day) } },
       });
-      const overCap = await trimSeenContexts(this.prisma, seenContextCap);
+      // One environment at a time, under the lock ingestion takes, so the two never deadlock.
+      let overCap = 0;
+      for (const { id } of await this.prisma.environment.findMany({ select: { id: true } })) {
+        overCap += await this.prisma.$transaction(async (tx) => {
+          await lockSeenContexts(tx, [id]);
+          return trimSeenContexts(tx, seenContextCap, id);
+        });
+      }
       if (counts.count + expired.count + overCap > 0) {
         this.logger.info(
           { countBuckets: counts.count, seenContexts: expired.count + overCap },

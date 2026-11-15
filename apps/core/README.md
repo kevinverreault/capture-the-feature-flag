@@ -45,18 +45,22 @@ Admin requests are logged as JSON with Core's logger (each request, and every pa
 
 Projects, environments and flags are addressed by their keys, which are lowercase kebab-case and immutable. An update body may repeat the current key (or SDK key), but any other value gets `400`:
 
-| Path                                                      | Methods                   |
-| :-------------------------------------------------------- | :------------------------ |
-| `/api/v1/projects`                                        | `GET`, `POST`             |
-| `/api/v1/projects/{project}`                              | `GET`, `PATCH`, `DELETE`  |
-| `/api/v1/projects/{project}/environments`                 | `GET`, `POST`             |
-| `/api/v1/projects/{project}/environments/{environment}`   | `GET`, `PATCH`, `DELETE`  |
-| `/api/v1/projects/{project}/flags`                        | `GET`, `POST`             |
-| `/api/v1/projects/{project}/flags/{flag}`                 | `GET`, `PATCH`, `DELETE`  |
-| `/api/v1/projects/{project}/flags/{flag}/targeting`       | `GET` (every environment) |
-| `/api/v1/projects/{project}/flags/{flag}/targeting/{env}` | `GET`, `PATCH`            |
-| `/api/v1/evaluator/environments`                          | `GET` (for Evaluators)    |
-| `/api/v1/evaluator/snapshot` (header `X-CTFF-SDK-Key`)    | `GET` (for Evaluators)    |
+| Path                                                                  | Methods                   |
+| :-------------------------------------------------------------------- | :------------------------ |
+| `/api/v1/projects`                                                    | `GET`, `POST`             |
+| `/api/v1/projects/{project}`                                          | `GET`, `PATCH`, `DELETE`  |
+| `/api/v1/projects/{project}/environments`                             | `GET`, `POST`             |
+| `/api/v1/projects/{project}/environments/{environment}`               | `GET`, `PATCH`, `DELETE`  |
+| `/api/v1/projects/{project}/flags`                                    | `GET`, `POST`             |
+| `/api/v1/projects/{project}/flags/{flag}`                             | `GET`, `PATCH`, `DELETE`  |
+| `/api/v1/projects/{project}/flags/{flag}/targeting`                   | `GET` (every environment) |
+| `/api/v1/projects/{project}/flags/{flag}/targeting/{env}`             | `GET`, `PATCH`            |
+| `/api/v1/evaluator/environments`                                      | `GET` (for Evaluators)    |
+| `/api/v1/evaluator/snapshot` (header `X-CTFF-SDK-Key`)                | `GET` (for Evaluators)    |
+| `/api/v1/evaluator/telemetry`                                         | `POST` (for Evaluators)   |
+| `/api/v1/projects/{project}/evaluation-counts`                        | `GET`                     |
+| `/api/v1/projects/{project}/environments/{environment}/seen-contexts` | `GET`                     |
+| `/api/v1/settings`                                                    | `GET`, `PATCH`            |
 
 - Each environment gets a generated SDK key (`ctff-env-…`).
 - `DELETE` on a flag deletes it outright for now; archiving, and deleting only archived flags, come with #11.

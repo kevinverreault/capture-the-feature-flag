@@ -11,6 +11,7 @@ import {
   IsOptional,
   IsString,
   Matches,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -21,6 +22,8 @@ import { IsOmittable } from '../common/keys.js';
 
 /** Bounds each list in a batch, so one request can't hold the database for long. */
 const maxEntries = 100_000;
+/** The most evaluations one count may report: far beyond any Evaluator's minute, and well inside a 4-byte column. */
+const maxCount = 1_000_000_000;
 
 export class ContextDto implements Context {
   @ApiProperty({ required: false, description: 'Any non-empty string.', example: 'alice' })
@@ -51,9 +54,10 @@ export class EvaluationCountDto implements EvaluationCount {
   @IsISO8601({ strict: true })
   minute!: string;
 
-  @ApiProperty({ minimum: 1, type: 'integer' })
+  @ApiProperty({ minimum: 1, maximum: maxCount, type: 'integer' })
   @IsInt()
   @Min(1)
+  @Max(maxCount)
   count!: number;
 }
 

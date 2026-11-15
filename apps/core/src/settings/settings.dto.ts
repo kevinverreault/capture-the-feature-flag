@@ -3,7 +3,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsInt, Max, Min } from 'class-validator';
 import { IsOmittable } from '../common/keys.js';
 
-/** The bounds of each setting, which the API enforces and the admin app shows. */
+/** The bounds of each setting, which the API enforces (and publishes in the OpenAPI document). */
 export const settingsBounds = {
   metricRetentionDays: { min: 1, max: 3650 },
   seenContextRetentionDays: { min: 1, max: 3650 },

@@ -1,10 +1,10 @@
-import { normalizeContext } from '@ctff/evaluation';
+import { minuteOf, normalizeContext } from '@ctff/evaluation';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { trimSeenContexts } from './seen-context-cap.js';
+import { lockSeenContexts, trimSeenContexts } from './seen-context-cap.js';
 import type {
   EvaluationCountBucketDto,
   EvaluationCountsQueryDto,
@@ -68,7 +68,8 @@ export class TelemetryService {
       for (const { flagKey, variationIndex, minute, count } of entry.counts) {
         const flag = flags.get(flagKey);
         if (!flag || variationIndex >= (flag.variations as unknown[]).length) continue;
-        const start = new Date(Math.floor(Date.parse(minute) / 60_000) * 60_000).toISOString();
+        // A clock running ahead mustn't make buckets in the future.
+        const start = minuteOf(Math.min(Date.parse(minute), now));
         const key = `${environment.id} ${flag.id} ${variationIndex} ${start}`;
         const row = counts.get(key);
         if (row) row.count += count;
@@ -91,37 +92,48 @@ export class TelemetryService {
     }
 
     // Sorted, so concurrent batches from several Evaluators lock rows in the same order and can't deadlock.
-    const countRows = [...counts.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, row]) => row);
-    if (countRows.length > 0) {
-      await this.prisma.$executeRaw`
-        INSERT INTO evaluation_counts (environment_id, flag_id, variation_index, minute, count)
-        SELECT * FROM unnest(
-          ${countRows.map((row) => row.environmentId)}::uuid[],
-          ${countRows.map((row) => row.flagId)}::uuid[],
-          ${countRows.map((row) => row.variationIndex)}::int[],
-          ${countRows.map((row) => row.minute)}::timestamptz[],
-          ${countRows.map((row) => row.count)}::int[]
-        )
-        ON CONFLICT (environment_id, flag_id, variation_index, minute)
-        DO UPDATE SET count = evaluation_counts.count + EXCLUDED.count`;
-    }
+    const sorted = <T>(rows: Map<string, T>) =>
+      [...rows.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, row]) => row);
+    const countRows = sorted(counts);
+    const seenRows = sorted(seen);
+    const environmentIds = [...new Set(seenRows.map((row) => row.environmentId))];
+    const { seenContextCap } = await this.settings.get();
 
-    const seenRows = [...seen.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, row]) => row);
-    if (seenRows.length > 0) {
-      await this.prisma.$executeRaw`
-        INSERT INTO seen_contexts (id, environment_id, context_key, user_id, country, last_seen)
-        SELECT gen_random_uuid(), * FROM unnest(
-          ${seenRows.map((row) => row.environmentId)}::uuid[],
-          ${seenRows.map((row) => row.contextKey)}::text[],
-          ${seenRows.map((row) => row.userId)}::text[],
-          ${seenRows.map((row) => row.country)}::text[],
-          ${seenRows.map((row) => row.lastSeen)}::timestamptz[]
-        )
-        ON CONFLICT (environment_id, context_key)
-        DO UPDATE SET last_seen = GREATEST(seen_contexts.last_seen, EXCLUDED.last_seen)`;
-      const { seenContextCap } = await this.settings.get();
-      await trimSeenContexts(this.prisma, seenContextCap, [...new Set(seenRows.map((row) => row.environmentId))]);
-    }
+    // One transaction, so a batch is stored whole or not at all. Batches for the same environment wait for each
+    // other's lock, so they get longer than Prisma's default limits to get a connection and to finish.
+    await this.prisma.$transaction(
+      async (tx) => {
+        if (countRows.length > 0) {
+          await tx.$executeRaw`
+          INSERT INTO evaluation_counts (environment_id, flag_id, variation_index, minute, count)
+          SELECT * FROM unnest(
+            ${countRows.map((row) => row.environmentId)}::uuid[],
+            ${countRows.map((row) => row.flagId)}::uuid[],
+            ${countRows.map((row) => row.variationIndex)}::int[],
+            ${countRows.map((row) => row.minute)}::timestamptz[],
+            ${countRows.map((row) => row.count)}::int[]
+          )
+          ON CONFLICT (environment_id, flag_id, variation_index, minute)
+          DO UPDATE SET count = evaluation_counts.count + EXCLUDED.count`;
+        }
+        if (seenRows.length > 0) {
+          await lockSeenContexts(tx, environmentIds);
+          await tx.$executeRaw`
+          INSERT INTO seen_contexts (id, environment_id, context_key, user_id, country, last_seen)
+          SELECT gen_random_uuid(), * FROM unnest(
+            ${seenRows.map((row) => row.environmentId)}::uuid[],
+            ${seenRows.map((row) => row.contextKey)}::text[],
+            ${seenRows.map((row) => row.userId)}::text[],
+            ${seenRows.map((row) => row.country)}::text[],
+            ${seenRows.map((row) => row.lastSeen)}::timestamptz[]
+          )
+          ON CONFLICT (environment_id, context_key)
+          DO UPDATE SET last_seen = GREATEST(seen_contexts.last_seen, EXCLUDED.last_seen)`;
+          for (const environmentId of environmentIds) await trimSeenContexts(tx, seenContextCap, environmentId);
+        }
+      },
+      { maxWait: 10_000, timeout: 30_000 },
+    );
   }
 
   /** The count buckets of a project from `from` (default: 24 hours ago) until `to` (default: now). */

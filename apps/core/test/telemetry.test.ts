@@ -150,6 +150,23 @@ describe('evaluation count ingestion', () => {
     expect((await counts(projectKey)).body).toEqual([]);
   });
 
+  it('counts a minute in the future, from an Evaluator whose clock runs ahead, in the current minute', async () => {
+    const { projectKey, production } = await project(api, ['rare-bird-alerts']);
+    const before = minuteAgo(0);
+    const ahead = new Date(Date.now() + minutes(90)).toISOString();
+    await send(api, {
+      environments: [
+        environment(production, {
+          counts: [{ flagKey: 'rare-bird-alerts', variationIndex: 0, minute: ahead, count: 2 }],
+        }),
+      ],
+    });
+    const after = minuteAgo(0);
+    const stored = (await counts(projectKey, `?to=${encodeURIComponent(ahead)}`)).body;
+    expect(stored).toHaveLength(1);
+    expect([before, after]).toContain(stored[0].minute);
+  });
+
   it('deletes the counts of a flag that is deleted', async () => {
     const { projectKey, production } = await project(api, ['short-lived']);
     await send(api, {
@@ -270,6 +287,34 @@ describe('seen context ingestion', () => {
     }
   });
 
+  it('stores every batch when several Evaluators send to the same environment at once', async () => {
+    const { projectKey, production } = await project(api, ['rare-bird-alerts']);
+    expect((await api.patch('/settings', { seenContextCap: 5 })).status).toBe(200);
+    try {
+      const minute = minuteAgo(0);
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, (_, evaluator) =>
+          send(api, {
+            environments: [
+              environment(production, {
+                counts: [{ flagKey: 'rare-bird-alerts', variationIndex: 0, minute, count: 1 }],
+                seenContexts: Array.from({ length: 20 }, (_, index) => ({
+                  context: { user_id: `u${(evaluator * 7 + index) % 30}` },
+                  lastSeen: at(index * 1000),
+                })),
+              }),
+            ],
+          }),
+        ),
+      );
+      expect(responses.map((response) => response.status)).toEqual(Array(10).fill(204));
+      expect((await api.get(`/projects/${projectKey}/evaluation-counts`)).body[0].count).toBe(10);
+      expect((await seenContexts(projectKey)).body).toHaveLength(5);
+    } finally {
+      await api.patch('/settings', { seenContextCap: 1000 });
+    }
+  });
+
   it('accepts a batch as large as an Evaluator sends at its limits', async () => {
     const { projectKey, production } = await project(api);
     const seen = Array.from({ length: 5000 }, (_, index) => ({
@@ -290,12 +335,15 @@ describe('telemetry retention', () => {
   const seenContexts = (api: ApiClient, projectKey: string) =>
     api.get(`/projects/${projectKey}/environments/production/seen-contexts`);
 
-  async function sendOldAndRecent(api: ApiClient, production: string): Promise<void> {
+  /** Sends telemetry 40 days, 2 days and 5 minutes old, and returns the minutes of the last two buckets. */
+  async function sendOldAndRecent(api: ApiClient, production: string): Promise<{ lapsed: string; recent: string }> {
+    const lapsed = minuteAgo(days(2));
+    const recent = minuteAgo(minutes(5));
     const bucket = (minute: string) => ({ flagKey: 'rare-bird-alerts', variationIndex: 0, minute, count: 1 });
     await send(api, {
       environments: [
         environment(production, {
-          counts: [bucket(minuteAgo(days(40))), bucket(minuteAgo(days(2))), bucket(minuteAgo(minutes(5)))],
+          counts: [bucket(minuteAgo(days(40))), bucket(lapsed), bucket(recent)],
           seenContexts: [
             { context: { user_id: 'gone' }, lastSeen: at(days(40)) },
             { context: { user_id: 'lapsed' }, lastSeen: at(days(2)) },
@@ -304,6 +352,7 @@ describe('telemetry retention', () => {
         }),
       ],
     });
+    return { lapsed, recent };
   }
 
   const minutesOf = async (api: ApiClient, projectKey: string) =>
@@ -316,11 +365,11 @@ describe('telemetry retention', () => {
     try {
       const api = apiClient(core.baseUrl);
       const { projectKey, production } = await project(api);
-      await sendOldAndRecent(api, production);
+      const { lapsed, recent } = await sendOldAndRecent(api, production);
 
       // The defaults keep 30 days.
-      await expect.poll(() => minutesOf(api, projectKey)).toEqual([minuteAgo(days(2)), minuteAgo(minutes(5))]);
-      await expect.poll(() => usersOf(api, projectKey)).toEqual(['recent', 'lapsed']);
+      await expect.poll(() => minutesOf(api, projectKey), { timeout: 5000 }).toEqual([lapsed, recent]);
+      await expect.poll(() => usersOf(api, projectKey), { timeout: 5000 }).toEqual(['recent', 'lapsed']);
     } finally {
       await core.stop();
     }
@@ -332,7 +381,7 @@ describe('telemetry retention', () => {
     try {
       const api = apiClient(core.baseUrl);
       const { projectKey, production } = await project(api);
-      await sendOldAndRecent(api, production);
+      const { recent } = await sendOldAndRecent(api, production);
       await send(api, {
         environments: [
           environment(production, { seenContexts: [{ context: { user_id: 'newest' }, lastSeen: at(0) }] }),
@@ -343,7 +392,7 @@ describe('telemetry retention', () => {
       expect(await usersOf(api, projectKey)).toEqual(['newest', 'recent', 'lapsed', 'gone']);
 
       await api.patch('/settings', { metricRetentionDays: 1 });
-      expect(await minutesOf(api, projectKey)).toEqual([minuteAgo(minutes(5))]);
+      expect(await minutesOf(api, projectKey)).toEqual([recent]);
       // Every change runs all of retention: the context last seen 40 days ago is past the default 30 days.
       expect(await usersOf(api, projectKey)).toEqual(['newest', 'recent', 'lapsed']);
 

@@ -1,25 +1,30 @@
-import { Prisma } from '../generated/prisma/client.js';
-import type { PrismaService } from '../database/prisma.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
 
 /**
- * Keeps only the `cap` most recently seen contexts of each environment (all of them, or those given), deleting
- * the rest. Ties in last-seen are broken by id, the same order the seen-context list uses.
+ * Takes the lock that serializes writes to an environment's seen contexts until the transaction ends. Ingestion
+ * and retention both take it before they upsert or trim, in the order of the environment ids, so several Core
+ * replicas writing the same environment wait for each other instead of deadlocking.
+ */
+export async function lockSeenContexts(tx: Prisma.TransactionClient, environmentIds: readonly string[]): Promise<void> {
+  for (const environmentId of [...environmentIds].sort()) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`seen_contexts:${environmentId}`}, 0))`;
+  }
+}
+
+/**
+ * Keeps only the `cap` most recently seen contexts of the environment, deleting the rest. Ties in last-seen are
+ * broken by id, the same order the seen-context list uses. Take {@link lockSeenContexts} first.
  */
 export async function trimSeenContexts(
-  prisma: PrismaService,
+  tx: Prisma.TransactionClient,
   cap: number,
-  environmentIds?: readonly string[],
+  environmentId: string,
 ): Promise<number> {
-  const only =
-    environmentIds === undefined
-      ? Prisma.empty
-      : Prisma.sql`WHERE environment_id = ANY(${[...environmentIds]}::uuid[])`;
-  return prisma.$executeRaw`
+  return tx.$executeRaw`
     DELETE FROM seen_contexts WHERE id IN (
-      SELECT id FROM (
-        SELECT id, row_number() OVER (PARTITION BY environment_id ORDER BY last_seen DESC, id ASC) AS rank
-        FROM seen_contexts ${only}
-      ) ranked
-      WHERE rank > ${cap}
+      SELECT id FROM seen_contexts
+      WHERE environment_id = ${environmentId}::uuid
+      ORDER BY last_seen DESC, id ASC
+      OFFSET ${cap}
     )`;
 }

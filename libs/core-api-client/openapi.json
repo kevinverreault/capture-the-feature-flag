@@ -1501,7 +1501,8 @@
           },
           "count": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 1000000000
           }
         },
         "required": [

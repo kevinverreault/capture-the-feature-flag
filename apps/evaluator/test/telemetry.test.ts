@@ -156,9 +156,11 @@ describe('evaluation telemetry', () => {
     core.setAvailable(false);
     await production.variation('rare-bird-alerts', { user_id: 'lost' }, false);
     await expect.poll(() => core.requests.some((request) => request.path === '/api/v1/evaluator/telemetry')).toBe(true);
-    expect(
-      evaluator.logs.some((entry) => entry['msg'] === 'Sending telemetry to Core failed; this batch is dropped'),
-    ).toBe(true);
+    await expect
+      .poll(() =>
+        evaluator.logs.some((entry) => entry['msg'] === 'Sending telemetry to Core failed; this batch is dropped'),
+      )
+      .toBe(true);
 
     core.setAvailable(true);
     expect(await production.variation('rare-bird-alerts', { user_id: 'kept' }, false)).toBe(true);
