@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Flag, Project } from '../generated/prisma/client.js';
 import { projectNotFound, ProjectsService } from '../projects/projects.service.js';
 import { offStateTargeting } from '../targeting/off-state.js';
+import type { FlagListItemDto } from './flag-list.dto.js';
 import type { CreateFlagDto, FlagDto, UpdateFlagDto } from './flags.dto.js';
 import { booleanVariations } from './variations.js';
 
@@ -17,10 +18,23 @@ export class FlagsService {
     private readonly projects: ProjectsService,
   ) {}
 
-  async list(projectKey: string): Promise<FlagDto[]> {
+  /** The project's flags by key, each with its targeting on or off in every environment. */
+  async list(projectKey: string): Promise<FlagListItemDto[]> {
     const project = await this.projects.find(projectKey);
-    const flags = await this.prisma.flag.findMany({ where: { projectId: project.id }, orderBy: { key: 'asc' } });
-    return flags.map((flag) => toFlagDto(project, flag));
+    const flags = await this.prisma.flag.findMany({
+      where: { projectId: project.id },
+      orderBy: { key: 'asc' },
+      include: {
+        targeting: {
+          select: { on: true, environment: { select: { key: true } } },
+          orderBy: { environment: { createdAt: 'asc' } },
+        },
+      },
+    });
+    return flags.map(({ targeting, ...flag }) => ({
+      ...toFlagDto(project, flag),
+      targeting: targeting.map((row) => ({ environmentKey: row.environment.key, on: row.on })),
+    }));
   }
 
   async get(projectKey: string, key: string): Promise<FlagDto> {
@@ -49,6 +63,7 @@ export class FlagsService {
               name: input.name,
               description: input.description ?? '',
               tags: input.tags ?? [],
+              managedBy: input.managedBy ?? null,
               variations: [...booleanVariations],
             },
           });
@@ -79,7 +94,13 @@ export class FlagsService {
       () =>
         this.prisma.flag.updateMany({
           where: { id: flag.id, version: input.version },
-          data: { name: input.name, description: input.description, tags: input.tags, version: { increment: 1 } },
+          data: {
+            name: input.name,
+            description: input.description,
+            tags: input.tags,
+            managedBy: input.managedBy,
+            version: { increment: 1 },
+          },
         }),
       `Flag ${key}`,
       input.version,
@@ -104,6 +125,7 @@ function toFlagDto(project: Project, flag: Flag): FlagDto {
     tags: flag.tags,
     variations: flag.variations as Variation[],
     version: flag.version,
+    managedBy: flag.managedBy,
     createdAt: flag.createdAt,
     updatedAt: flag.updatedAt,
   };

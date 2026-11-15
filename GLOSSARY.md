@@ -36,6 +36,10 @@ _Avoid_: Flag name, flag id
 One of the possible values a flag can serve. A boolean flag has exactly two: `true` and `false`.
 _Avoid_: Value, option, treatment
 
+**Managed by**:
+The marker on a flag naming the tool that manages it as code. In V1 that is `terraform` or nothing. It is informational: the admin app shows a badge and warns before an edit, but nothing is locked.
+_Avoid_: Owner, locked flag
+
 **Archived flag**:
 A flag that has been retired: hidden from the flag list and never served, but still recoverable until permanently deleted.
 _Avoid_: Deleted flag, disabled flag

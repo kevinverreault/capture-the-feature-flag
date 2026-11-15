@@ -370,13 +370,13 @@
         ],
         "responses": {
           "200": {
-            "description": "",
+            "description": "By key, each with its targeting on or off per environment.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/FlagDto"
+                    "$ref": "#/components/schemas/FlagListItemDto"
                   }
                 }
               }
@@ -1112,6 +1112,146 @@
           }
         }
       },
+      "TargetingStateDto": {
+        "type": "object",
+        "properties": {
+          "environmentKey": {
+            "type": "string",
+            "example": "production"
+          },
+          "on": {
+            "type": "boolean",
+            "description": "Targeting on or off. While off, every context gets the off variation."
+          }
+        },
+        "required": [
+          "environmentKey",
+          "on"
+        ]
+      },
+      "FlagListItemDto": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "example": "birdwatch"
+          },
+          "key": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "name": {
+            "type": "string",
+            "example": "Rare bird alerts"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "variations": {
+            "example": [
+              true,
+              false
+            ],
+            "description": "The ordered variations; targeting refers to them by index. Boolean flags are always [true, false].",
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "version": {
+            "type": "number",
+            "description": "Incremented on every edit; send it back with the next edit."
+          },
+          "managedBy": {
+            "type": "string",
+            "enum": [
+              "terraform"
+            ],
+            "nullable": true,
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "targeting": {
+            "description": "The flag's targeting on or off in every environment of the project, in the environments' order.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TargetingStateDto"
+            }
+          }
+        },
+        "required": [
+          "projectKey",
+          "key",
+          "name",
+          "description",
+          "tags",
+          "variations",
+          "version",
+          "managedBy",
+          "createdAt",
+          "updatedAt",
+          "targeting"
+        ]
+      },
+      "CreateFlagDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The flag key: lowercase kebab-case, immutable after creation.",
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "maxLength": 64,
+            "example": "rare-bird-alerts"
+          },
+          "name": {
+            "type": "string",
+            "description": "The flag's display name.",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "What the flag controls."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
+            "example": [
+              "alerts"
+            ],
+            "maxItems": 50
+          },
+          "managedBy": {
+            "type": "string",
+            "nullable": false,
+            "enum": [
+              "terraform"
+            ],
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
       "FlagDto": {
         "type": "object",
         "properties": {
@@ -1151,6 +1291,14 @@
             "type": "number",
             "description": "Incremented on every edit; send it back with the next edit."
           },
+          "managedBy": {
+            "type": "string",
+            "enum": [
+              "terraform"
+            ],
+            "nullable": true,
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -1168,44 +1316,9 @@
           "tags",
           "variations",
           "version",
+          "managedBy",
           "createdAt",
           "updatedAt"
-        ]
-      },
-      "CreateFlagDto": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "string",
-            "description": "The flag key: lowercase kebab-case, immutable after creation.",
-            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
-            "maxLength": 64,
-            "example": "rare-bird-alerts"
-          },
-          "name": {
-            "type": "string",
-            "description": "The flag's display name.",
-            "maxLength": 200
-          },
-          "description": {
-            "type": "string",
-            "maxLength": 2000,
-            "description": "What the flag controls."
-          },
-          "tags": {
-            "example": [
-              "alerts"
-            ],
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "key",
-          "name"
         ]
       },
       "UpdateFlagDto": {
@@ -1230,14 +1343,24 @@
             "description": "What the flag controls."
           },
           "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
             "example": [
               "alerts"
             ],
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "maxItems": 50
+          },
+          "managedBy": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "terraform"
+            ],
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag. Send null to clear it."
           }
         },
         "required": [

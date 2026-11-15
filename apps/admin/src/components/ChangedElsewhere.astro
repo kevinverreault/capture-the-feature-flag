@@ -1,0 +1,31 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import Button from '@ds/components/ui/Button.astro';
+
+interface Props {
+  /** What changed, such as "this flag" or "the targeting in Production". */
+  what: string;
+  /** The page to reload to see the latest version. */
+  reloadHref: string;
+}
+
+const { what, reloadHref } = Astro.props;
+
+// Shown when a save hit 409 because someone else (or Terraform) changed the thing since the page was loaded. The
+// form keeps what the admin submitted, along with the version it was based on, so saving again can't overwrite
+// the other change; reloading shows it.
+---
+
+<Alert variant="warning" icon="triangle-alert" title="Changed elsewhere — reload">
+  <p class="changed-elsewhere">
+    Someone else changed {what} since you loaded this page, so your change was not saved. What you submitted is
+    still below: reload to see the latest version, then make your change again.
+  </p>
+  <Button href={reloadHref} variant="secondary" size="small">Reload</Button>
+</Alert>
+
+<style>
+  .changed-elsewhere {
+    margin: 0 0 var(--space-xs);
+  }
+</style>

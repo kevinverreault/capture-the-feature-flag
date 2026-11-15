@@ -50,6 +50,23 @@ describe('formErrors', () => {
     });
   });
 
+  it('reports a conflict on a change based on a version as a change made elsewhere', () => {
+    const error = new CoreApiError(409, ['Flag rare-bird-alerts has changed since version 3; reload it and try again']);
+    expect(formErrors(error, { fields: ['name'], versioned: true })).toEqual({
+      fields: {},
+      form: [],
+      changedElsewhere: true,
+    });
+  });
+
+  it('reports other errors of a change based on a version as usual', () => {
+    const error = invalid({ name: ['name must not be blank'] });
+    expect(formErrors(error, { fields: ['name'], versioned: true })).toEqual({
+      fields: { name: 'name must not be blank' },
+      form: [],
+    });
+  });
+
   it('shows any other error response on the whole form', () => {
     const error = new CoreApiError(404, ['Project birdwatch not found']);
     expect(formErrors(error, { fields: ['key'], conflictField: 'key' })).toEqual({
