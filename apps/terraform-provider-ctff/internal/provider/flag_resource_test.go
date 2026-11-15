@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -85,15 +86,7 @@ func TestAccFlagResource(t *testing.T) {
 			{
 				// An edit made in the admin app shows up as drift, and applying restores the configuration.
 				PreConfig: func() {
-					ctx := context.Background()
-					flag, err := api.GetFlag(ctx, projectKey, "rare-bird-alerts")
-					if err != nil {
-						t.Fatal(err)
-					}
-					_, err = api.UpdateFlag(ctx, projectKey, "rare-bird-alerts", flag.Version, client.FlagInput{
-						Name: "Renamed by hand", Description: flag.Description, Tags: flag.Tags, ManagedBy: "terraform",
-					})
-					if err != nil {
+					if err := renameFlagByHand(t, projectKey, "rare-bird-alerts", "Renamed by hand"); err != nil {
 						t.Fatal(err)
 					}
 				},
@@ -132,7 +125,7 @@ func TestAccFlagResource_importAdoptsFlag(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = api.DeleteProject(ctx, projectKey) })
 	handmade := flagFixture{key: "photo-id-beta", name: "Photo ID beta"}
-	if err := createUnmanagedFlag(ctx, api, projectKey, handmade); err != nil {
+	if err := createUnmanagedFlag(t, projectKey, handmade); err != nil {
 		t.Fatal(err)
 	}
 
@@ -175,15 +168,24 @@ resource "ctff_flag" "test" {
 }
 
 // createUnmanagedFlag creates a flag the way the admin app does, without a "managed by" marker.
-func createUnmanagedFlag(ctx context.Context, api *client.Client, projectKey string, flag flagFixture) error {
-	_, err := api.CreateFlag(ctx, projectKey, flag.key, client.FlagInput{Name: flag.name})
-	return err
+func createUnmanagedFlag(t *testing.T, projectKey string, flag flagFixture) error {
+	return requestCore(t, "POST", "/projects/"+projectKey+"/flags", map[string]any{"key": flag.key, "name": flag.name}, nil)
+}
+
+// renameFlagByHand edits a flag the way the admin app does, based on its current version.
+func renameFlagByHand(t *testing.T, projectKey, key, name string) error {
+	path := "/projects/" + projectKey + "/flags/" + key
+	var flag client.Flag
+	if err := requestCore(t, "GET", path, nil, &flag); err != nil {
+		return err
+	}
+	return requestCore(t, "PATCH", path, map[string]any{"version": flag.Version, "name": name}, nil)
 }
 
 // checkFlag checks Core holds the flag as configured, marked as managed by Terraform.
 func checkFlag(api *client.Client, projectKey string, want flagFixture) resource.TestCheckFunc {
 	return func(*terraform.State) error {
-		flag, err := api.GetFlag(context.Background(), projectKey, want.key)
+		flag, err := api.GetFlag(context.Background(), client.Ref{ProjectKey: projectKey, Key: want.key})
 		if err != nil {
 			return err
 		}
@@ -205,9 +207,72 @@ func checkFlag(api *client.Client, projectKey string, want flagFixture) resource
 
 func checkFlagGone(api *client.Client, projectKey, key string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
-		if _, err := api.GetFlag(context.Background(), projectKey, key); !client.IsNotFound(err) {
+		if _, err := api.GetFlag(context.Background(), client.Ref{ProjectKey: projectKey, Key: key}); !client.IsNotFound(err) {
 			return fmt.Errorf("flag %s still exists in Core (err: %v)", key, err)
 		}
 		return nil
 	}
+}
+
+// When the flag changes in Core between plan and apply, Core rejects the edit as stale, and so does the apply.
+func TestAccFlagResource_staleVersion(t *testing.T) {
+	projectKey := randomKey("project")
+	flag := flagFixture{key: "new-sighting-form", name: "New sighting form"}
+	renamed := flagFixture{key: "new-sighting-form", name: "Sighting form v2"}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{Config: flagConfig(projectKey, flag)},
+			{
+				Config: flagConfig(projectKey, renamed),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("ctff_flag.test", plancheck.ResourceActionUpdate),
+						// Runs after the plan, before the apply.
+						planCheckFunc(func() error {
+							return renameFlagByHand(t, projectKey, flag.key, "Renamed by hand meanwhile")
+						}),
+					},
+				},
+				ExpectError: regexp.MustCompile(`The flag changed outside Terraform`),
+			},
+		},
+	})
+}
+
+// planCheckFunc runs code between a step's plan and its apply.
+type planCheckFunc func() error
+
+func (f planCheckFunc) CheckPlan(_ context.Context, _ plancheck.CheckPlanRequest, resp *plancheck.CheckPlanResponse) {
+	resp.Error = f()
+}
+
+func TestAccFlagResource_invalidAttributes(t *testing.T) {
+	projectKey := randomKey("project")
+	tooManyTags := make([]string, tagsMaxItems+1)
+	for i := range tooManyTags {
+		tooManyTags[i] = fmt.Sprintf("tag-%d", i)
+	}
+	invalid := []struct {
+		flag  flagFixture
+		error string
+	}{
+		{flagFixture{key: "Rare_Bird_Alerts", name: "Rare bird alerts"}, `lowercase kebab-case flag key`},
+		{flagFixture{key: "rare-bird-alerts", name: "   "}, `must not be blank`},
+		{flagFixture{key: "rare-bird-alerts", name: strings.Repeat("n", nameMaxLength+1)}, `string length must be at most 200`},
+		{flagFixture{key: "rare-bird-alerts", name: "Rare", description: strings.Repeat("d", descriptionMaxLength+1)}, `string length must be at most 2000`},
+		{flagFixture{key: "rare-bird-alerts", name: "Rare", tags: []string{" alerts"}}, `non-blank without leading or trailing spaces`},
+		{flagFixture{key: "rare-bird-alerts", name: "Rare", tags: tooManyTags}, `set must contain at most 50 elements`},
+	}
+	steps := make([]resource.TestStep, len(invalid))
+	for i, c := range invalid {
+		steps[i] = resource.TestStep{
+			Config:   flagConfig(projectKey, c.flag),
+			PlanOnly: true,
+			// Terraform wraps long messages, so any whitespace may separate the words.
+			ExpectError: regexp.MustCompile(strings.ReplaceAll(c.error, " ", `\s+`)),
+		}
+	}
+	resource.Test(t, resource.TestCase{ProtoV6ProviderFactories: protoV6ProviderFactories, Steps: steps})
 }

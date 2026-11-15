@@ -89,13 +89,11 @@ type Flag struct {
 	ManagedBy   *string  `json:"managedBy"`
 }
 
-// FlagInput is the editable part of a flag.
+// FlagInput is the editable part of a flag. The client always marks the flag as managed by Terraform.
 type FlagInput struct {
 	Name        string
 	Description string
 	Tags        []string
-	// ManagedBy is the "managed by" marker to set; empty leaves it as it is (unset on a new flag).
-	ManagedBy string
 }
 
 func (input FlagInput) body() map[string]any {
@@ -103,12 +101,32 @@ func (input FlagInput) body() map[string]any {
 	if tags == nil {
 		tags = []string{}
 	}
-	body := map[string]any{"name": input.Name, "description": input.Description, "tags": tags}
-	if input.ManagedBy != "" {
-		body["managedBy"] = input.ManagedBy
-	}
-	return body
+	return map[string]any{"name": input.Name, "description": input.Description, "tags": tags, "managedBy": ManagedBy}
 }
+
+// Ref addresses an environment or a flag: the key of its project and its own key.
+type Ref struct {
+	ProjectKey string
+	Key        string
+}
+
+// ID is the Terraform resource ID of what the ref addresses, and its import ID: "<project key>/<key>".
+func (r Ref) ID() string { return r.ProjectKey + "/" + r.Key }
+
+// ParseRef parses an ID made by Ref.ID.
+func ParseRef(id string) (Ref, error) {
+	projectKey, key, ok := strings.Cut(id, "/")
+	if !ok || projectKey == "" || key == "" || strings.Contains(key, "/") {
+		return Ref{}, fmt.Errorf("expected <project key>/<key>, got %q", id)
+	}
+	return Ref{ProjectKey: projectKey, Key: key}, nil
+}
+
+// Ref addresses the environment.
+func (e *Environment) Ref() Ref { return Ref{ProjectKey: e.ProjectKey, Key: e.Key} }
+
+// Ref addresses the flag.
+func (f *Flag) Ref() Ref { return Ref{ProjectKey: f.ProjectKey, Key: f.Key} }
 
 func (c *Client) GetProject(ctx context.Context, key string) (*Project, error) {
 	var out Project
@@ -130,62 +148,63 @@ func (c *Client) DeleteProject(ctx context.Context, key string) error {
 	return c.do(ctx, http.MethodDelete, projectPath(key), nil, nil)
 }
 
-func (c *Client) GetEnvironment(ctx context.Context, projectKey, key string) (*Environment, error) {
+func (c *Client) GetEnvironment(ctx context.Context, ref Ref) (*Environment, error) {
 	var out Environment
-	return &out, c.do(ctx, http.MethodGet, environmentPath(projectKey, key), nil, &out)
+	return &out, c.do(ctx, http.MethodGet, environmentPath(ref), nil, &out)
 }
 
 // CreateEnvironment creates the environment; Core generates its SDK key.
-func (c *Client) CreateEnvironment(ctx context.Context, projectKey, key, name string) (*Environment, error) {
+func (c *Client) CreateEnvironment(ctx context.Context, ref Ref, name string) (*Environment, error) {
 	var out Environment
-	body := map[string]any{"key": key, "name": name}
-	return &out, c.do(ctx, http.MethodPost, projectPath(projectKey)+"/environments", body, &out)
+	body := map[string]any{"key": ref.Key, "name": name}
+	return &out, c.do(ctx, http.MethodPost, projectPath(ref.ProjectKey)+"/environments", body, &out)
 }
 
-func (c *Client) UpdateEnvironment(ctx context.Context, projectKey, key, name string) (*Environment, error) {
+func (c *Client) UpdateEnvironment(ctx context.Context, ref Ref, name string) (*Environment, error) {
 	var out Environment
-	return &out, c.do(ctx, http.MethodPatch, environmentPath(projectKey, key), map[string]any{"name": name}, &out)
+	return &out, c.do(ctx, http.MethodPatch, environmentPath(ref), map[string]any{"name": name}, &out)
 }
 
 // DeleteEnvironment deletes the environment with the targeting of every flag in it.
-func (c *Client) DeleteEnvironment(ctx context.Context, projectKey, key string) error {
-	return c.do(ctx, http.MethodDelete, environmentPath(projectKey, key), nil, nil)
+func (c *Client) DeleteEnvironment(ctx context.Context, ref Ref) error {
+	return c.do(ctx, http.MethodDelete, environmentPath(ref), nil, nil)
 }
 
-func (c *Client) GetFlag(ctx context.Context, projectKey, key string) (*Flag, error) {
+func (c *Client) GetFlag(ctx context.Context, ref Ref) (*Flag, error) {
 	var out Flag
-	return &out, c.do(ctx, http.MethodGet, flagPath(projectKey, key), nil, &out)
+	return &out, c.do(ctx, http.MethodGet, flagPath(ref), nil, &out)
 }
 
-// CreateFlag creates the flag; Core gives it off-state targeting in every environment.
-func (c *Client) CreateFlag(ctx context.Context, projectKey, key string, input FlagInput) (*Flag, error) {
+// CreateFlag creates the flag, managed by Terraform; Core gives it off-state targeting in every environment.
+func (c *Client) CreateFlag(ctx context.Context, ref Ref, input FlagInput) (*Flag, error) {
 	var out Flag
 	body := input.body()
-	body["key"] = key
-	return &out, c.do(ctx, http.MethodPost, projectPath(projectKey)+"/flags", body, &out)
+	body["key"] = ref.Key
+	return &out, c.do(ctx, http.MethodPost, projectPath(ref.ProjectKey)+"/flags", body, &out)
 }
 
-// UpdateFlag edits the flag based on version; Core rejects a stale version with 409.
-func (c *Client) UpdateFlag(ctx context.Context, projectKey, key string, version int64, input FlagInput) (*Flag, error) {
+// UpdateFlag edits the flag based on version, marking it as managed by Terraform; Core rejects a stale version
+// with 409.
+func (c *Client) UpdateFlag(ctx context.Context, ref Ref, version int64, input FlagInput) (*Flag, error) {
 	var out Flag
 	body := input.body()
 	body["version"] = version
-	return &out, c.do(ctx, http.MethodPatch, flagPath(projectKey, key), body, &out)
+	return &out, c.do(ctx, http.MethodPatch, flagPath(ref), body, &out)
 }
 
 // DeleteFlag deletes the flag with its targeting in every environment.
-func (c *Client) DeleteFlag(ctx context.Context, projectKey, key string) error {
-	return c.do(ctx, http.MethodDelete, flagPath(projectKey, key), nil, nil)
+func (c *Client) DeleteFlag(ctx context.Context, ref Ref) error {
+	return c.do(ctx, http.MethodDelete, flagPath(ref), nil, nil)
 }
 
 func projectPath(key string) string { return "/projects/" + url.PathEscape(key) }
 
-func environmentPath(projectKey, key string) string {
-	return projectPath(projectKey) + "/environments/" + url.PathEscape(key)
+func environmentPath(ref Ref) string {
+	return projectPath(ref.ProjectKey) + "/environments/" + url.PathEscape(ref.Key)
 }
 
-func flagPath(projectKey, key string) string {
-	return projectPath(projectKey) + "/flags/" + url.PathEscape(key)
+func flagPath(ref Ref) string {
+	return projectPath(ref.ProjectKey) + "/flags/" + url.PathEscape(ref.Key)
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body, out any) error {

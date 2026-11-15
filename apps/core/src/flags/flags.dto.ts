@@ -16,6 +16,7 @@ import {
 import { ImmutableKey, IsKey, IsName, IsOmittable } from '../common/keys.js';
 
 const tagPattern = /^\S(?:.*\S)?$/;
+const tagMaxLength = 64;
 
 function IsDescription(): PropertyDecorator {
   return applyDecorators(
@@ -28,18 +29,24 @@ function IsDescription(): PropertyDecorator {
 
 function IsTags(): PropertyDecorator {
   return applyDecorators(
-    ApiProperty({ required: false, type: [String], example: ['alerts'], maxItems: 50 }),
+    ApiProperty({
+      required: false,
+      type: 'array',
+      items: { type: 'string', maxLength: tagMaxLength, pattern: tagPattern.source },
+      example: ['alerts'],
+      maxItems: 50,
+    }),
     IsOmittable(),
     IsArray(),
     ArrayMaxSize(50),
     ArrayUnique(),
     IsString({ each: true }),
-    MaxLength(64, { each: true }),
+    MaxLength(tagMaxLength, { each: true }),
     Matches(tagPattern, { each: true, message: 'tags must be non-blank without leading or trailing spaces' }),
   );
 }
 
-/** The tools that can mark a flag as managed by them. V1 has one: the Terraform provider. */
+/** The tools that can mark a flag as managed by them: the values of the ManagedBy enum in schema.prisma. */
 export const managedByValues = ['terraform'] as const;
 export type ManagedBy = (typeof managedByValues)[number];
 

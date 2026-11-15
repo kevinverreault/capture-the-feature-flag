@@ -2,16 +2,20 @@ package provider
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"testing"
@@ -213,6 +217,43 @@ func testAPI(t *testing.T) *client.Client {
 		t.Fatal(err)
 	}
 	return c
+}
+
+// requestCore calls Core's API without the provider's client, as the admin app or another tool would: without
+// X-CTFF-Actor or a "managed by" marker. A non-nil out receives the JSON response.
+func requestCore(t *testing.T, method, path string, body, out any) error {
+	t.Helper()
+	var reader io.Reader
+	if body != nil {
+		encoded, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		reader = bytes.NewReader(encoded)
+	}
+	req, err := http.NewRequest(method, strings.TrimRight(os.Getenv(BaseURLEnv), "/")+"/api/v1"+path, reader)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 300 {
+		return fmt.Errorf("%s %s: %d: %s", method, path, resp.StatusCode, payload)
+	}
+	if out != nil {
+		return json.Unmarshal(payload, out)
+	}
+	return nil
 }
 
 // randomKey is a key unique to this run, so tests sharing a Core don't collide.

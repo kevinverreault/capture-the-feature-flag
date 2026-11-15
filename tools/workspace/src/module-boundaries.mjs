@@ -26,6 +26,10 @@ export const depConstraints = [
   // Only Core owns the database, so only Core may use Prisma. Nothing else may depend on Core either, which
   // also keeps Prisma from leaking through it: the admin app (ADR 0003), Evaluators (ADR 0001) and the rest
   // talk to Core over HTTP.
+  //
+  // One recorded exception: the Terraform provider (Go, so outside these lint rules) declares an Nx
+  // implicitDependency on Core. It imports nothing from Core and calls it only over HTTP; the edge exists so its
+  // acceptance tests run against Core's build, and re-run in `nx affected` when Core changes.
   {
     sourceTag: '/^scope:(?!core$)/',
     notDependOnLibsWithTags: ['scope:core'],

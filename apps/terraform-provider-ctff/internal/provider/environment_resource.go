@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
@@ -85,7 +84,7 @@ func (r *environmentResource) Create(ctx context.Context, req resource.CreateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	environment, err := r.client.CreateEnvironment(ctx, plan.ProjectKey.ValueString(), plan.Key.ValueString(), plan.Name.ValueString())
+	environment, err := r.client.CreateEnvironment(ctx, plan.ref(), plan.Name.ValueString())
 	if err != nil {
 		apiError(&resp.Diagnostics, "create the environment", err)
 		return
@@ -99,7 +98,7 @@ func (r *environmentResource) Read(ctx context.Context, req resource.ReadRequest
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	environment, err := r.client.GetEnvironment(ctx, state.ProjectKey.ValueString(), state.Key.ValueString())
+	environment, err := r.client.GetEnvironment(ctx, state.ref())
 	if client.IsNotFound(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -117,7 +116,7 @@ func (r *environmentResource) Update(ctx context.Context, req resource.UpdateReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	environment, err := r.client.UpdateEnvironment(ctx, plan.ProjectKey.ValueString(), plan.Key.ValueString(), plan.Name.ValueString())
+	environment, err := r.client.UpdateEnvironment(ctx, plan.ref(), plan.Name.ValueString())
 	if err != nil {
 		apiError(&resp.Diagnostics, "update the environment", err)
 		return
@@ -131,7 +130,7 @@ func (r *environmentResource) Delete(ctx context.Context, req resource.DeleteReq
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	err := r.client.DeleteEnvironment(ctx, state.ProjectKey.ValueString(), state.Key.ValueString())
+	err := r.client.DeleteEnvironment(ctx, state.ref())
 	if err != nil && !client.IsNotFound(err) {
 		apiError(&resp.Diagnostics, "delete the environment", err)
 	}
@@ -139,17 +138,16 @@ func (r *environmentResource) Delete(ctx context.Context, req resource.DeleteReq
 
 // ImportState imports an environment as <project key>/<environment key>.
 func (r *environmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	projectKey, key, ok := splitImportID(req.ID, "environment", &resp.Diagnostics)
-	if !ok {
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), projectKey)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key"), key)...)
+	importRef(ctx, req, resp)
+}
+
+func (m environmentModel) ref() client.Ref {
+	return client.Ref{ProjectKey: m.ProjectKey.ValueString(), Key: m.Key.ValueString()}
 }
 
 func toEnvironmentModel(environment *client.Environment) environmentModel {
 	return environmentModel{
-		ID:         types.StringValue(environment.ProjectKey + "/" + environment.Key),
+		ID:         types.StringValue(environment.Ref().ID()),
 		ProjectKey: types.StringValue(environment.ProjectKey),
 		Key:        types.StringValue(environment.Key),
 		Name:       types.StringValue(environment.Name),

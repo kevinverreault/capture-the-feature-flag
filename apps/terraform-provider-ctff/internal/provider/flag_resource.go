@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"sort"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/setvalidator"
@@ -52,8 +51,6 @@ func (r *flagResource) Metadata(_ context.Context, req resource.MetadataRequest,
 	resp.TypeName = req.ProviderTypeName + "_flag"
 }
 
-var tagPattern = regexp.MustCompile(`^\S(?:.*\S)?$`)
-
 func (r *flagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	resp.Schema = schema.Schema{
 		Description: "A boolean flag of a project, stored as the variations [true, false]. Creating it gives it " +
@@ -88,7 +85,7 @@ func (r *flagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Optional:    true,
 				Computed:    true,
 				Default:     stringdefault.StaticString(""),
-				Validators:  []validator.String{stringvalidator.LengthAtMost(2000)},
+				Validators:  []validator.String{stringvalidator.LengthAtMost(descriptionMaxLength)},
 			},
 			"tags": schema.SetAttribute{
 				Description: "Tags for finding the flag. Defaults to none.",
@@ -97,9 +94,9 @@ func (r *flagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 				Computed:    true,
 				Default:     setdefault.StaticValue(types.SetValueMust(types.StringType, []attr.Value{})),
 				Validators: []validator.Set{
-					setvalidator.SizeAtMost(50),
+					setvalidator.SizeAtMost(tagsMaxItems),
 					setvalidator.ValueStringsAre(
-						stringvalidator.LengthAtMost(64),
+						stringvalidator.LengthAtMost(tagMaxLength),
 						stringvalidator.RegexMatches(tagPattern, "must be non-blank without leading or trailing spaces"),
 					),
 				},
@@ -150,7 +147,7 @@ func (r *flagResource) Create(ctx context.Context, req resource.CreateRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	flag, err := r.client.CreateFlag(ctx, plan.ProjectKey.ValueString(), plan.Key.ValueString(), input)
+	flag, err := r.client.CreateFlag(ctx, plan.ref(), input)
 	if err != nil {
 		apiError(&resp.Diagnostics, "create the flag", err)
 		return
@@ -164,7 +161,7 @@ func (r *flagResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	flag, err := r.client.GetFlag(ctx, state.ProjectKey.ValueString(), state.Key.ValueString())
+	flag, err := r.client.GetFlag(ctx, state.ref())
 	if client.IsNotFound(err) {
 		resp.State.RemoveResource(ctx)
 		return
@@ -189,7 +186,7 @@ func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		return
 	}
 	// The edit is based on the version Terraform last read; Core rejects it if the flag changed since.
-	flag, err := r.client.UpdateFlag(ctx, plan.ProjectKey.ValueString(), plan.Key.ValueString(), state.Version.ValueInt64(), input)
+	flag, err := r.client.UpdateFlag(ctx, plan.ref(), state.Version.ValueInt64(), input)
 	if client.IsConflict(err) {
 		resp.Diagnostics.AddError("The flag changed outside Terraform",
 			fmt.Sprintf("%s\n\nIt was edited after Terraform read it. Run terraform plan again to see the change, then apply.", err))
@@ -208,7 +205,7 @@ func (r *flagResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	err := r.client.DeleteFlag(ctx, state.ProjectKey.ValueString(), state.Key.ValueString())
+	err := r.client.DeleteFlag(ctx, state.ref())
 	if err != nil && !client.IsNotFound(err) {
 		apiError(&resp.Diagnostics, "delete the flag", err)
 	}
@@ -216,12 +213,11 @@ func (r *flagResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 
 // ImportState imports a flag as <project key>/<flag key>. The next apply marks it as managed by Terraform.
 func (r *flagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	projectKey, key, ok := splitImportID(req.ID, "flag", &resp.Diagnostics)
-	if !ok {
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), projectKey)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key"), key)...)
+	importRef(ctx, req, resp)
+}
+
+func (m flagModel) ref() client.Ref {
+	return client.Ref{ProjectKey: m.ProjectKey.ValueString(), Key: m.Key.ValueString()}
 }
 
 // setFlagState records the flag as Core returned it. Tags are a set, so their order in Core doesn't matter.
@@ -238,7 +234,7 @@ func setFlagState(ctx context.Context, state *tfsdk.State, diags *diag.Diagnosti
 		managedBy = *flag.ManagedBy
 	}
 	diags.Append(state.Set(ctx, flagModel{
-		ID:          types.StringValue(flag.ProjectKey + "/" + flag.Key),
+		ID:          types.StringValue(flag.Ref().ID()),
 		ProjectKey:  types.StringValue(flag.ProjectKey),
 		Key:         types.StringValue(flag.Key),
 		Name:        types.StringValue(flag.Name),
@@ -257,7 +253,6 @@ func flagInput(ctx context.Context, plan flagModel) (client.FlagInput, diag.Diag
 		Name:        plan.Name.ValueString(),
 		Description: plan.Description.ValueString(),
 		Tags:        tags,
-		ManagedBy:   client.ManagedBy,
 	}, diags
 }
 

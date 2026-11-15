@@ -19,18 +19,37 @@
     ],
     "targets": {
       "lint": {
-        "dependsOn": []
+        "dependsOn": [],
+        "inputs": [
+          "default",
+          {
+            "runtime": "go version"
+          }
+        ]
       },
       "typecheck": {
-        "dependsOn": []
+        "dependsOn": [],
+        "inputs": [
+          "default",
+          {
+            "runtime": "go version"
+          }
+        ]
       },
       "build": {
-        "dependsOn": []
+        "dependsOn": [],
+        "inputs": [
+          "production",
+          {
+            "runtime": "go version"
+          }
+        ]
       },
       "test": {
         "dependsOn": [
           "^build"
-        ]
+        ],
+        "cache": false
       }
     }
   }

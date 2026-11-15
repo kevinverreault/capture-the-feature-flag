@@ -7,7 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Flag, Project } from '../generated/prisma/client.js';
 import { projectNotFound, ProjectsService } from '../projects/projects.service.js';
 import { offStateTargeting } from '../targeting/off-state.js';
-import type { CreateFlagDto, FlagDto, ManagedBy, UpdateFlagDto } from './flags.dto.js';
+import type { CreateFlagDto, FlagDto, UpdateFlagDto } from './flags.dto.js';
 import { booleanVariations } from './variations.js';
 
 @Injectable()
@@ -111,8 +111,7 @@ function toFlagDto(project: Project, flag: Flag): FlagDto {
     tags: flag.tags,
     variations: flag.variations as Variation[],
     version: flag.version,
-    // The column only ever holds values the API accepted.
-    managedBy: flag.managedBy as ManagedBy | null,
+    managedBy: flag.managedBy,
     createdAt: flag.createdAt,
     updatedAt: flag.updatedAt,
   };

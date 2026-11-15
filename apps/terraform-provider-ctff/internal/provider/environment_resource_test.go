@@ -88,7 +88,7 @@ func TestAccEnvironmentResource_invalidImportID(t *testing.T) {
 				ResourceName:  "ctff_environment.test",
 				ImportState:   true,
 				ImportStateId: "production",
-				ExpectError:   regexp.MustCompile(`expected <project key>/<environment key>`),
+				ExpectError:   regexp.MustCompile(`expected <project key>/<key>, got "production"`),
 			},
 		},
 	})
@@ -97,7 +97,7 @@ func TestAccEnvironmentResource_invalidImportID(t *testing.T) {
 // checkEnvironment checks Core has the environment with this name, and the SDK key Terraform recorded.
 func checkEnvironment(api *client.Client, projectKey, key, name string) resource.TestCheckFunc {
 	return func(state *terraform.State) error {
-		environment, err := api.GetEnvironment(context.Background(), projectKey, key)
+		environment, err := api.GetEnvironment(context.Background(), client.Ref{ProjectKey: projectKey, Key: key})
 		if err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func checkEnvironment(api *client.Client, projectKey, key, name string) resource
 
 func checkEnvironmentGone(api *client.Client, projectKey, key string) resource.TestCheckFunc {
 	return func(*terraform.State) error {
-		if _, err := api.GetEnvironment(context.Background(), projectKey, key); !client.IsNotFound(err) {
+		if _, err := api.GetEnvironment(context.Background(), client.Ref{ProjectKey: projectKey, Key: key}); !client.IsNotFound(err) {
 			return fmt.Errorf("environment %s still exists in Core (err: %v)", key, err)
 		}
 		return nil

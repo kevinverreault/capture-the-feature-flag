@@ -62,6 +62,8 @@ Each project's `package.json` declares exactly one `type:*` tag and one `scope:*
 - any project other than `core` depends on `core`: the admin app ([ADR 0003](docs/adr/0003-admin-app-mounted-inside-core.md)), Evaluators ([ADR 0001](docs/adr/0001-evaluator-polls-core-not-the-database.md)) and everything else call Core over HTTP,
 - any project other than `core` imports Prisma.
 
+The one recorded exception is the Go Terraform provider. It declares an Nx `implicitDependencies` on `core`, so its acceptance tests run against Core's build and re-run when Core changes. It still calls Core only over HTTP.
+
 The rules cover `.astro` files too (through `eslint-plugin-astro`). The Prisma ban only applies to packages Nx knows from the lockfile, so it starts working once Prisma is installed (by `core`). Before that, a Prisma import passes `lint` and only `typecheck` catches it, so test the rule in a workspace where Prisma is installed.
 
 The `@ctff/workspace` tests fail if a project is missing either tag, because an untagged project would escape these rules.

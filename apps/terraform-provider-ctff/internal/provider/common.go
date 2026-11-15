@@ -1,22 +1,39 @@
 package provider
 
 import (
+	"context"
 	"fmt"
 	"regexp"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
+	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 
 	"github.com/kevinverreault/capture-the-feature-flag/apps/terraform-provider-ctff/internal/client"
 )
 
-// keyPattern is Core's rule for project, environment and flag keys: lowercase kebab-case, starting with a letter.
-var keyPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
+// Core's validation rules, repeated here so plan catches what apply would be rejected for. Each names its source in
+// Core; TestAccValidationRulesMatchCore checks them against the OpenAPI document Core generates from those sources.
+const (
+	// keyPatternSource and keyMaxLength: keyPattern and keyMaxLength in apps/core/src/common/keys.ts.
+	keyPatternSource = `^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`
+	keyMaxLength     = 64
+	// nameMaxLength: IsName in apps/core/src/common/keys.ts.
+	nameMaxLength = 200
+	// descriptionMaxLength, tagsMaxItems, tagMaxLength and tagPatternSource: IsDescription, IsTags and tagPattern
+	// in apps/core/src/flags/flags.dto.ts.
+	descriptionMaxLength = 2000
+	tagsMaxItems         = 50
+	tagMaxLength         = 64
+	tagPatternSource     = `^\S(?:.*\S)?$`
+)
 
-const keyMaxLength = 64
+var (
+	keyPattern = regexp.MustCompile(keyPatternSource)
+	tagPattern = regexp.MustCompile(tagPatternSource)
+)
 
 // keyValidators check a key at plan time, with the same rule Core applies.
 func keyValidators(what string) []validator.String {
@@ -26,10 +43,10 @@ func keyValidators(what string) []validator.String {
 	}
 }
 
-// nameValidators check a display name the way Core does: non-blank, at most 200 characters.
+// nameValidators check a display name the way Core does: non-blank, at most nameMaxLength characters.
 func nameValidators() []validator.String {
 	return []validator.String{
-		stringvalidator.LengthAtMost(200),
+		stringvalidator.LengthAtMost(nameMaxLength),
 		stringvalidator.RegexMatches(regexp.MustCompile(`\S`), "must not be blank"),
 	}
 }
@@ -47,14 +64,16 @@ func configureClient(req resource.ConfigureRequest, resp *resource.ConfigureResp
 	return c
 }
 
-// splitImportID parses an import ID made of a project key and a second key, as "project/key".
-func splitImportID(id, what string, diags *diag.Diagnostics) (projectKey, key string, ok bool) {
-	parts := strings.Split(id, "/")
-	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-		diags.AddError("Invalid import ID", fmt.Sprintf("expected <project key>/<%s key>, got %q", what, id))
-		return "", "", false
+// importRef starts the import of an environment or a flag from its ID, "<project key>/<key>"; Read fills in the
+// rest.
+func importRef(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
+	ref, err := client.ParseRef(req.ID)
+	if err != nil {
+		resp.Diagnostics.AddError("Invalid import ID", err.Error())
+		return
 	}
-	return parts[0], parts[1], true
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), ref.ProjectKey)...)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key"), ref.Key)...)
 }
 
 func apiError(diags *diag.Diagnostics, action string, err error) {
