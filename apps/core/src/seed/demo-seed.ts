@@ -75,7 +75,10 @@ export async function seedDemo(app: INestApplication, databaseUrl: string, logge
     try {
       await seedProject(app);
     } catch (error) {
-      await projects.delete(project.key, seedActor);
+      // Removing the half-seeded project lets the next start seed it again; failing that, the seed error matters.
+      await projects
+        .delete(project.key, seedActor)
+        .catch((cleanup: unknown) => logger.error({ err: cleanup }, 'Could not remove the half-seeded demo project'));
       throw new Error(`The demo seed failed: ${(error as Error).message}`, { cause: error });
     }
     logger.info({ project: project.key }, 'Seeded the demo project');

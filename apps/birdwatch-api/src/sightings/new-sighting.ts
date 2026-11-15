@@ -39,7 +39,7 @@ export function checkNewSighting(body: unknown, now = new Date()): CheckedSighti
   const count =
     typeof input['count'] === 'string' && input['count'].trim() !== '' ? Number(input['count']) : input['count'];
   if (typeof count !== 'number' || !Number.isInteger(count) || count < 1 || count > maxCount) {
-    errors.count = 'Count at least one bird, and at most 10,000';
+    errors.count = `Count at least one bird, and at most ${maxCount.toLocaleString('en')}`;
   }
 
   const notes = text(input['notes']);

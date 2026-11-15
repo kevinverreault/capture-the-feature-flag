@@ -25,7 +25,7 @@ docker compose up
 
 This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000>, where the [admin app](apps/admin/README.md) opens, and the [Evaluator](apps/evaluator/README.md) on <http://localhost:3001>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>. Applications evaluate flags through the Evaluator with [`@ctff/sdk`](libs/sdk/README.md), or in NestJS with [`@ctff/nestjs`](libs/nestjs/README.md). The Evaluator serves Prometheus metrics at <http://localhost:3001/metrics>, and [a k6 script](apps/evaluator/README.md#load-testing) measures its latency.
 
-On an empty database, Core seeds the `birdwatch` demo project ([the demo seed](apps/core/README.md#the-demo-seed)), used by **Birdwatch**, the birding demo: its website, [birdwatch-web](apps/birdwatch-web/README.md), is on <http://localhost:4000>, and its API, [birdwatch-api](apps/birdwatch-api/README.md), on <http://localhost:4001>. Log in as a birder, and switch `new-sighting-form` off in the admin app (project Birdwatch, environment Development): "Log a sighting" disappears within seconds.
+On an empty database, Core seeds the `birdwatch` demo project ([the demo seed](apps/core/README.md#the-demo-seed)), used by **Birdwatch**, the birding demo: its website, [birdwatch-web](apps/birdwatch-web/README.md), is on <http://localhost:4000>, and its API, [birdwatch-api](apps/birdwatch-api/README.md), on <http://localhost:4001>. Log in as a birder, and switch the targeting of `new-sighting-form` off in the admin app (project Birdwatch, environment Development): "Log a sighting" disappears within seconds.
 
 ## Layout
 

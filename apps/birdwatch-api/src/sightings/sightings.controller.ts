@@ -1,5 +1,5 @@
 import { type AllFlags, Flags, RequireFlag } from '@ctff/nestjs';
-import { BadRequestException, Body, Controller, Get, HttpCode, Post, Req } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Post, Req } from '@nestjs/common';
 import type { Sighting } from '../data/sightings.js';
 import type { BirderRequest } from '../session/auth.guard.js';
 import { checkNewSighting } from './new-sighting.js';
@@ -20,7 +20,6 @@ export class SightingsController {
    * if the endpoint didn't exist. A body that doesn't check out gets `400`, with a message per field in `fields`.
    */
   @Post()
-  @HttpCode(201)
   @RequireFlag('new-sighting-form')
   log(@Req() request: BirderRequest, @Body() body: unknown): { sighting: Sighting } {
     const checked = checkNewSighting(body);

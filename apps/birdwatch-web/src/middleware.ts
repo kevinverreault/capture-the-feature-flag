@@ -6,7 +6,7 @@ import { defineMiddleware } from 'astro:middleware';
  * - A page that fails (birdwatch-api unreachable or answering 5xx) is logged and answered with the 500 page.
  */
 export const onRequest = defineMiddleware(async (context, next) => {
-  context.locals.apiUrl ||= process.env['BIRDWATCH_API_URL']?.replace(/\/+$/, '') ?? '';
+  context.locals.apiUrl ||= process.env['BIRDWATCH_API_URL']?.trim().replace(/\/+$/, '') ?? '';
   try {
     return await next();
   } catch (error) {

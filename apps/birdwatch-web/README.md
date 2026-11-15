@@ -13,7 +13,7 @@ The website of **Birdwatch**, the birding demo of Capture The Feature Flag: Astr
 | `/health/live`   | Liveness                                                                                                               |
 | `/health/ready`  | Readiness: ready while birdwatch-api is                                                                                |
 
-Every page but the picker needs a session: without one, or once it has expired, it redirects to `/login`. Pages render on each request with the flags birdwatch-api returns, so switching `new-sighting-form` off in the admin app hides the form on the next page load, within one Evaluator poll interval. A form posted from a page loaded before the switch gets `404` from birdwatch-api, and the page says the sighting wasn't logged. When the flags can't be loaded, `false` is the fallback value, so the form stays hidden.
+Every page but the picker needs a session: without one, or once it has expired, it redirects to `/login`. Pages render on each request with the flags birdwatch-api returns, so switching the targeting of `new-sighting-form` off in the admin app (it then serves its off variation, `false`) hides the form on the next page load, within one Evaluator poll interval. A form posted from a page loaded before the switch gets `404` from birdwatch-api, and the page says the sighting wasn't logged. When the flags can't be loaded, `false` is the fallback value, so the form stays hidden.
 
 A form post must come from the site's own pages: Astro checks its `Origin`. When birdwatch-api is unreachable, the page is logged and answered with a 500 page.
 

@@ -23,6 +23,6 @@ COPY --from=build /out /app
 # The `node` user of the base image, by id so orchestrators can verify it isn't root.
 USER 1000:1000
 EXPOSE 3000
-HEALTHCHECK --interval=5s --timeout=3s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=5s --timeout=3s --start-period=90s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/health/ready').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 CMD ["node", "dist/main.js"]

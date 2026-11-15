@@ -1,5 +1,5 @@
 import { type AllFlags, type Context, Flags } from '@ctff/nestjs';
-import { Body, Controller, Get, HttpCode, Inject, NotFoundException, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Inject, NotFoundException, Post, Req } from '@nestjs/common';
 import { type Birder, birders, findBirder } from '../data/birders.js';
 import type { BirdwatchApiConfig } from '../config.js';
 import { BIRDWATCH_API_CONFIG } from '../tokens.js';
@@ -21,7 +21,6 @@ export class SessionController {
   /** The fake login: anyone can be any birder, and gets a session token (a JWT signed with the dev key). */
   @Public()
   @Post('session')
-  @HttpCode(201)
   async logIn(@Body() body: unknown): Promise<{ token: string; expiresInSeconds: number; birder: Birder }> {
     const birderId = typeof body === 'object' && body !== null ? (body as { birderId?: unknown }).birderId : undefined;
     const birder = typeof birderId === 'string' ? findBirder(birderId) : undefined;

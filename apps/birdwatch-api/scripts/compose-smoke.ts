@@ -3,8 +3,8 @@
 //   node apps/birdwatch-api/scripts/compose-smoke.ts
 //
 // Checks that Core seeded the birdwatch project, that a birder can log in on the website, see the feed and log a
-// sighting while new-sighting-form serves true, and that switching it off through Core's API hides "Log a
-// sighting" and makes the API answer 404 within one poll interval. It switches the flag back on at the end.
+// sighting while new-sighting-form serves true, and that switching its targeting off through Core's API hides "Log a
+// sighting" and makes the API answer 404 within one poll interval. It switches its targeting back on at the end.
 //
 // Environment: CORE_URL (default http://localhost:3000), BIRDWATCH_API_URL (default http://localhost:4001),
 // BIRDWATCH_WEB_URL (default http://localhost:4000) and POLL_INTERVAL_MS (the Evaluator's, default 2000).
@@ -42,13 +42,15 @@ async function until(attempt: () => Promise<boolean>, timeoutMs: number): Promis
   }
 }
 
-async function switchKillSwitch(on: boolean): Promise<void> {
+/** Switches the targeting of the kill switch on or off in development, through Core's API. */
+async function setTargeting(on: boolean): Promise<void> {
   const { body } = await json(`${coreUrl}/api/v1${targetingPath}`);
   const { status } = await json(`${coreUrl}/api/v1${targetingPath}`, {
     method: 'PATCH',
     body: JSON.stringify({ version: body['version'], on }),
   });
-  if (status !== 200) throw new Error(`Switching ${killSwitch} ${on ? 'on' : 'off'} answered ${status}`);
+  if (status !== 200)
+    throw new Error(`Switching the targeting of ${killSwitch} ${on ? 'on' : 'off'} answered ${status}`);
 }
 
 async function webLogIn(birderId: string): Promise<string> {
@@ -100,14 +102,17 @@ async function main(): Promise<void> {
   const cookie = await webLogIn('alice');
   check(await feedShowsLogASighting(cookie), 'the website shows Alice the feed with "Log a sighting"');
 
-  await switchKillSwitch(false);
+  await setTargeting(false);
   try {
     const switched = performance.now();
     const hidden = await until(async () => !(await feedShowsLogASighting(cookie)), pollIntervalMs + pollGraceMs);
-    check(hidden, `"Log a sighting" is gone ${Math.round(performance.now() - switched)} ms after the switch-off`);
-    check((await logSighting(token as string)) === 404, `the endpoint answers 404 while ${killSwitch} is off`);
+    check(
+      hidden,
+      `"Log a sighting" is gone ${Math.round(performance.now() - switched)} ms after its targeting is switched off`,
+    );
+    check((await logSighting(token as string)) === 404, `the endpoint answers 404 while ${killSwitch} serves false`);
   } finally {
-    await switchKillSwitch(true);
+    await setTargeting(true);
   }
 }
 
