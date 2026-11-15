@@ -100,8 +100,8 @@ describe('dashboard', () => {
         { flagKey: 'rare-bird-alerts', variationIndex: 0, minute: minuteAgo(minutes(1)), count: 1 },
         { flagKey: 'rare-bird-alerts', variationIndex: 1, minute: now, count: 2 },
         { flagKey: 'rare-bird-alerts', variationIndex: 0, minute: earlier, count: 3 },
-        // Older than 24 hours: left out.
-        { flagKey: 'rare-bird-alerts', variationIndex: 0, minute: minuteAgo(hours(25)), count: 100 },
+        // Older than 24 hours and the current hour: left out.
+        { flagKey: 'rare-bird-alerts', variationIndex: 0, minute: minuteAgo(hours(26)), count: 100 },
       ]);
       await sendCounts(api, development, [{ flagKey: 'photo-id-beta', variationIndex: 1, minute: now, count: 7 }]);
 
@@ -109,8 +109,9 @@ describe('dashboard', () => {
       expect(response.status).toBe(200);
       const series = response.body;
       expect(series).toMatchObject({ range: '24h', bucketMinutes: 60, environmentKey: null });
-      // 24 whole hours, the last one the current hour, so the latest counts are in.
-      expect(Date.parse(series.to) - Date.parse(series.from)).toBe(hours(24));
+      // 25 whole hours, the last one the current hour, so the latest counts are in and the whole 24 hours too.
+      expect(Date.parse(series.to) - Date.parse(series.from)).toBe(hours(25));
+      expect(Date.parse(series.from)).toBeLessThanOrEqual(Date.now() - hours(24));
       expect(new Date(series.to).getUTCMinutes()).toBe(0);
       expect(Date.parse(series.to)).toBeGreaterThan(Date.now());
       expect(Date.parse(series.to) - hours(1)).toBeLessThanOrEqual(Date.now());
@@ -185,7 +186,8 @@ describe('dashboard', () => {
       expect(response.status).toBe(200);
       const series = response.body;
       expect(series).toMatchObject({ range: '7d', bucketMinutes: 360, environmentKey: 'production' });
-      expect(Date.parse(series.to) - Date.parse(series.from)).toBe(days(7));
+      expect(Date.parse(series.to) - Date.parse(series.from)).toBe(days(7) + hours(6));
+      expect(Date.parse(series.from)).toBeLessThanOrEqual(Date.now() - days(7));
       // Buckets start at 00:00, 06:00, 12:00 and 18:00 UTC.
       expect(new Date(series.to).getUTCHours() % 6).toBe(0);
       expect(series.counts).toEqual([

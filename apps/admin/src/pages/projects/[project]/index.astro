@@ -24,7 +24,7 @@ const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
 const params = { path: { projectKey } };
 const range = dashboardRange(Astro.url.searchParams.get('range'));
-const asked = Astro.url.searchParams.get('environment') || undefined;
+const requestedEnvironmentKey = Astro.url.searchParams.get('environment') || undefined;
 
 const [projects, project, environments, flags, summary, stale, changes] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
@@ -39,7 +39,7 @@ const [projects, project, environments, flags, summary, stale, changes] = await 
   unwrap(core.GET('/api/v1/audit-entries', { params: { query: { projectKey, limit: recentChanges } } })),
 ]);
 // An environment that isn't the project's (renamed or deleted since) is not a filter.
-const environment = environments?.find((listed) => listed.key === asked);
+const environment = environments?.find((listed) => listed.key === requestedEnvironmentKey);
 const series =
   project &&
   (await orNotFound(
@@ -49,17 +49,18 @@ const series =
       }),
     ),
   ));
-const found = project && environments && flags && summary && stale && series;
-if (!found) Astro.response.status = 404;
+const hasPageData = project && environments && flags && summary && stale && series;
+if (!hasPageData) Astro.response.status = 404;
 
 const chart = series && flags ? evaluationChart(series, flags) : undefined;
 const rangeLabel = dashboardRanges.find((listed) => listed.value === range)?.label.toLowerCase() ?? '';
-const scope = environment ? ` in ${environment.name}` : '';
+// Names the environment the charts are of, after what they count: " in Production".
+const scopeSuffix = environment ? ` in ${environment.name}` : '';
 const now = new Date();
 ---
 
 {
-  found && chart ? (
+  hasPageData && chart ? (
     <AdminLayout title={`Dashboard · ${project.name}`} projects={projects} project={project}>
       <ProjectNav project={project} current="dashboard" />
 
@@ -99,7 +100,7 @@ const now = new Date();
         {summary.environments.length === 0 && (
           <p>
             Targeting is per environment: <a href={routes.environments(project.key)}>create an environment</a> to
-            switch flags on.
+            switch targeting on.
           </p>
         )}
       </section>
@@ -139,14 +140,14 @@ const now = new Date();
           <span class="hero-value">{fullCount(chart.total)}</span>
           <span class="hero-label">
             evaluations in the {rangeLabel}
-            {scope}
+            {scopeSuffix}
           </span>
         </p>
 
         {chart.total === 0 ? (
           <p>
             No evaluations in the {rangeLabel}
-            {scope}. Evaluators report what they evaluated about every minute.
+            {scopeSuffix}. Evaluators report what they evaluated about every minute.
           </p>
         ) : (
           <div class="charts">
@@ -154,7 +155,7 @@ const now = new Date();
               <h3 slot="header" id="evaluations-over-time" class="text-lg">
                 Over time
               </h3>
-              <EvaluationTimeline chart={chart} range={range} label={`Evaluations over the ${rangeLabel}${scope}`} />
+              <EvaluationTimeline chart={chart} range={range} label={`Evaluations over the ${rangeLabel}${scopeSuffix}`} />
             </Card>
             <Card as="section" aria-labelledby="evaluations-per-flag">
               <h3 slot="header" id="evaluations-per-flag" class="text-lg">
@@ -163,7 +164,7 @@ const now = new Date();
               <FlagEvaluations
                 chart={chart}
                 projectKey={project.key}
-                label={`Evaluations per flag over the ${rangeLabel}${scope}`}
+                label={`Evaluations per flag over the ${rangeLabel}${scopeSuffix}`}
               />
             </Card>
           </div>

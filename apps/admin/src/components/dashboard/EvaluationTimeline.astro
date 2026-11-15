@@ -14,7 +14,7 @@ import {
 } from '../../lib/dashboard';
 import ChartLegend from './ChartLegend.astro';
 import ChartTooltip from './ChartTooltip.astro';
-import { seriesColor } from './series';
+import StackedSegments from './StackedSegments.astro';
 
 interface Props {
   chart: EvaluationChart;
@@ -31,7 +31,7 @@ const percent = (value: number) => `${((value / top) * 100).toFixed(3)}%`;
 const edge = Math.ceil(chart.buckets.length / 6);
 ---
 
-<figure class="timeline" aria-label={label}>
+<figure class="chart timeline" aria-label={label}>
   <ChartLegend variations={chart.variations} />
   <div class="plot">
     <div class="y-ticks" aria-hidden="true">
@@ -46,14 +46,15 @@ const edge = Math.ceil(chart.buckets.length / 6);
           chart.buckets.map((bucket, index) => (
             <li
               tabindex="0"
-              class:list={[index < edge && 'start', index >= chart.buckets.length - edge && 'end']}
+              class:list={['chart-target', index < edge && 'start', index >= chart.buckets.length - edge && 'end']}
               aria-label={`${bucketTime(bucket.start)} UTC: ${describeCounts(chart.variations, bucket.counts)}`}
             >
-              <span class="stack" style={`height: ${percent(bucket.total)}`}>
-                {bucket.counts.map((count, slot) =>
-                  count > 0 ? <span style={`flex-grow: ${count}; background-color: ${seriesColor(slot)}`} /> : null,
-                )}
-              </span>
+              <StackedSegments
+                class="stack"
+                direction="up"
+                counts={bucket.counts}
+                style={`height: ${percent(bucket.total)}`}
+              />
               {hasAxisLabel(bucket.start, range) && (
                 <span class="x-label" aria-hidden="true">
                   {axisLabel(bucket.start, range)}
@@ -138,41 +139,18 @@ const edge = Math.ceil(chart.buckets.length / 6);
   }
 
   .columns li {
-    position: relative;
     display: flex;
     flex: 1 1 0;
     align-items: flex-end;
     justify-content: center;
     min-width: 0;
     padding-inline: 1px;
-    border-radius: 2px;
-    outline: none;
   }
 
-  /* The whole column is the target: a ghost wash shows the one hovered or focused. */
-  .columns li:hover,
-  .columns li:focus-visible {
-    background-color: hsl(var(--color-on-background) / 0.06);
-  }
-
-  .columns li:focus-visible {
-    outline: 2px solid hsl(var(--color-accent));
-    outline-offset: -2px;
-  }
-
-  .stack {
-    display: flex;
-    flex-direction: column-reverse;
-    gap: 2px;
+  /* The whole column is the target (.chart-target); the column of segments is at most 24px wide. */
+  .columns :global(.stack) {
     width: 100%;
     max-width: 24px;
-    overflow: hidden;
-    border-radius: 4px 4px 0 0;
-  }
-
-  .stack span {
-    flex-basis: 0;
-    min-height: 1px;
   }
 
   .x-label {
@@ -199,25 +177,5 @@ const edge = Math.ceil(chart.buckets.length / 6);
     right: 0;
     left: auto;
     transform: none;
-  }
-
-  li:hover :global(.chart-tip),
-  li:focus-visible :global(.chart-tip) {
-    display: grid;
-  }
-
-  figcaption {
-    font-size: var(--fs-sm);
-    color: hsl(var(--color-on-background) / 0.75);
-  }
-
-  summary {
-    cursor: pointer;
-  }
-
-  @media (forced-colors: active) {
-    .stack span {
-      forced-color-adjust: none;
-    }
   }
 </style>

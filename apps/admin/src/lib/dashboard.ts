@@ -29,10 +29,8 @@ export interface ChartBucket {
 /** A flag's evaluations over the range: per variation, in the chart's order, and in all. */
 export interface ChartFlagTotal {
   key: string;
-  /** Its name, or its key when it is not one of the project's flags any more. */
+  /** Its name, or its key when the flag list doesn't have it yet (created since it was fetched). */
   name: string;
-  /** Whether it is one of the project's flags (archived or not), so it has a page to link to. */
-  known: boolean;
   archived: boolean;
   counts: number[];
   total: number;
@@ -56,16 +54,12 @@ export interface EvaluationChart {
   flags: ChartFlagTotal[];
   /** Each flag's evaluations per environment, by flag key then environment key. */
   rows: ChartRow[];
-  /** All evaluations of the range, per variation. */
-  totals: number[];
+  /** All evaluations of the range. */
   total: number;
 }
 
 /** The variations of every flag in V1, by index (ADR 0002). */
-const booleanVariations = [true, false];
-
-/** The variations every boolean flag has, first in every chart so that each keeps its place and color. */
-const leadingVariations = ['true', 'false'];
+const booleanVariations: readonly unknown[] = [true, false];
 
 /**
  * Lays the evaluation series out for the dashboard's charts: summed by bucket (every bucket of the range, so the
@@ -74,15 +68,17 @@ const leadingVariations = ['true', 'false'];
  */
 export function evaluationChart(series: EvaluationSeries, flags: readonly ChartFlag[]): EvaluationChart {
   const byKey = new Map(flags.map((flag) => [flag.key, flag]));
-  const valueOf = (flagKey: string, index: number) => {
-    // A flag deleted since had the variations every flag has in V1 (ADR 0002).
+  const variationValue = (flagKey: string, index: number) => {
+    // Counts go with their flag when it is deleted, so a flag missing from the list was created since it was
+    // fetched: it has the variations every flag has in V1 (ADR 0002).
     const variations = byKey.get(flagKey)?.variations ?? booleanVariations;
     return index < variations.length ? String(variations[index]) : `variation ${index}`;
   };
 
-  const variations = [...leadingVariations];
+  // The boolean variations come first in every chart, so that each keeps its place and color.
+  const variations = booleanVariations.map(String);
   for (const count of series.counts) {
-    const value = valueOf(count.flagKey, count.variationIndex);
+    const value = variationValue(count.flagKey, count.variationIndex);
     if (!variations.includes(value)) variations.push(value);
   }
   const empty = () => variations.map(() => 0);
@@ -97,10 +93,10 @@ export function evaluationChart(series: EvaluationSeries, flags: readonly ChartF
   }));
   const flagTotals = new Map<string, ChartFlagTotal>();
   const rows = new Map<string, ChartRow>();
-  const totals = empty();
+  let total = 0;
 
   for (const count of series.counts) {
-    const slot = variations.indexOf(valueOf(count.flagKey, count.variationIndex));
+    const slot = variations.indexOf(variationValue(count.flagKey, count.variationIndex));
     const flag = byKey.get(count.flagKey);
     const name = flag?.name ?? count.flagKey;
 
@@ -112,7 +108,6 @@ export function evaluationChart(series: EvaluationSeries, flags: readonly ChartF
       flagTotal = {
         key: count.flagKey,
         name,
-        known: flag !== undefined,
         archived: flag?.archived ?? false,
         counts: empty(),
         total: 0,
@@ -128,7 +123,7 @@ export function evaluationChart(series: EvaluationSeries, flags: readonly ChartF
       rows.set(rowKey, row);
     }
     add(row, slot, count.count);
-    totals[slot] = (totals[slot] ?? 0) + count.count;
+    total += count.count;
   }
 
   return {
@@ -138,8 +133,7 @@ export function evaluationChart(series: EvaluationSeries, flags: readonly ChartF
     rows: [...rows.values()].sort(
       (a, b) => compare(a.flagKey, b.flagKey) || compare(a.environmentKey, b.environmentKey),
     ),
-    totals,
-    total: totals.reduce((sum, count) => sum + count, 0),
+    total,
   };
 }
 
@@ -150,13 +144,16 @@ function add(target: { counts: number[]; total: number }, slot: number, count: n
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
+/** About how many steps a value axis has. */
+const tickSteps = 4;
+
 /**
  * The ticks of a value axis from 0 to just past `max`, a round step apart (1, 2 or 5 times a power of ten), about
  * four of them. With nothing to show, the axis still goes from 0 to 1.
  */
-export function niceTicks(max: number, target = 4): number[] {
+export function niceTicks(max: number): number[] {
   if (max <= 0) return [0, 1];
-  const rough = max / target;
+  const rough = max / tickSteps;
   const power = 10 ** Math.floor(Math.log10(rough));
   const step = [1, 2, 5, 10].map((multiple) => multiple * power).find((candidate) => candidate >= rough) ?? 10 * power;
   // Counts are whole numbers, so the step is too.

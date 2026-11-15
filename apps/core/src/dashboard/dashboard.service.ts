@@ -68,7 +68,8 @@ export class DashboardService {
   /**
    * The evaluations of the range (default: the last 24 hours), of every flag of the project or of one environment,
    * summed per bucket, flag, environment and variation. Buckets are aligned on UTC (whole hours, or 00:00, 06:00,
-   * 12:00 and 18:00), and the last one is the current one, so the latest counts are in.
+   * 12:00 and 18:00). The last one is the current one, so the latest counts are in, and there is one bucket more
+   * than the range holds (25 hourly, or 29 of 6 hours), so the whole range is covered.
    */
   async evaluations(projectKey: string, query: EvaluationSeriesQueryDto): Promise<EvaluationSeriesDto> {
     const project = await this.projects.find(projectKey);
@@ -77,7 +78,8 @@ export class DashboardService {
     const { days, bucketMinutes } = evaluationRanges[range];
     const bucketMs = bucketMinutes * minuteMs;
     const to = new Date((Math.floor(Date.now() / bucketMs) + 1) * bucketMs);
-    const from = new Date(to.getTime() - days * dayMs);
+    // The current bucket has only begun, so one more bucket makes the range cover the whole time asked for.
+    const from = new Date(to.getTime() - days * dayMs - bucketMs);
     const environmentId = environment?.id ?? null;
 
     const rows = await this.prisma.$queryRaw<SeriesRow[]>`

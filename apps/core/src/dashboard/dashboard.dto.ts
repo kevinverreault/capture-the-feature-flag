@@ -77,7 +77,7 @@ export class EvaluationSeriesCountDto {
 
 /**
  * The evaluations of a time range, summed into buckets of the same size from `from` to `to`. The last bucket is the
- * current one, still filling.
+ * current one, still filling, so there is one bucket more than the range holds, and the whole range is covered.
  */
 export class EvaluationSeriesDto {
   @ApiProperty({ enum: Object.keys(evaluationRanges), enumName: 'EvaluationRange' })

@@ -59,8 +59,14 @@ const series = {
       variationIndex: 0,
       count: 3,
     },
-    // A flag deleted since.
-    { start: '2026-11-15T12:00:00.000Z', flagKey: 'gone', environmentKey: 'production', variationIndex: 0, count: 1 },
+    // A flag created since the flag list was fetched.
+    {
+      start: '2026-11-15T12:00:00.000Z',
+      flagKey: 'brand-new',
+      environmentKey: 'production',
+      variationIndex: 0,
+      count: 1,
+    },
   ],
 };
 
@@ -86,21 +92,20 @@ describe('evaluationChart', () => {
   it('stacks the variations by value, true before false, whatever their index', () => {
     expect(chart.variations).toEqual(['true', 'false']);
     expect(chart.total).toBe(18);
-    expect(chart.totals).toEqual([10, 8]);
   });
 
-  it('totals each flag over the range, most evaluated first, naming flags by their name when known', () => {
+  it('totals each flag over the range, most evaluated first, named by its key until the flag list has it', () => {
     expect(chart.flags).toEqual([
-      { key: 'photo-id-beta', name: 'Photo ID (beta)', known: true, archived: false, counts: [0, 7], total: 7 },
-      { key: 'rare-bird-alerts', name: 'Rare bird alerts', known: true, archived: false, counts: [6, 1], total: 7 },
-      { key: 'old-feed', name: 'Old feed', known: true, archived: true, counts: [3, 0], total: 3 },
-      { key: 'gone', name: 'gone', known: false, archived: false, counts: [1, 0], total: 1 },
+      { key: 'photo-id-beta', name: 'Photo ID (beta)', archived: false, counts: [0, 7], total: 7 },
+      { key: 'rare-bird-alerts', name: 'Rare bird alerts', archived: false, counts: [6, 1], total: 7 },
+      { key: 'old-feed', name: 'Old feed', archived: true, counts: [3, 0], total: 3 },
+      { key: 'brand-new', name: 'brand-new', archived: false, counts: [1, 0], total: 1 },
     ]);
   });
 
   it('totals each flag in each environment, for the table view', () => {
     expect(chart.rows).toEqual([
-      { flagKey: 'gone', flagName: 'gone', environmentKey: 'production', counts: [1, 0], total: 1 },
+      { flagKey: 'brand-new', flagName: 'brand-new', environmentKey: 'production', counts: [1, 0], total: 1 },
       { flagKey: 'old-feed', flagName: 'Old feed', environmentKey: 'production', counts: [3, 0], total: 3 },
       {
         flagKey: 'photo-id-beta',

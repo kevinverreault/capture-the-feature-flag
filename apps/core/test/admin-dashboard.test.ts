@@ -95,8 +95,8 @@ describe('admin app: dashboard', () => {
     expect(await total('?range=30d&environment=staging')).toBe('47');
 
     const dashboard = await page(await admin.get(`/projects/${projectKey}`));
-    // Every hour of the last 24 has its column.
-    expect(dashboard.querySelectorAll('.timeline .columns > li')).toHaveLength(24);
+    // Every hour of the last 24 has its column, and so does the current one.
+    expect(dashboard.querySelectorAll('.timeline .columns > li')).toHaveLength(25);
     const bars = dashboard.querySelectorAll('.flag-evaluations .bars > li');
     expect(bars.map((bar) => bar.getAttribute('data-flag'))).toEqual(['rare-bird-alerts', 'photo-id-beta']);
     expect(bars[0]?.querySelector('.track')?.getAttribute('aria-label')).toBe('Rare bird alerts: 30 true, 12 false');
@@ -109,7 +109,7 @@ describe('admin app: dashboard', () => {
       ['Rare bird alerts', 'production', '30', '12', '42'],
     ]);
     const week = await page(await admin.get(`/projects/${projectKey}?range=7d`));
-    expect(week.querySelectorAll('.timeline .columns > li')).toHaveLength(28);
+    expect(week.querySelectorAll('.timeline .columns > li')).toHaveLength(29);
     expect(week.querySelector('select[name="range"] option[selected]')?.getAttribute('value')).toBe('7d');
   });
 

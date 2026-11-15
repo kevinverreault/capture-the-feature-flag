@@ -29,7 +29,7 @@ Deleting asks for confirmation in a dialog (or, without scripts, through a plain
 
 A form post must come from the admin app's own pages: Astro checks its `Origin` (or `Sec-Fetch-Site`), and one carrying neither is refused. When a page fails (Core unreachable, or answering `5xx`), the admin app logs it and answers with its 500 page, which doesn't call Core.
 
-The dashboard's charts are plain HTML and CSS, server-rendered from the evaluation series Core sums: columns per hour (or per 6 hours over 7 days) stacked by variation, and a bar per flag, the 10 most evaluated. Hovering or focusing a column or bar shows its counts, and each chart has a table view. Their series colors are the design system's sage (`true`) and terracotta (`false`), stepped for each theme in [src/styles/admin.css](src/styles/admin.css). The time range and environment filters are a plain `GET` form above the charts, sent as soon as one changes when scripts run. Times are UTC, as in the audit log.
+The dashboard's charts are plain HTML and CSS, server-rendered from the evaluation series Core sums: columns per hour (or per 6 hours over 7 days), the current one included, stacked by variation, and a bar per flag, the 10 most evaluated. Hovering or focusing a column or bar shows its counts, and each chart has a table view. Their series colors are the design system's sage (`true`) and terracotta (`false`), stepped for each theme in [src/styles/admin.css](src/styles/admin.css). The time range and environment filters are a plain `GET` form above the charts, sent as soon as one changes when scripts run. Times are UTC, as in the audit log.
 
 ## Hosting it
 
