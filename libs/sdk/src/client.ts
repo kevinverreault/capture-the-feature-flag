@@ -1,10 +1,10 @@
 import {
   type Context,
   type EvaluationErrorKind,
-  type EvaluationReason,
+  type EvaluationReason as GenericEvaluationReason,
   type EvaluationRequest,
+  type EvaluatorError,
   evaluatorErrors,
-  type FlagEvaluation,
   sdkKeyHeader,
 } from '@ctff/evaluation';
 
@@ -17,9 +17,25 @@ export interface ClientOptions {
   timeoutMs?: number;
 }
 
-export const defaultTimeoutMs = 500;
+const defaultTimeoutMs = 500;
 
-/** The value an evaluation served, with why. */
+/**
+ * Why the SDK returned what it did: an `ERROR` reason names what went wrong in evaluation itself (a malformed
+ * flag or context), at the Evaluator (an unknown SDK key, not ready) or on the way there.
+ */
+export type ErrorKind =
+  | EvaluationErrorKind
+  | EvaluatorError
+  /** The Evaluator didn't answer within the timeout. */
+  | 'TIMEOUT'
+  /** The Evaluator is unreachable. */
+  | 'NETWORK_ERROR'
+  /** The Evaluator answered with another error, or with something that isn't an evaluation. */
+  | 'EVALUATOR_ERROR';
+
+export type EvaluationReason = GenericEvaluationReason<ErrorKind>;
+
+/** The variation an evaluation served, with why; or the fallback value, with why no variation was served. */
 export interface EvaluationDetail {
   /** The served variation, or the caller's fallback value when no variation could be served. */
   value: boolean;
@@ -52,7 +68,7 @@ export function createClient(options: ClientOptions): Client {
       variationIndex: null,
       reason,
     });
-    const error = (errorKind: EvaluationErrorKind) => fallback({ kind: 'ERROR', errorKind });
+    const error = (errorKind: ErrorKind) => fallback({ kind: 'ERROR', errorKind });
     try {
       const body: EvaluationRequest = { context };
       const response = await fetch(`${evaluatorUrl}/api/v1/evaluate/${encodeURIComponent(flagKey)}`, {
@@ -81,18 +97,32 @@ export function createClient(options: ClientOptions): Client {
 }
 
 /** The error kind an Evaluator error answer names (`UNKNOWN_SDK_KEY`, `NOT_READY`), or `EVALUATOR_ERROR`. */
-function errorKindOf(answer: unknown): EvaluationErrorKind {
+function errorKindOf(answer: unknown): ErrorKind {
   const error = isObject(answer) ? answer['error'] : undefined;
   return evaluatorErrors.find((known) => known === error) ?? 'EVALUATOR_ERROR';
 }
 
-/** The answer as a single-flag evaluation, or `null` when it isn't one. */
-function asFlagEvaluation(answer: unknown): FlagEvaluation | null {
-  if (!isObject(answer) || !isObject(answer['reason']) || typeof answer['reason']['kind'] !== 'string') return null;
-  const { value, variationIndex } = answer;
+/** An evaluation as an Evaluator answers it, checked at runtime. */
+type CheckedEvaluation =
+  | { value: boolean; variationIndex: number; reason: EvaluationReason }
+  | { value: null; variationIndex: null; reason: EvaluationReason };
+
+/**
+ * The answer as a single-flag evaluation, or `null` when it isn't a consistent one: a served variation must come
+ * with a reason that serves one, and no variation with `FLAG_NOT_FOUND` or `ERROR`. Reasons this SDK doesn't
+ * know yet are accepted for served variations, so a newer Evaluator keeps working.
+ */
+function asFlagEvaluation(answer: unknown): CheckedEvaluation | null {
+  if (!isObject(answer) || !isObject(answer['reason'])) return null;
+  const { value, variationIndex, reason } = answer;
+  const kind = reason['kind'];
+  if (typeof kind !== 'string') return null;
+  if (value === null && variationIndex === null) {
+    const consistent = kind === 'FLAG_NOT_FOUND' || (kind === 'ERROR' && typeof reason['errorKind'] === 'string');
+    return consistent ? (answer as CheckedEvaluation) : null;
+  }
   const served = typeof value === 'boolean' && Number.isInteger(variationIndex);
-  const notServed = value === null && variationIndex === null;
-  return served || notServed ? (answer as unknown as FlagEvaluation) : null;
+  return served && kind !== 'FLAG_NOT_FOUND' && kind !== 'ERROR' ? (answer as CheckedEvaluation) : null;
 }
 
 function parseJson(text: string): unknown {

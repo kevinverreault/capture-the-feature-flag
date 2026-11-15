@@ -9,31 +9,21 @@ export interface Context {
   country?: string;
 }
 
-/** What went wrong when an evaluation reason is `ERROR`. */
+/**
+ * What went wrong when `evaluate()` reports the `ERROR` reason. The Evaluator and the SDK add error kinds of their
+ * own (an unknown SDK key, a timeout, …), for evaluations that can't even be attempted.
+ */
 export const evaluationErrorKinds = [
   /** The flag's targeting refers to a variation it doesn't have. */
   'MALFORMED_FLAG',
   /** The context isn't an object, or one of its attributes has the wrong type or format. */
   'MALFORMED_CONTEXT',
-  /** The Evaluator doesn't know the SDK key. */
-  'UNKNOWN_SDK_KEY',
-  /** The Evaluator hasn't loaded its first snapshot yet. */
-  'NOT_READY',
-  /** The SDK gave up waiting for the Evaluator. */
-  'TIMEOUT',
-  /** The SDK couldn't reach the Evaluator. */
-  'NETWORK_ERROR',
-  /** The Evaluator answered with an error or with something the SDK doesn't understand. */
-  'EVALUATOR_ERROR',
 ] as const;
 export type EvaluationErrorKind = (typeof evaluationErrorKinds)[number];
 
-/** Why an evaluation produced its variation. */
-export type EvaluationReason =
-  | { kind: 'OFF' }
-  | { kind: 'DEFAULT' }
-  | { kind: 'FLAG_NOT_FOUND' }
-  | { kind: 'ERROR'; errorKind: EvaluationErrorKind };
+/** Why an evaluation produced its variation. `ErrorKind` is widened by callers that add error kinds of their own. */
+export type EvaluationReason<ErrorKind extends string = EvaluationErrorKind> =
+  { kind: 'OFF' } | { kind: 'DEFAULT' } | { kind: 'FLAG_NOT_FOUND' } | { kind: 'ERROR'; errorKind: ErrorKind };
 
 /**
  * The outcome of one evaluation. When no variation is served (flag not found, or an error) `value` and
@@ -51,9 +41,14 @@ const error = (errorKind: EvaluationErrorKind): EvaluationResult => ({
 
 /**
  * Works out which variation a flag serves to a context in the environment of the snapshot. Pure, and total: it
- * never throws, whatever it's given, and reports malformed input with the `ERROR` reason.
+ * never throws, whatever it's given, and reports malformed input with the `ERROR` reason. The context is checked
+ * at runtime, since it usually arrives over the wire; a missing one is a `MALFORMED_CONTEXT` error.
  */
-export function evaluate(snapshot: EnvironmentSnapshot, flagKey: string, context: Context): EvaluationResult {
+export function evaluate(
+  snapshot: EnvironmentSnapshot,
+  flagKey: string,
+  context: Context | undefined,
+): EvaluationResult {
   const flag = snapshot.flags.find((candidate) => candidate.key === flagKey);
   if (!flag) return { value: null, variationIndex: null, reason: { kind: 'FLAG_NOT_FOUND' } };
   if (!normalizeContext(context)) return error('MALFORMED_CONTEXT');

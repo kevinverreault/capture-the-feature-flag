@@ -22,19 +22,19 @@ Outside Docker: `pnpm nx run @ctff/evaluator:build`, then `CORE_URL=http://local
 Each poll fetches `GET /api/v1/evaluator/environments` (every environment of every project, with its SDK key), then `GET /api/v1/evaluator/snapshot` for each environment on the list. Each request sends the ETag already held as `If-None-Match`, so an unchanged list or snapshot costs a `304`. The next poll starts one poll interval after the previous one ends, so a targeting change reaches the Evaluator within about one poll interval.
 
 - An environment added in Core is served from the next poll on. An environment deleted in Core is dropped, and its SDK key becomes unknown.
-- When a poll fails (Core unreachable, an error status, a timeout or a malformed body), the Evaluator logs a warning once and keeps serving its last good snapshots until a poll succeeds again.
+- When a poll fails (Core unreachable, an error status, a timeout or a malformed body), the Evaluator logs a warning once and keeps serving its last good snapshots until a poll succeeds again. The same goes for one environment's snapshot: it keeps its last good copy, and the other environments are unaffected.
 
 ## API
 
 - `/health/live` answers as long as the process runs.
-- `/health/ready` fails with `503` until the first poll has loaded the environment list and every snapshot on it. From then on it stays ready, including while Core is unreachable.
+- `/health/ready` fails with `503` until a poll has loaded the environment list and at least one snapshot on it (or found the list empty), so the Evaluator never serves from empty data. One environment whose snapshot keeps failing doesn't hold back the others. From then on it stays ready, including while Core is unreachable.
 - `POST /api/v1/evaluate/{flagKey}`, with the SDK key in the `X-CTFF-SDK-Key` header (redacted from logs) and the body `{ "context": { "user_id": "alice", "country": "CA" } }`, evaluates one flag:
 
   ```json
   { "flagKey": "rare-bird-alerts", "value": false, "variationIndex": 1, "reason": { "kind": "OFF" } }
   ```
 
-  An unknown flag answers `200` with `"value": null`, `"variationIndex": null` and the reason `FLAG_NOT_FOUND`. A malformed context (an attribute of the wrong type, an empty `user_id`, a `country` that isn't two letters) gets the reason `{ "kind": "ERROR", "errorKind": "MALFORMED_CONTEXT" }`. Errors answer with `{ "statusCode", "error", "message" }`, where `error` is `UNKNOWN_SDK_KEY` for an unknown SDK key (`404`) and `NOT_READY` before the first snapshots are loaded (`503`). A missing SDK key header gets `400`.
+  An unknown flag answers `200` with `"value": null`, `"variationIndex": null` and the reason `FLAG_NOT_FOUND`. A malformed context (an attribute of the wrong type, an empty `user_id`, a `country` that isn't two letters) gets the reason `{ "kind": "ERROR", "errorKind": "MALFORMED_CONTEXT" }`. Errors answer with `{ "statusCode", "error", "message" }`, where `error` is `UNKNOWN_SDK_KEY` for an unknown SDK key (`404`) and `NOT_READY` (`503`) before the first snapshots are loaded, or for an environment Core lists whose snapshot hasn't loaded yet. A missing SDK key header gets `400`.
 
 The request and answer types (`EvaluationRequest`, `FlagEvaluation`, `EvaluatorErrorBody`) are in `@ctff/evaluation`. Applications use them through [`@ctff/sdk`](../../libs/sdk/).
 

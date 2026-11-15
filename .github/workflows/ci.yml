@@ -62,7 +62,7 @@ jobs:
           curl --fail --silent --show-error -X POST http://localhost:3000/api/v1/projects \
             -H 'content-type: application/json' -d '{"key":"smoke-test","name":"Smoke test"}'
       - name: The SDK sees targeting switched on through Core within one poll interval
-        run: echo "SDK_KEY=$(node apps/evaluator/scripts/compose-smoke.ts toggle)" >> "$GITHUB_ENV"
+        run: echo "SDK_KEY=$(node apps/evaluator/scripts/compose-smoke.ts switch-on)" >> "$GITHUB_ENV"
       - name: The Evaluator keeps serving its last snapshot while Core is stopped
         run: |
           docker compose stop core

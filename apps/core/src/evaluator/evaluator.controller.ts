@@ -9,14 +9,20 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { EnvironmentListDto, EnvironmentSnapshotDto } from './snapshot.dto.js';
-import { matchesIfNoneMatch, type Serialized, SnapshotService } from './snapshot.service.js';
+import { EnvironmentListDto } from './environment-list.dto.js';
+import { EnvironmentListService } from './environment-list.service.js';
+import { sendWithEtag } from './json-with-etag.js';
+import { EnvironmentSnapshotDto } from './snapshot.dto.js';
+import { SnapshotService } from './snapshot.service.js';
 
 /** The endpoints Evaluators call (ADR 0001). */
 @ApiTags('evaluator')
 @Controller('evaluator')
 export class EvaluatorController {
-  constructor(private readonly snapshots: SnapshotService) {}
+  constructor(
+    private readonly environmentList: EnvironmentListService,
+    private readonly snapshots: SnapshotService,
+  ) {}
 
   /** Evaluators poll this list to learn which environments to keep a snapshot of. */
   @Get('environments')
@@ -27,7 +33,7 @@ export class EvaluatorController {
     @Headers('if-none-match') ifNoneMatch: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    send(response, await this.snapshots.environments(), ifNoneMatch);
+    sendWithEtag(response, await this.environmentList.list(), ifNoneMatch);
   }
 
   /**
@@ -52,17 +58,6 @@ export class EvaluatorController {
     if (!sdkKey) throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
     const snapshot = await this.snapshots.forSdkKey(sdkKey);
     response.setHeader('Vary', sdkKeyHeader);
-    send(response, snapshot, ifNoneMatch);
+    sendWithEtag(response, snapshot, ifNoneMatch);
   }
-}
-
-/** Sends the body with its ETag, or `304 Not Modified` when If-None-Match already names it. */
-function send(response: Response, { json, etag }: Serialized, ifNoneMatch: string | undefined): void {
-  response.setHeader('ETag', etag);
-  response.setHeader('Cache-Control', 'no-cache');
-  if (matchesIfNoneMatch(ifNoneMatch, etag)) {
-    response.status(304).end();
-    return;
-  }
-  response.status(200).type('application/json').send(json);
 }

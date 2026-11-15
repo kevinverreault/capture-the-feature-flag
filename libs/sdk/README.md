@@ -33,7 +33,7 @@ The context is typed as `{ user_id?: string; country?: string }`, where `country
 | :-------------------------------------------------- | :---------------------------------------------------------------- |
 | `{ kind: 'FLAG_NOT_FOUND' }`                        | The environment has no flag with that key                         |
 | `{ kind: 'ERROR', errorKind: 'UNKNOWN_SDK_KEY' }`   | The Evaluator doesn't know the SDK key                            |
-| `{ kind: 'ERROR', errorKind: 'NOT_READY' }`         | The Evaluator hasn't loaded its first snapshots yet               |
+| `{ kind: 'ERROR', errorKind: 'NOT_READY' }`         | The Evaluator hasn't loaded the environment's snapshot yet        |
 | `{ kind: 'ERROR', errorKind: 'TIMEOUT' }`           | The Evaluator didn't answer within `timeoutMs`                    |
 | `{ kind: 'ERROR', errorKind: 'NETWORK_ERROR' }`     | The Evaluator is unreachable                                      |
 | `{ kind: 'ERROR', errorKind: 'MALFORMED_CONTEXT' }` | A context attribute has the wrong type or format                  |

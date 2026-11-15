@@ -1,9 +1,10 @@
 // End-to-end check of the evaluation path against a running `docker compose up`: Core's API changes targeting,
 // and the SDK sees the change through the Evaluator. Build the SDK first (`pnpm nx run @ctff/sdk:build`), then:
 //
-//   node apps/evaluator/scripts/compose-smoke.ts toggle
+//   node apps/evaluator/scripts/compose-smoke.ts switch-on
 //       Creates a project with a flag, checks the SDK gets `false` while targeting is off, switches targeting on
-//       through Core's API and checks the SDK gets `true` within one poll interval. Prints the SDK key.
+//       through Core's API and checks the SDK gets `true` within one poll interval (see `pollGraceMs`). Prints the
+//       SDK key.
 //   node apps/evaluator/scripts/compose-smoke.ts expect <sdk-key> <flag-key> <true|false>
 //       Checks the SDK gets that variation (for instance after `docker compose stop core`).
 //
@@ -16,6 +17,12 @@ const coreUrl = process.env['CORE_URL'] ?? 'http://localhost:3000';
 const evaluatorUrl = process.env['EVALUATOR_URL'] ?? 'http://localhost:3001';
 const pollIntervalMs = Number(process.env['POLL_INTERVAL_MS'] ?? 2000);
 const flagKey = 'smoke-test-flag';
+/**
+ * The Evaluator starts its next poll one interval after the previous poll ends, so a change shows up within one
+ * interval plus the duration of one poll (milliseconds inside compose). This grace covers that, the 100 ms between
+ * this script's evaluations, and one evaluation's round trip; nothing more.
+ */
+const pollGraceMs = 500;
 const context = { user_id: 'smoke-test', country: 'CA' };
 
 async function core(method: string, path: string, body?: unknown): Promise<Record<string, unknown>> {
@@ -47,7 +54,7 @@ function check(condition: boolean, message: string): void {
   console.error(`ok: ${message}`);
 }
 
-async function toggle(): Promise<void> {
+async function switchOn(): Promise<void> {
   const projectKey = `smoke-test-${Date.now()}`;
   await core('POST', '/projects', { key: projectKey, name: 'Smoke test' });
   const { sdkKey } = (await core('POST', `/projects/${projectKey}/environments`, {
@@ -69,11 +76,10 @@ async function toggle(): Promise<void> {
     on: true,
   });
   const switched = performance.now();
-  // One poll interval, plus the time the poll and an evaluation take.
   const on = await evaluateUntil(
     client,
     (detail) => detail.value && detail.reason.kind === 'DEFAULT',
-    pollIntervalMs + 1000,
+    pollIntervalMs + pollGraceMs,
   );
   const elapsed = Math.round(performance.now() - switched);
   check(
@@ -93,10 +99,10 @@ async function expectVariation(sdkKey: string, key: string, expected: boolean): 
 
 const [command, ...args] = process.argv.slice(2);
 try {
-  if (command === 'toggle') await toggle();
+  if (command === 'switch-on') await switchOn();
   else if (command === 'expect' && args.length === 3 && (args[2] === 'true' || args[2] === 'false')) {
     await expectVariation(args[0] as string, args[1] as string, args[2] === 'true');
-  } else throw new Error('Usage: compose-smoke.ts toggle | expect <sdk-key> <flag-key> <true|false>');
+  } else throw new Error('Usage: compose-smoke.ts switch-on | expect <sdk-key> <flag-key> <true|false>');
 } catch (error) {
   console.error(`failed: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);

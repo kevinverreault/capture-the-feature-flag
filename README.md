@@ -113,6 +113,6 @@ To move the submodule to a newer design system commit: `git -C vendor/design-sys
 
 - `nx affected -t lint typecheck test build`,
 - `nx affected -t docker-build`, which builds the images of affected projects that define that target.
-- a compose smoke test: `docker compose up --build --wait`, then checks that Core and the Evaluator are healthy and run as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval once targeting is switched on through Core's API, and still `true` after `docker compose stop core`.
+- a compose smoke test: `docker compose up --build --wait`, then checks that Core and the Evaluator are healthy and run as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval (plus 500 ms for the poll's own latency) once targeting is switched on through Core's API, and still `true` after `docker compose stop core`.
 
 Nothing is published: images are built but not pushed, and packages are not released.

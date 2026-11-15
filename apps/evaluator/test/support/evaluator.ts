@@ -21,7 +21,7 @@ export interface RunningEvaluator {
 }
 
 /** Starts the built Evaluator as its own process, configured only through environment variables. */
-export async function startEvaluator(coreUrl: string, env: Record<string, string> = {}): Promise<RunningEvaluator> {
+export async function startEvaluator(coreUrl: string): Promise<RunningEvaluator> {
   const child = spawn(process.execPath, [mainJs], {
     env: {
       PATH: process.env['PATH'],
@@ -30,7 +30,6 @@ export async function startEvaluator(coreUrl: string, env: Record<string, string
       HOST: '127.0.0.1',
       LOG_LEVEL: 'info',
       POLL_INTERVAL_MS: String(pollIntervalMs),
-      ...env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });

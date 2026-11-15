@@ -87,6 +87,7 @@ describe('evaluate when no variation can be served', () => {
 
   it.each<[string, unknown]>([
     ['a context that is not an object', 'alice'],
+    ['a missing context', undefined],
     ['a null context', null],
     ['an array context', ['alice']],
     ['an empty user_id', { user_id: '' }],

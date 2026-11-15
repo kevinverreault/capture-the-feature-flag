@@ -1,2 +1,9 @@
-export { createClient, defaultTimeoutMs, type Client, type ClientOptions, type EvaluationDetail } from './client.js';
-export type { Context, EvaluationErrorKind, EvaluationReason } from '@ctff/evaluation';
+export {
+  createClient,
+  type Client,
+  type ClientOptions,
+  type ErrorKind,
+  type EvaluationDetail,
+  type EvaluationReason,
+} from './client.js';
+export type { Context } from '@ctff/evaluation';

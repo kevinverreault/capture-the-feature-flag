@@ -45,10 +45,29 @@ describe('polling Core', () => {
     expect(await client.variation('rare-bird-alerts', alice, false)).toBe(true);
   });
 
-  it('is not ready while the environment list loads but a snapshot on it does not', async () => {
+  it('is ready while one environment fails to load, and answers NOT_READY only for that environment', async () => {
     core = await startFakeCore();
-    core.put('ctff-env-production', environment('production', [flag('rare-bird-alerts')]));
+    core.put('ctff-env-production', environment('production', [flag('rare-bird-alerts', { on: true })]));
     // A snapshot Core can't serve: the list names it, but its snapshot fails to parse as one.
+    core.put('ctff-env-broken', { projectKey: 'birdwatch', environmentKey: 'broken' } as never);
+    evaluator = await startEvaluator(core.url);
+    await evaluator.waitUntilReady();
+
+    const production = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-production' });
+    const broken = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-broken' });
+    expect(await production.variation('rare-bird-alerts', alice, false)).toBe(true);
+    expect(await broken.variationDetail('rare-bird-alerts', alice, false)).toEqual({
+      value: false,
+      variationIndex: null,
+      reason: { kind: 'ERROR', errorKind: 'NOT_READY' },
+    });
+
+    core.put('ctff-env-broken', environment('broken', [flag('rare-bird-alerts', { on: true })]));
+    await expect.poll(() => broken.variation('rare-bird-alerts', alice, false)).toBe(true);
+  });
+
+  it('is not ready while the environment list loads but none of the snapshots on it do', async () => {
+    core = await startFakeCore();
     core.put('ctff-env-broken', { projectKey: 'birdwatch', environmentKey: 'broken' } as never);
     evaluator = await startEvaluator(core.url);
 
@@ -58,6 +77,12 @@ describe('polling Core', () => {
     expect(await evaluator.isReady()).toBe(false);
 
     core.put('ctff-env-broken', environment('broken', []));
+    await evaluator.waitUntilReady();
+  });
+
+  it('is ready once the environment list loads when Core has no environments yet', async () => {
+    core = await startFakeCore();
+    evaluator = await startEvaluator(core.url);
     await evaluator.waitUntilReady();
   });
 

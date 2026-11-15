@@ -186,6 +186,59 @@ describe('the fallback value', () => {
     }
   });
 
+  it.each([
+    ['a served variation with FLAG_NOT_FOUND', { value: true, variationIndex: 0, reason: { kind: 'FLAG_NOT_FOUND' } }],
+    ['a served variation with ERROR', { value: true, variationIndex: 0, reason: { kind: 'ERROR', errorKind: 'X' } }],
+    ['no variation with DEFAULT', { value: null, variationIndex: null, reason: { kind: 'DEFAULT' } }],
+    ['no variation with an ERROR without its kind', { value: null, variationIndex: null, reason: { kind: 'ERROR' } }],
+    ['a variation without its index', { value: true, variationIndex: null, reason: { kind: 'DEFAULT' } }],
+  ])('is returned with an EVALUATOR_ERROR for an inconsistent answer: %s', async (_case, answer) => {
+    const inconsistent = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer));
+    });
+    await new Promise<void>((resolve) => inconsistent.listen(0, '127.0.0.1', resolve));
+    const { port } = inconsistent.address() as AddressInfo;
+    try {
+      const client = createClient({ evaluatorUrl: `http://127.0.0.1:${port}`, sdkKey: 'ctff-env-production' });
+      expect(await client.variationDetail('rare-bird-alerts', alice, false)).toEqual({
+        value: false,
+        variationIndex: null,
+        reason: { kind: 'ERROR', errorKind: 'EVALUATOR_ERROR' },
+      });
+    } finally {
+      await new Promise((resolve) => inconsistent.close(resolve));
+    }
+  });
+
+  it('accepts a served variation with a reason this SDK does not know yet, from a newer Evaluator', async () => {
+    const newer = createServer((_request, response) => {
+      const answer = { flagKey: 'rare-bird-alerts', value: true, variationIndex: 0, reason: { kind: 'RULE_MATCH' } };
+      response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer));
+    });
+    await new Promise<void>((resolve) => newer.listen(0, '127.0.0.1', resolve));
+    const { port } = newer.address() as AddressInfo;
+    try {
+      const client = createClient({ evaluatorUrl: `http://127.0.0.1:${port}`, sdkKey: 'ctff-env-production' });
+      expect(await client.variation('rare-bird-alerts', alice, false)).toBe(true);
+    } finally {
+      await new Promise((resolve) => newer.close(resolve));
+    }
+  });
+
+  it('is returned with a MALFORMED_CONTEXT error when the request has no context', async () => {
+    const response = await fetch(`${evaluator.url}/api/v1/evaluate/rare-bird-alerts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-ctff-sdk-key': 'ctff-env-production' },
+      body: JSON.stringify({ user_id: 'alice' }),
+    });
+    expect(await response.json()).toEqual({
+      flagKey: 'rare-bird-alerts',
+      value: null,
+      variationIndex: null,
+      reason: { kind: 'ERROR', errorKind: 'MALFORMED_CONTEXT' },
+    });
+  });
+
   it('is returned with an EVALUATOR_ERROR when the answer is not an evaluation', async () => {
     const other = createServer((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end('{"hello":"world"}');
