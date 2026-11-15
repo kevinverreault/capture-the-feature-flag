@@ -36,13 +36,13 @@ export async function reloadUntil(
 export class BirdwatchSession {
   constructor(readonly page: Page) {}
 
-  /** `options` are the browser context's, such as the `colorScheme` the system prefers. */
+  /** `colorScheme` is the one the browser's system prefers, which the design system's theme follows by default. */
   static async logIn(
     browser: Browser,
     birder: BirderId,
-    options: BrowserContextOptions = {},
+    colorScheme?: BrowserContextOptions['colorScheme'],
   ): Promise<BirdwatchSession> {
-    const context = await browser.newContext({ ...options, baseURL: urls.birdwatchWeb });
+    const context = await browser.newContext({ baseURL: urls.birdwatchWeb, colorScheme });
     const page = await context.newPage();
     await page.goto('/login');
     await page.getByRole('button', { name: `Log in as ${birders[birder].name}` }).click();
@@ -107,10 +107,11 @@ export const test = base.extend<Fixtures>({
     },
     { auto: true },
   ],
-  birdwatch: async ({ browser }, use) => {
+  // The sessions' contexts are the fixture's own, so it hands them the test's colorScheme (`test.use`).
+  birdwatch: async ({ browser, colorScheme }, use) => {
     const sessions: BirdwatchSession[] = [];
     await use(async (birder) => {
-      const session = await BirdwatchSession.logIn(browser, birder);
+      const session = await BirdwatchSession.logIn(browser, birder, colorScheme);
       sessions.push(session);
       return session;
     });
