@@ -1,10 +1,22 @@
 import type { Variation } from '@ctff/evaluation';
 import { applyDecorators } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayUnique, IsArray, IsInt, IsString, Matches, MaxLength, Min } from 'class-validator';
+import {
+  ArrayMaxSize,
+  ArrayUnique,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { ImmutableKey, IsKey, IsName, IsOmittable } from '../common/keys.js';
 
 const tagPattern = /^\S(?:.*\S)?$/;
+const tagMaxLength = 64;
 
 function IsDescription(): PropertyDecorator {
   return applyDecorators(
@@ -17,14 +29,42 @@ function IsDescription(): PropertyDecorator {
 
 function IsTags(): PropertyDecorator {
   return applyDecorators(
-    ApiProperty({ required: false, type: [String], example: ['alerts'], maxItems: 50 }),
+    ApiProperty({
+      required: false,
+      type: 'array',
+      items: { type: 'string', maxLength: tagMaxLength, pattern: tagPattern.source },
+      example: ['alerts'],
+      maxItems: 50,
+    }),
     IsOmittable(),
     IsArray(),
     ArrayMaxSize(50),
     ArrayUnique(),
     IsString({ each: true }),
-    MaxLength(64, { each: true }),
+    MaxLength(tagMaxLength, { each: true }),
     Matches(tagPattern, { each: true, message: 'tags must be non-blank without leading or trailing spaces' }),
+  );
+}
+
+/** The tools that can mark a flag as managed by them: the values of the ManagedBy enum in schema.prisma. */
+export const managedByValues = ['terraform'] as const;
+export type ManagedBy = (typeof managedByValues)[number];
+
+const managedByDescription =
+  'The tool managing the flag as code: "terraform" when the Terraform provider manages it, null otherwise. ' +
+  'The admin app shows a badge and warns before edits. It is informational: it does not lock the flag.';
+
+/** The "managed by" marker. An update may also send null, handing the flag back to manual management. */
+function IsManagedBy({ nullable }: { nullable: boolean }): PropertyDecorator {
+  return applyDecorators(
+    ApiProperty({
+      required: false,
+      nullable,
+      enum: managedByValues,
+      description: nullable ? `${managedByDescription} Send null to clear it.` : managedByDescription,
+    }),
+    nullable ? IsOptional() : IsOmittable(),
+    IsIn(managedByValues, { message: `managedBy must be one of: ${managedByValues.join(', ')}` }),
   );
 }
 
@@ -40,6 +80,9 @@ export class CreateFlagDto {
 
   @IsTags()
   tags?: string[];
+
+  @IsManagedBy({ nullable: false })
+  managedBy?: ManagedBy;
 }
 
 export class UpdateFlagDto {
@@ -59,6 +102,9 @@ export class UpdateFlagDto {
 
   @IsTags()
   tags?: string[];
+
+  @IsManagedBy({ nullable: true })
+  managedBy?: ManagedBy | null;
 }
 
 export class FlagDto {
@@ -86,6 +132,9 @@ export class FlagDto {
 
   @ApiProperty({ description: 'Incremented on every edit; send it back with the next edit.' })
   version!: number;
+
+  @ApiProperty({ enum: managedByValues, nullable: true, description: managedByDescription })
+  managedBy!: ManagedBy | null;
 
   @ApiProperty()
   createdAt!: Date;
