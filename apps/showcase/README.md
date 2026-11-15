@@ -41,4 +41,4 @@ The [Dockerfile](Dockerfile) builds the site, then serves `dist/` with `nginxinc
 docker build -f apps/showcase/Dockerfile -t ctff-showcase .   # from the repository root
 ```
 
-As for Birdwatch and the admin app, the showcase has no tests of its own beyond the S5 end-to-end suite.
+As for Birdwatch and the admin app, the showcase has no tests of its own beyond the S5 [end-to-end suite](../e2e/README.md).

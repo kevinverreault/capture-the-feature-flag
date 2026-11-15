@@ -1,0 +1,34 @@
+{
+  "name": "@ctff/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The end-to-end suite (S5): Playwright driving the admin app, Birdwatch and the showcase over the whole compose stack.",
+  "exports": "./playwright.config.ts",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:e2e"
+    ],
+    "targets": {
+      "e2e": {
+        "cache": false,
+        "dependsOn": [
+          "^build"
+        ]
+      }
+    }
+  },
+  "dependencies": {
+    "@ctff/core-api-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "typescript": "~6.0.3"
+  }
+}

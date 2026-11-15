@@ -13,6 +13,7 @@ export const scopeTags = [
   'scope:birdwatch',
   'scope:showcase',
   'scope:terraform',
+  'scope:e2e',
   'scope:shared',
 ];
 

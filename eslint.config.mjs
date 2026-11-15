@@ -9,7 +9,17 @@ export default [
   ...nx.configs['flat/javascript'],
   ...astro.configs.recommended,
   {
-    ignores: ['**/dist', '**/src/generated', '**/.astro', '**/node_modules', '**/coverage', 'vendor/**', '.nx/**'],
+    ignores: [
+      '**/dist',
+      '**/src/generated',
+      '**/.astro',
+      '**/node_modules',
+      '**/coverage',
+      'vendor/**',
+      '.nx/**',
+      '**/playwright-report',
+      '**/test-results',
+    ],
   },
   {
     files: ['**/*.{ts,tsx,cts,mts,js,jsx,cjs,mjs,astro}'],

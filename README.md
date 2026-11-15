@@ -49,6 +49,7 @@ The workspace uses pnpm workspaces and Nx. Every project is a pnpm package whose
 | `test`         | `vitest run`                                                                             |
 | `build`        | Builds into the project's `dist/`                                                        |
 | `docker-build` | Projects that ship an image: `docker build` from the repo root                           |
+| `e2e`          | The [end-to-end suite](apps/e2e/README.md) (S5): Playwright over the compose stack       |
 
 The Go Terraform provider follows the same targets with Go tools: `gofmt` for `lint`, `go vet` for `typecheck`, `go build` and `go test`. The [showcase](apps/showcase/README.md#code-samples) is the one exception to the `typecheck` convention: after `astro check`, it compiles its guides' TypeScript samples and runs `terraform validate` on its Terraform sample against the provider's build, so it needs Go and the Terraform CLI too (it declares an Nx implicit dependency on `@ctff/terraform-provider`).
 
@@ -124,6 +125,7 @@ To move the submodule to a newer design system commit: `git -C vendor/design-sys
 - `nx affected -t lint typecheck test build`,
 - `nx affected -t docker-build`, which builds the images of affected projects that define that target.
 - a compose smoke test: `docker compose up --build --wait`, then checks that every service is healthy and runs as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval (plus 500 ms for the poll's own latency) once targeting is switched on through Core's API, and still `true` after `docker compose stop core`. Before stopping Core, [apps/birdwatch-api/scripts/compose-smoke.ts](apps/birdwatch-api/scripts/compose-smoke.ts) checks the Birdwatch demo, its `new-sighting-form` kill switch and its targeting showcase. It also checks that the showcase runs as non-root, serves each of its pages, and answers `404` for an unknown one.
+- the [end-to-end suite](apps/e2e/README.md) (S5): Playwright starts the compose stack (with `apps/e2e/compose.e2e.yaml`) and, in a headless Chromium, switches the targeting of `new-sighting-form` off, adds a country rule, creates and targets a flag and archives one in the admin app, checking what Birdwatch shows each birder within one poll interval; then checks the dashboard and the Contexts explorer after Birdwatch traffic, and that every showcase page loads without errors.
 - a compose Terraform profile test: `docker compose --profile terraform up --build`, which builds the [Terraform provider](apps/terraform-provider-ctff/README.md) and applies its example configuration, then checks that Core holds the declared targeting with the flags managed by `terraform` and Terraform's changes attributed to it, and that applying again restores targeting edited outside Terraform.
 
 Nothing is published: images are built but not pushed, and packages are not released.
