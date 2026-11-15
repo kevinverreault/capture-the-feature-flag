@@ -6,6 +6,7 @@ import Alert from '@ds/components/feedback/Alert.astro';
 import Toast from '@ds/components/feedback/Toast.astro';
 import DropdownMenu from '@ds/components/overlay/DropdownMenu.astro';
 import Button from '@ds/components/ui/Button.astro';
+import ThemeInit from '@ds/components/ui/ThemeInit.astro';
 import ThemeToggle from '@ds/components/ui/ThemeToggle.astro';
 import { takeFlash } from '../lib/flash';
 import { routes } from '../lib/routes';
@@ -33,6 +34,7 @@ const switcherItems = [
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <ThemeInit />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} · Capture The Feature Flag</title>
   </head>
