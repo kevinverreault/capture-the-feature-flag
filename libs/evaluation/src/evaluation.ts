@@ -169,9 +169,10 @@ function isStringArray(value: unknown): value is string[] {
 
 /**
  * The context with absent (`undefined` or `null`) attributes left out and `country` in uppercase, or `null` when
- * it is malformed. Context attributes V1 doesn't know are ignored.
+ * it is malformed. Context attributes V1 doesn't know are ignored. `evaluate()` checks contexts with it, and the
+ * Evaluator and Core use it to record seen contexts the same way.
  */
-function normalizeContext(context: unknown): Context | null {
+export function normalizeContext(context: unknown): Context | null {
   if (!isObject(context)) return null;
   const normalized: Context = {};
   for (const key of contextAttributeKeys) {

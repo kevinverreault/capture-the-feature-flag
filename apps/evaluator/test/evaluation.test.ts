@@ -128,6 +128,24 @@ describe('the fallback value', () => {
     },
   );
 
+  it('is returned with FLAG_NOT_FOUND once a flag is archived, until it is restored', async () => {
+    // Core leaves archived flags out of the snapshot, and puts them back as they were on restore.
+    const live = environment('staging', [flag('rare-bird-alerts', { on: true })]);
+    core.put('ctff-env-staging', live);
+    const client = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-staging' });
+    const served = { value: true, variationIndex: 0, reason: { kind: 'DEFAULT' } };
+    await expect.poll(() => client.variationDetail('rare-bird-alerts', alice, false)).toEqual(served);
+
+    core.put('ctff-env-staging', environment('staging', []));
+    await expect
+      .poll(() => client.variationDetail('rare-bird-alerts', alice, false))
+      .toEqual({ value: false, variationIndex: null, reason: { kind: 'FLAG_NOT_FOUND' } });
+    expect(await client.variation('rare-bird-alerts', alice, false)).toBe(false);
+
+    core.put('ctff-env-staging', live);
+    await expect.poll(() => client.variationDetail('rare-bird-alerts', alice, false)).toEqual(served);
+  });
+
   it('is returned with an UNKNOWN_SDK_KEY error for an SDK key the Evaluator does not know', async () => {
     const client = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-unknown' });
     expect(await client.variationDetail('rare-bird-alerts', alice, false)).toEqual({

@@ -1,0 +1,133 @@
+---
+import type { AuditEntry } from '@ctff/core-api-client';
+import Badge from '@ds/components/ui/Badge.astro';
+import Table from '@ds/components/ui/Table.astro';
+import { auditChanges, auditSummary } from '../lib/audit';
+import { routes } from '../lib/routes';
+
+interface Props {
+  entries: readonly AuditEntry[];
+  /** The variations of the project's current flags by key: their entries show variations by value and link to them. */
+  flags: ReadonlyMap<string, readonly unknown[]>;
+  /** The page of older entries, when there is one. */
+  olderHref?: string | undefined;
+  /** Said when there are no entries. */
+  empty: string;
+}
+
+const { entries, flags, olderHref, empty } = Astro.props;
+const when = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'medium', timeZone: 'UTC' });
+const shown = entries.map((entry) => {
+  const variations = entry.flagKey === null ? undefined : flags.get(entry.flagKey);
+  const changes = auditChanges(entry, variations);
+  const updated = entry.before !== null && entry.after !== null;
+  return {
+    entry,
+    summary: auditSummary(entry),
+    flagHref:
+      entry.flagKey !== null && variations
+        ? routes.flag(entry.projectKey, entry.flagKey, entry.environmentKey ?? undefined)
+        : undefined,
+    columns: updated
+      ? [
+          { key: 'field', label: 'Field' },
+          { key: 'before', label: 'Before' },
+          { key: 'after', label: 'After' },
+        ]
+      : [
+          { key: 'field', label: 'Field' },
+          { key: 'value', label: entry.after === null ? 'Was' : 'Value' },
+        ],
+    rows: changes.map((change) => ({
+      field: change.field,
+      before: change.before?.join('\n') ?? '',
+      after: change.after?.join('\n') ?? '',
+      value: (change.after ?? change.before ?? []).join('\n'),
+    })),
+  };
+});
+---
+
+{
+  shown.length === 0 ? (
+    <p>{empty}</p>
+  ) : (
+    <ol class="audit-entries">
+      {shown.map(({ entry, summary, flagHref, columns, rows }) => (
+        <li data-audit-entry={entry.id}>
+          <div class="audit-heading">
+            <Badge variant={entry.action === 'delete' ? 'danger' : 'outline'}>{entry.action}</Badge>
+            <span class="audit-summary">{flagHref ? <a href={flagHref}>{summary}</a> : summary}</span>
+            <span class="audit-actor">
+              by <strong>{entry.actor}</strong>
+            </span>
+            <time datetime={entry.createdAt}>{when.format(new Date(entry.createdAt))} UTC</time>
+          </div>
+          {rows.length === 0 ? (
+            <p class="audit-nothing">Nothing changed.</p>
+          ) : (
+            <Table class="audit-changes" caption={`What changed: ${summary}`} columns={columns} rows={rows} rowHeader="field" />
+          )}
+        </li>
+      ))}
+    </ol>
+  )
+}
+{
+  olderHref && (
+    <a href={olderHref} rel="next" class="audit-older">
+      Older entries
+    </a>
+  )
+}
+
+<style>
+  .audit-entries {
+    display: grid;
+    gap: var(--space-md);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .audit-entries > li {
+    display: grid;
+    gap: var(--space-xs);
+    padding-bottom: var(--space-sm);
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.15);
+  }
+
+  .audit-heading {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: baseline;
+  }
+
+  .audit-summary {
+    font-weight: 700;
+  }
+
+  time,
+  .audit-actor {
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .audit-nothing {
+    margin: 0;
+  }
+
+  /* Multi-line values (rules, individual targets) keep a line each. */
+  .audit-entries :global(.audit-changes td) {
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+
+  .audit-entries :global(.audit-changes caption) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+</style>

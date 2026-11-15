@@ -1,0 +1,27 @@
+---
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Textarea from '@ds/components/form/Textarea.astro';
+import type { FlagFieldValues } from '../lib/flag-fields';
+import type { FormErrors } from '../lib/form-errors';
+
+interface Props {
+  /** What the inputs show: what was submitted, or the flag as it is (see flagFieldValues). */
+  values: FlagFieldValues;
+  errors: FormErrors;
+}
+
+const { values, errors } = Astro.props;
+
+// The fields of a flag an admin can set on create and edit. The key is immutable, so each form shows it its own way.
+---
+
+<FormField label="Name" error={errors.fields['name']}>
+  <Input name="name" value={values.name} required />
+</FormField>
+<FormField label="Description (optional)" hint="What the flag controls." error={errors.fields['description']}>
+  <Textarea name="description" value={values.description} />
+</FormField>
+<FormField label="Tags (optional)" hint="Separated by commas, such as alerts, beta." error={errors.fields['tags']}>
+  <Input name="tags" value={values.tags} />
+</FormField>

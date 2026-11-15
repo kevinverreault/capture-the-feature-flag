@@ -35,12 +35,7 @@ export function ImmutableKey(what: string): PropertyDecorator {
 }
 
 /** Fails with 400 when an update body tries to change an immutable key (the body's `property`). */
-export function assertKeyUnchanged(
-  what: string,
-  current: string,
-  sent: string | undefined,
-  property = 'key',
-): void {
+export function assertKeyUnchanged(what: string, current: string, sent: string | undefined, property = 'key'): void {
   if (sent !== undefined && sent !== current) {
     throw invalidBody({ [property]: [`${what} key is immutable and cannot be changed`] });
   }

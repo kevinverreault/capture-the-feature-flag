@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
 import { ApiConflictResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { Actor, RecordsAudit } from '../audit/actor.js';
 import { TargetingDto, UpdateTargetingDto } from './targeting.dto.js';
 import { TargetingService } from './targeting.service.js';
 
@@ -25,14 +26,18 @@ export class TargetingController {
   }
 
   @Patch(':environmentKey')
+  @RecordsAudit()
   @ApiOkResponse({ type: TargetingDto })
-  @ApiConflictResponse({ description: 'The targeting changed since the version the change is based on.' })
+  @ApiConflictResponse({
+    description: 'The targeting changed since the version the change is based on, or its flag is archived.',
+  })
   update(
     @Param('projectKey') projectKey: string,
     @Param('flagKey') flagKey: string,
     @Param('environmentKey') environmentKey: string,
     @Body() body: UpdateTargetingDto,
+    @Actor() actor: string,
   ): Promise<TargetingDto> {
-    return this.targeting.update(projectKey, flagKey, environmentKey, body);
+    return this.targeting.update(projectKey, flagKey, environmentKey, body, actor);
   }
 }

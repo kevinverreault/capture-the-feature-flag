@@ -1,0 +1,50 @@
+---
+import { seriesColor } from './series';
+
+interface Props {
+  variations: readonly string[];
+}
+
+const { variations } = Astro.props;
+---
+
+<ul class="chart-legend" aria-label="Variations">
+  {
+    variations.map((variation, slot) => (
+      <li>
+        <span class="swatch" style={`background-color: ${seriesColor(slot)}`} />
+        <code>{variation}</code>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: var(--fs-sm);
+  }
+
+  li {
+    display: inline-flex;
+    gap: 0.4em;
+    align-items: center;
+  }
+
+  .swatch {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 2px;
+  }
+
+  @media (forced-colors: active) {
+    .swatch {
+      forced-color-adjust: none;
+    }
+  }
+</style>

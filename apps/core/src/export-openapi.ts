@@ -23,7 +23,14 @@ if (!target) {
 const logger = pino({ level: 'silent' });
 const app = await NestFactory.create(
   AppModule.forRoot(
-    { databaseUrl: 'postgres://unused', host: '127.0.0.1', port: 0, logLevel: 'silent', adminEnabled: false },
+    {
+      databaseUrl: 'postgres://unused',
+      host: '127.0.0.1',
+      port: 0,
+      logLevel: 'silent',
+      adminEnabled: false,
+      retentionIntervalMs: 1,
+    },
     logger,
   ),
   { preview: true, logger: false },

@@ -1,6 +1,346 @@
 ---
+import { unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Select from '@ds/components/form/Select.astro';
+import Badge from '@ds/components/ui/Badge.astro';
+import Button from '@ds/components/ui/Button.astro';
+import Card from '@ds/components/ui/Card.astro';
+import EvaluationTimeline from '../../../components/dashboard/EvaluationTimeline.astro';
+import FlagEvaluations from '../../../components/dashboard/FlagEvaluations.astro';
+import RecentChanges from '../../../components/dashboard/RecentChanges.astro';
+import NotFound from '../../../components/NotFound.astro';
+import ProjectNav from '../../../components/ProjectNav.astro';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../lib/core';
+import { dashboardRange, dashboardRanges, evaluationChart, fullCount, lastEvaluated } from '../../../lib/dashboard';
+import { orNotFound } from '../../../lib/forms';
 import { routes } from '../../../lib/routes';
 
-// A project opens on its environments (its flags join them with #9).
-return Astro.redirect(routes.environments(Astro.params.project ?? ''));
+/** How many audit entries the dashboard shows as recent changes. */
+const recentChanges = 10;
+
+// The project's landing page.
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const params = { path: { projectKey } };
+const range = dashboardRange(Astro.url.searchParams.get('range'));
+const requestedEnvironmentKey = Astro.url.searchParams.get('environment') || undefined;
+
+const [projects, project, environments, flags, summary, stale, changes] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params }))),
+  // Archived flags too, so that their evaluations and changes are named and linked.
+  orNotFound(
+    unwrap(core.GET('/api/v1/projects/{projectKey}/flags', { params: { ...params, query: { includeArchived: true } } })),
+  ),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/dashboard/summary', { params }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/dashboard/stale-flags', { params }))),
+  unwrap(core.GET('/api/v1/audit-entries', { params: { query: { projectKey, limit: recentChanges } } })),
+]);
+// An environment that isn't the project's (renamed or deleted since) is not a filter.
+const environment = environments?.find((listed) => listed.key === requestedEnvironmentKey);
+const series =
+  project &&
+  (await orNotFound(
+    unwrap(
+      core.GET('/api/v1/projects/{projectKey}/dashboard/evaluations', {
+        params: { ...params, query: { range, environment: environment?.key } },
+      }),
+    ),
+  ));
+const hasPageData = project && environments && flags && summary && stale && series;
+if (!hasPageData) Astro.response.status = 404;
+
+const chart = series && flags ? evaluationChart(series, flags) : undefined;
+const rangeLabel = dashboardRanges.find((listed) => listed.value === range)?.label.toLowerCase() ?? '';
+// Names the environment the charts are of, after what they count: " in Production".
+const scopeSuffix = environment ? ` in ${environment.name}` : '';
+const now = new Date();
 ---
+
+{
+  hasPageData && chart ? (
+    <AdminLayout title={`Dashboard · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="dashboard" />
+
+      <section aria-labelledby="flag-counts" class="dashboard-section">
+        <div class="section-heading">
+          <h2 id="flag-counts" class="text-xl">
+            Flags
+          </h2>
+          <Button href={routes.flags(project.key)} variant="muted" decoration="ghost" size="small">
+            All flags
+          </Button>
+        </div>
+        <ul class="tiles">
+          <li>
+            <Card as="div" class="tile" data-tile="flags">
+              <span class="tile-label">Flags</span>
+              <span class="tile-value">{fullCount(summary.flagCount)}</span>
+              <span class="tile-note">{fullCount(summary.archivedFlagCount)} archived</span>
+            </Card>
+          </li>
+          {summary.environments.map((counts) => (
+            <li>
+              <Card as="div" class="tile" data-environment={counts.environmentKey}>
+                <span class="tile-label">{counts.name}</span>
+                <span class="tile-value">
+                  <span data-state="on">{fullCount(counts.on)}</span> on
+                  <span class="tile-separator">·</span>
+                  <span data-state="off">{fullCount(counts.off)}</span> off
+                </span>
+                <a class="tile-note" href={routes.environment(project.key, counts.environmentKey)}>
+                  {counts.environmentKey}
+                </a>
+              </Card>
+            </li>
+          ))}
+        </ul>
+        {summary.environments.length === 0 && (
+          <p>
+            Targeting is per environment: <a href={routes.environments(project.key)}>create an environment</a> to
+            switch targeting on.
+          </p>
+        )}
+      </section>
+
+      <section aria-labelledby="evaluations" class="dashboard-section">
+        <h2 id="evaluations" class="text-xl">
+          Evaluations
+        </h2>
+        <form method="get" action={routes.project(project.key)} class="filters" data-auto-submit aria-label="Evaluation charts">
+          <FormField label="Time range">
+            <Select name="range">
+              {dashboardRanges.map((listed) => (
+                <option value={listed.value} selected={listed.value === range}>
+                  {listed.label}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Environment">
+            <Select name="environment">
+              <option value="" selected={environment === undefined}>
+                All environments
+              </option>
+              {environments.map((listed) => (
+                <option value={listed.key} selected={listed.key === environment?.key}>
+                  {listed.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <Button type="submit" variant="secondary" class="filters-submit">
+            Show
+          </Button>
+        </form>
+
+        <p class="hero" data-total={chart.total}>
+          <span class="hero-value">{fullCount(chart.total)}</span>
+          <span class="hero-label">
+            evaluations in the {rangeLabel}
+            {scopeSuffix}
+          </span>
+        </p>
+
+        {chart.total === 0 ? (
+          <p>
+            No evaluations in the {rangeLabel}
+            {scopeSuffix}. Evaluators report what they evaluated about every minute.
+          </p>
+        ) : (
+          <div class="charts">
+            <Card as="section" aria-labelledby="evaluations-over-time">
+              <h3 slot="header" id="evaluations-over-time" class="text-lg">
+                Over time
+              </h3>
+              <EvaluationTimeline chart={chart} range={range} label={`Evaluations over the ${rangeLabel}${scopeSuffix}`} />
+            </Card>
+            <Card as="section" aria-labelledby="evaluations-per-flag">
+              <h3 slot="header" id="evaluations-per-flag" class="text-lg">
+                Per flag
+              </h3>
+              <FlagEvaluations
+                chart={chart}
+                projectKey={project.key}
+                label={`Evaluations per flag over the ${rangeLabel}${scopeSuffix}`}
+              />
+            </Card>
+          </div>
+        )}
+      </section>
+
+      <div class="columns">
+        <section aria-labelledby="recent-changes" class="dashboard-section">
+          <div class="section-heading">
+            <h2 id="recent-changes" class="text-xl">
+              Recent changes
+            </h2>
+            <Button href={routes.audit(project.key)} variant="muted" decoration="ghost" size="small">
+              Audit log
+            </Button>
+          </div>
+          <RecentChanges entries={changes.entries} flagKeys={new Set(flags.map((flag) => flag.key))} />
+        </section>
+
+        <section aria-labelledby="stale-flags" class="dashboard-section">
+          <h2 id="stale-flags" class="text-xl">
+            Stale flags
+          </h2>
+          <p class="stale-threshold">
+            Flags without evaluations in any environment for {stale.thresholdDays}{' '}
+            {stale.thresholdDays === 1 ? 'day' : 'days'}: candidates for archiving. The threshold is in{' '}
+            <a href={routes.telemetrySettings()}>Settings</a>.
+          </p>
+          {stale.flags.length === 0 ? (
+            <p>No stale flags.</p>
+          ) : (
+            <ul class="stale-list">
+              {stale.flags.map((flag) => (
+                <li data-flag={flag.key}>
+                  <a href={routes.flag(project.key, flag.key)}>{flag.name}</a>
+                  <code>{flag.key}</code>
+                  <Badge variant="outline">{lastEvaluated(flag.lastEvaluatedAt, now)}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Project not found" projects={projects}>
+      <NotFound>There is no project {projectKey}.</NotFound>
+    </AdminLayout>
+  )
+}
+
+<script>
+  // With scripts, the charts follow the filters as soon as one changes.
+  for (const form of document.querySelectorAll<HTMLFormElement>('form[data-auto-submit]')) {
+    form.addEventListener('change', () => form.requestSubmit());
+  }
+</script>
+
+<style>
+  .dashboard-section {
+    display: grid;
+    gap: var(--space-sm);
+    align-content: start;
+  }
+
+  .dashboard-section p {
+    margin: 0;
+  }
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .tiles > li {
+    display: grid;
+  }
+
+  .tiles :global(.tile .card-body) {
+    display: grid;
+    gap: 0.25em;
+  }
+
+  .tile-label {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .tile-value {
+    font-size: var(--fs-xl);
+    font-weight: 700;
+  }
+
+  .tile-separator {
+    padding-inline: 0.25em;
+    color: hsl(var(--color-on-background) / 0.5);
+  }
+
+  .tile-note {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: end;
+  }
+
+  .hero {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: baseline;
+  }
+
+  .hero-value {
+    font-size: var(--fs-3xl);
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .hero-label {
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .charts,
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+    gap: var(--space-md);
+  }
+
+  .charts h3 {
+    margin: 0;
+  }
+
+  .stale-threshold {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  /* The accent stays readable on the background in both themes. */
+  .dashboard-section p a {
+    color: hsl(var(--color-accent));
+  }
+
+  .stale-list {
+    display: grid;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .stale-list li {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: baseline;
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.1);
+  }
+
+  .stale-list a {
+    color: inherit;
+    font-weight: 700;
+  }
+
+  .stale-list code {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+</style>

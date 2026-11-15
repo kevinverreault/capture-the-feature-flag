@@ -8,6 +8,8 @@ export interface CoreConfig {
   adminEnabled: boolean;
   /** The Core the admin app calls; unset means this one. */
   adminCoreUrl?: string | undefined;
+  /** How often the retention job purges telemetry older than the retention in Settings. */
+  retentionIntervalMs: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
@@ -26,7 +28,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
     logLevel: env['LOG_LEVEL'] ?? 'info',
     adminEnabled: parseBoolean('ADMIN_ENABLED', env['ADMIN_ENABLED'], true),
     adminCoreUrl: env['ADMIN_CORE_URL']?.trim() || undefined,
+    retentionIntervalMs: positiveInteger('RETENTION_INTERVAL_MS', env['RETENTION_INTERVAL_MS'], 60 * 60_000),
   };
+}
+
+/** A positive integer variable, where an empty value means unset. */
+function positiveInteger(name: string, raw: string | undefined, fallback: number): number {
+  const value = raw?.trim() ? Number(raw.trim()) : fallback;
+  if (!Number.isInteger(value) || value < 1) throw new Error(`${name} must be a positive integer: ${raw}`);
+  return value;
 }
 
 function parseBoolean(name: string, raw: string | undefined, fallback: boolean): boolean {
@@ -36,3 +46,6 @@ function parseBoolean(name: string, raw: string | undefined, fallback: boolean):
   if (value === 'false') return false;
   throw new Error(`${name} must be true or false: ${raw}`);
 }
+
+/** The injection token of the CoreConfig, which AppModule provides to every module. */
+export const CORE_CONFIG = Symbol('CORE_CONFIG');

@@ -1,0 +1,243 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import Checkbox from '@ds/components/form/Checkbox.astro';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Select from '@ds/components/form/Select.astro';
+import Badge from '@ds/components/ui/Badge.astro';
+import Button from '@ds/components/ui/Button.astro';
+import NotFound from '../../../../components/NotFound.astro';
+import ProjectNav from '../../../../components/ProjectNav.astro';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../../lib/core';
+import { filterFlags, flagListCaption, listedFlags, listedTags, sameTag } from '../../../../lib/flag-list';
+import { orNotFound } from '../../../../lib/forms';
+import { routes } from '../../../../lib/routes';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const params = { path: { projectKey } };
+const search = Astro.url.searchParams.get('search') ?? '';
+const tag = Astro.url.searchParams.get('tag') ?? '';
+const includeArchived = Astro.url.searchParams.get('includeArchived') === 'true';
+
+const [projects, project, environments, flags] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params }))),
+  // Archived flags too, so a project whose flags are all archived doesn't read as having none.
+  orNotFound(
+    unwrap(core.GET('/api/v1/projects/{projectKey}/flags', { params: { ...params, query: { includeArchived: true } } })),
+  ),
+]);
+if (!project || !environments || !flags) Astro.response.status = 404;
+
+const listed = listedFlags(flags ?? [], { includeArchived });
+const tags = listedTags(listed);
+const shown = filterFlags(listed, { search, tag });
+const filtered = search.trim() !== '' || tag !== '';
+const isOn = (flag: (typeof shown)[number], environmentKey: string) =>
+  flag.targeting.some((state) => state.environmentKey === environmentKey && state.on);
+---
+
+{
+  project && environments && flags ? (
+    <AdminLayout title={`Flags · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="flags" />
+
+      <section aria-labelledby="flag-list" class="flag-list">
+        <div class="section-heading">
+          <h2 id="flag-list" class="text-xl">
+            Flags
+          </h2>
+          <Button href={routes.newFlag(project.key)} variant="primary">
+            Create flag
+          </Button>
+        </div>
+
+        {flags.length === 0 ? (
+          <p>This project has no flags yet.</p>
+        ) : (
+          <>
+            <form method="get" class="filters" role="search" aria-label="Find flags">
+              <FormField label="Search">
+                <Input name="search" type="search" value={search} placeholder="Key or name" />
+              </FormField>
+              <FormField label="Tag">
+                <Select name="tag">
+                  <option value="" selected={tag === ''}>
+                    All tags
+                  </option>
+                  {tags.map((listed) => (
+                    <option value={listed} selected={sameTag(listed, tag)}>
+                      {listed}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <label class="show-archived">
+                <Checkbox name="includeArchived" value="true" checked={includeArchived} />
+                Show archived
+              </label>
+              <Button type="submit" variant="secondary">
+                Filter
+              </Button>
+              {filtered && (
+                <Button href={routes.flags(project.key)} variant="muted" decoration="ghost">
+                  Clear
+                </Button>
+              )}
+            </form>
+
+            {listed.length === 0 ? (
+              <p>Every flag of this project is archived: show archived to see them.</p>
+            ) : shown.length === 0 ? (
+              <p>No flag matches this search.</p>
+            ) : (
+              <div class="table-root">
+                <table class="flags-table">
+                  <caption>
+                    {flagListCaption(shown.length, listed.length, filtered)}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Flag</th>
+                      <th scope="col">Tags</th>
+                      {environments.map((environment) => (
+                        <th scope="col" class="state">
+                          {environment.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {shown.map((flag) => (
+                      <tr data-flag={flag.key} data-archived={flag.archived ? '' : undefined}>
+                        <th scope="row">
+                          <span class="flag-name">
+                            <a href={routes.flag(project.key, flag.key)}>{flag.name}</a>
+                            {flag.archived && <Badge variant="muted">Archived</Badge>}
+                          </span>
+                          <code class="flag-key">{flag.key}</code>
+                        </th>
+                        <td>
+                          <span class="tag-list">
+                            {flag.tags.map((flagTag) => (
+                              <Badge variant="outline">{flagTag}</Badge>
+                            ))}
+                          </span>
+                        </td>
+                        {environments.map((environment) => (
+                          <td class="state" data-environment={environment.key}>
+                            {isOn(flag, environment.key) ? (
+                              <Badge variant="primary">On</Badge>
+                            ) : (
+                              <Badge variant="muted">Off</Badge>
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+        {environments.length === 0 && (
+          <p>
+            Targeting is per environment:{' '}
+            <a href={routes.environments(project.key)}>create an environment</a> to switch targeting on.
+          </p>
+        )}
+      </section>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Project not found" projects={projects}>
+      <NotFound>There is no project {projectKey}.</NotFound>
+    </AdminLayout>
+  )
+}
+
+<style>
+  .flag-list {
+    display: grid;
+    gap: var(--space-sm);
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: end;
+  }
+
+  .table-root {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .flags-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  caption {
+    padding-bottom: 0.75em;
+    text-align: start;
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  th,
+  td {
+    padding: 0.75em 1em;
+    text-align: start;
+    vertical-align: top;
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.15);
+  }
+
+  thead th {
+    font-family: var(--ff-sans-condensed);
+    font-size: var(--fs-sm);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: hsl(var(--color-on-background) / 0.75);
+    border-bottom-color: hsl(var(--color-on-background) / 0.4);
+  }
+
+  tbody th {
+    display: grid;
+    gap: 0.25em;
+    font-weight: 400;
+  }
+
+  tbody th a {
+    font-weight: 700;
+    color: inherit;
+  }
+
+  .flag-key {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .state {
+    text-align: center;
+  }
+
+  .show-archived {
+    display: inline-flex;
+    gap: var(--space-xs);
+    align-items: center;
+    min-height: 2.5em;
+    cursor: pointer;
+  }
+
+  .flag-name {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
+  }
+</style>

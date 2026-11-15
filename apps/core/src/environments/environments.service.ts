@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { environmentState, recordAudit } from '../audit/audit-entry.js';
 import { assertKeyUnchanged } from '../common/keys.js';
 import { withUniqueKey } from '../common/persistence.js';
-import { lockProject } from '../database/lock-project.js';
+import { lockAndReload, lockRow } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Environment, Project } from '../generated/prisma/client.js';
 import { projectNotFound, ProjectsService } from '../projects/projects.service.js';
@@ -35,17 +36,17 @@ export class EnvironmentsService {
     const environment = await this.prisma.environment.findUnique({
       where: { projectId_key: { projectId: project.id, key } },
     });
-    if (!environment) throw new NotFoundException(`Environment ${key} not found in project ${project.key}`);
+    if (!environment) throw environmentNotFound(project, key);
     return environment;
   }
 
   /** Creates the environment with off-state targeting for every existing flag of the project. */
-  async create(projectKey: string, input: CreateEnvironmentDto): Promise<EnvironmentDto> {
+  async create(projectKey: string, input: CreateEnvironmentDto, actor: string): Promise<EnvironmentDto> {
     const project = await this.projects.find(projectKey);
     const environment = await withUniqueKey(
       () =>
         this.prisma.$transaction(async (tx) => {
-          if (!(await lockProject(tx, project.id))) throw projectNotFound(project.key);
+          if (!(await lockRow(tx, 'project', project.id))) throw projectNotFound(project.key);
           const created = await tx.environment.create({
             data: { projectId: project.id, key: input.key, name: input.name, sdkKey: generateSdkKey() },
           });
@@ -53,6 +54,15 @@ export class EnvironmentsService {
           await tx.targeting.createMany({
             data: flags.map((flag) => ({ flagId: flag.id, environmentId: created.id, ...offStateTargeting })),
           });
+          await recordAudit(
+            tx,
+            { type: 'environment', project, environment: created },
+            {
+              action: 'create',
+              actor,
+              after: environmentState(created),
+            },
+          );
           return created;
         }),
       `Environment ${input.key} already exists in project ${project.key}`,
@@ -60,28 +70,53 @@ export class EnvironmentsService {
     return toEnvironmentDto(project, environment);
   }
 
-  async update(projectKey: string, key: string, input: UpdateEnvironmentDto): Promise<EnvironmentDto> {
+  async update(projectKey: string, key: string, input: UpdateEnvironmentDto, actor: string): Promise<EnvironmentDto> {
     const project = await this.projects.find(projectKey);
-    const environment = await this.find(project, key);
-    assertKeyUnchanged('environment', environment.key, input.key);
-    assertKeyUnchanged('SDK', environment.sdkKey, input.sdkKey, 'sdkKey');
-    const updated = await this.prisma.environment.update({
-      where: { id: environment.id },
-      data: { name: input.name },
+    const found = await this.find(project, key);
+    assertKeyUnchanged('environment', found.key, input.key);
+    assertKeyUnchanged('SDK', found.sdkKey, input.sdkKey, 'sdkKey');
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const environment = await lockAndReload(tx, 'environment', found.id, () => environmentNotFound(project, key));
+      const updated = await tx.environment.update({ where: { id: environment.id }, data: { name: input.name } });
+      await recordAudit(
+        tx,
+        { type: 'environment', project, environment: updated },
+        {
+          action: 'update',
+          actor,
+          before: environmentState(environment),
+          after: environmentState(updated),
+        },
+      );
+      return updated;
     });
     return toEnvironmentDto(project, updated);
   }
 
   /** Deletes the environment with the targeting of every flag in it. */
-  async delete(projectKey: string, key: string): Promise<void> {
+  async delete(projectKey: string, key: string, actor: string): Promise<void> {
     const project = await this.projects.find(projectKey);
-    const environment = await this.find(project, key);
+    const found = await this.find(project, key);
     // Under the project lock, so a flag being created can't write targeting for this environment meanwhile.
     await this.prisma.$transaction(async (tx) => {
-      if (!(await lockProject(tx, project.id))) throw projectNotFound(project.key);
-      await tx.environment.deleteMany({ where: { id: environment.id } });
+      if (!(await lockRow(tx, 'project', project.id))) throw projectNotFound(project.key);
+      const environment = await lockAndReload(tx, 'environment', found.id, () => environmentNotFound(project, key));
+      await tx.environment.delete({ where: { id: environment.id } });
+      await recordAudit(
+        tx,
+        { type: 'environment', project, environment },
+        {
+          action: 'delete',
+          actor,
+          before: environmentState(environment),
+        },
+      );
     });
   }
+}
+
+function environmentNotFound(project: Project, key: string): NotFoundException {
+  return new NotFoundException(`Environment ${key} not found in project ${project.key}`);
 }
 
 function toEnvironmentDto(project: Project, environment: Environment): EnvironmentDto {
