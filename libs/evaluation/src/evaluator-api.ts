@@ -21,13 +21,25 @@ export interface EnvironmentList {
   environments: EnvironmentListEntry[];
 }
 
-/** The body of a single-flag evaluation request to the Evaluator (`POST /api/v1/evaluate/{flagKey}`). */
+/**
+ * The body of an evaluation request to the Evaluator: of a single-flag evaluation (`POST /api/v1/evaluate/{flagKey}`)
+ * and of a bulk evaluation (`POST /api/v1/evaluate`).
+ */
 export interface EvaluationRequest {
   context: Context;
 }
 
 /** The Evaluator's answer to a single-flag evaluation request. */
 export type FlagEvaluation = EvaluationResult & { flagKey: string };
+
+/**
+ * The Evaluator's answer to a bulk evaluation request: every flag of the environment, evaluated for the context.
+ * Archived flags evaluate as not found, so they are left out; no entry has the `FLAG_NOT_FOUND` reason.
+ */
+export interface BulkEvaluation {
+  /** Ordered by flag key. */
+  flags: FlagEvaluation[];
+}
 
 /**
  * The errors the Evaluator names in its error answers, so SDKs can report them as such. They are error kinds of

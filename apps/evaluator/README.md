@@ -36,10 +36,21 @@ Each poll fetches `GET /api/v1/evaluator/environments` (every environment of eve
 
   An unknown flag answers `200` with `"value": null`, `"variationIndex": null` and the reason `FLAG_NOT_FOUND`. A malformed context (an attribute of the wrong type, an empty `user_id`, a `country` that isn't two letters) gets the reason `{ "kind": "ERROR", "errorKind": "MALFORMED_CONTEXT" }`. Errors answer with `{ "statusCode", "error", "message" }`, where `error` is `UNKNOWN_SDK_KEY` for an unknown SDK key (`404`) and `NOT_READY` (`503`) before the first snapshots are loaded, or for an environment Core lists whose snapshot hasn't loaded yet. A missing SDK key header gets `400`.
 
-The request and answer types (`EvaluationRequest`, `FlagEvaluation`, `EvaluatorErrorBody`) are in `@ctff/evaluation`. Applications use them through [`@ctff/sdk`](../../libs/sdk/).
+- `POST /api/v1/evaluate`, with the same header and body, is a bulk evaluation: it evaluates every flag of the environment for the context and answers them in flag key order. Archived flags are left out. It answers errors the same way.
+
+  ```json
+  {
+    "flags": [
+      { "flagKey": "new-sighting-form", "value": true, "variationIndex": 0, "reason": { "kind": "DEFAULT" } },
+      { "flagKey": "rare-bird-alerts", "value": false, "variationIndex": 1, "reason": { "kind": "OFF" } }
+    ]
+  }
+  ```
+
+The request and answer types (`EvaluationRequest`, `FlagEvaluation`, `BulkEvaluation`, `EvaluatorErrorBody`) are in `@ctff/evaluation`. Applications use them through [`@ctff/sdk`](../../libs/sdk/).
 
 ## Tests (S3)
 
-`pnpm nx run @ctff/evaluator:test` drives the built Evaluator (`dist/main.js`, started as its own process) through the public API of `@ctff/sdk`. The Evaluator points at a fake Core ([test/support/fake-core.ts](test/support/fake-core.ts)) built only from the shared snapshot types in `@ctff/evaluation`, which Core's own tests (S2) check Core against. The tests cover evaluation results, the fallback value cases, readiness, polling with ETags, and keeping the last good snapshot. They need no Docker.
+`pnpm nx run @ctff/evaluator:test` drives the built Evaluator (`dist/main.js`, started as its own process) through the public API of `@ctff/sdk`. The Evaluator points at a fake Core ([test/support/fake-core.ts](test/support/fake-core.ts)) built only from the shared snapshot types in `@ctff/evaluation`, which Core's own tests (S2) check Core against. The tests cover single and bulk evaluation results, the fallback value cases, readiness, polling with ETags, and keeping the last good snapshot. [`@ctff/nestjs`](../../libs/nestjs/) is tested through the same harness, with a Nest testing app whose SDK calls go through a counting proxy ([test/support/counting-proxy.ts](test/support/counting-proxy.ts)). They need no Docker.
 
 [scripts/compose-smoke.ts](scripts/compose-smoke.ts) runs the same path against the real Core in a running `docker compose up`, and CI runs it in the compose smoke test.

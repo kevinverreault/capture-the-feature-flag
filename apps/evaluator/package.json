@@ -41,7 +41,9 @@
     "rxjs": "^7.8.2"
   },
   "devDependencies": {
+    "@ctff/nestjs": "workspace:*",
     "@ctff/sdk": "workspace:*",
+    "@nestjs/testing": "^11.2.10",
     "@types/express": "^5.0.6",
     "typescript": "~6.0.3"
   }

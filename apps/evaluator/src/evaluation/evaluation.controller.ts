@@ -1,4 +1,6 @@
 import {
+  type BulkEvaluation,
+  type EnvironmentSnapshot,
   evaluate,
   type EvaluationRequest,
   type EvaluatorErrorBody,
@@ -34,6 +36,28 @@ export class EvaluationController {
     @Headers(sdkKeyHeader) sdkKey: string | undefined,
     @Body() body: unknown,
   ): FlagEvaluation {
+    const snapshot = this.snapshot(sdkKey);
+    return { flagKey, ...evaluate(snapshot, flagKey, contextOf(body)) };
+  }
+
+  /**
+   * Evaluates every flag of the environment for the context in the body, in flag key order. Flags that evaluate as
+   * not found (archived ones) are left out. A malformed or missing context gives every flag the `ERROR` reason.
+   */
+  @Post()
+  @HttpCode(200)
+  evaluateAll(@Headers(sdkKeyHeader) sdkKey: string | undefined, @Body() body: unknown): BulkEvaluation {
+    const snapshot = this.snapshot(sdkKey);
+    const context = contextOf(body);
+    const flags = snapshot.flags
+      .map((flag): FlagEvaluation => ({ flagKey: flag.key, ...evaluate(snapshot, flag.key, context) }))
+      .filter((evaluation) => evaluation.reason.kind !== 'FLAG_NOT_FOUND')
+      .sort((a, b) => (a.flagKey < b.flagKey ? -1 : a.flagKey > b.flagKey ? 1 : 0));
+    return { flags };
+  }
+
+  /** The snapshot of the SDK key's environment; throws the error answer when there is none to evaluate from. */
+  private snapshot(sdkKey: string | undefined): EnvironmentSnapshot {
     if (!sdkKey) throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
     const held = this.snapshots.environment(sdkKey);
     if (!this.snapshots.ready || held.kind === 'loading') {
@@ -54,9 +78,13 @@ export class EvaluationController {
       };
       throw new NotFoundException(unknownSdkKey);
     }
-    // Unchecked here: evaluate() validates the context at runtime and reports a malformed one.
-    const request: Partial<EvaluationRequest> =
-      typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {};
-    return { flagKey, ...evaluate(held.snapshot, flagKey, request.context) };
+    return held.snapshot;
   }
+}
+
+/** The context of a request body, unchecked: evaluate() validates it at runtime and reports a malformed one. */
+function contextOf(body: unknown): EvaluationRequest['context'] | undefined {
+  const request: Partial<EvaluationRequest> =
+    typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {};
+  return request.context;
 }

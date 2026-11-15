@@ -21,6 +21,10 @@ if (await flags.variation('rare-bird-alerts', context, false)) {
 // The same, with the variation index and the evaluation reason.
 const detail = await flags.variationDetail('rare-bird-alerts', context, false);
 // { value: true, variationIndex: 0, reason: { kind: 'DEFAULT' } }
+
+// Every flag of the environment at once, in one request. Look a flag up with a fallback value.
+const all = await flags.allFlags(context);
+const alerts = all.values['rare-bird-alerts'] ?? false;
 ```
 
 The context is typed as `{ user_id?: string; country?: string }`, where `country` is an ISO 3166-1 alpha-2 code. Either attribute may be left out.
@@ -39,6 +43,23 @@ The context is typed as `{ user_id?: string; country?: string }`, where `country
 | `{ kind: 'ERROR', errorKind: 'MALFORMED_CONTEXT' }` | A context attribute has the wrong type or format                  |
 | `{ kind: 'ERROR', errorKind: 'MALFORMED_FLAG' }`    | The flag's targeting refers to a variation it doesn't have        |
 | `{ kind: 'ERROR', errorKind: 'EVALUATOR_ERROR' }`   | The Evaluator answered with another error, or with something else |
+
+### `allFlags`
+
+`allFlags(context)` doesn't throw or reject either. It returns:
+
+```ts
+{
+  values: { 'new-sighting-form': true, 'rare-bird-alerts': false }, // every flag that served a variation
+  details: {                                                       // every flag, with its evaluation
+    'new-sighting-form': { value: true, variationIndex: 0, reason: { kind: 'DEFAULT' } },
+    'rare-bird-alerts': { value: false, variationIndex: 1, reason: { kind: 'OFF' } },
+  },
+  error: null,
+}
+```
+
+Archived flags aren't in it. A flag whose evaluation failed (such as `MALFORMED_CONTEXT`, which every flag gets for a malformed context) has a detail with `value: null` and `variationIndex: null`, and no entry in `values`. When the Evaluator can't be asked, or answers with an error or with something that isn't a bulk evaluation, `values` and `details` are empty and `error` is one of the `ERROR` kinds above (`UNKNOWN_SDK_KEY`, `NOT_READY`, `TIMEOUT`, `NETWORK_ERROR` or `EVALUATOR_ERROR`). There is no fallback value to pass. A flag missing from `values` falls back on the caller's side, as in `all.values['rare-bird-alerts'] ?? false`.
 
 The fallback value is not the same thing as the **default variation**. The default variation is part of targeting, and is served when targeting is on and nothing else matches (reason `DEFAULT`).
 
