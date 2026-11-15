@@ -2,7 +2,7 @@
 # submodule checked out (the admin app compiles it from source):
 #   docker build -f apps/core/Dockerfile -t ctff-core .
 # All configuration comes from environment variables: DATABASE_URL (required), PORT, HOST, LOG_LEVEL,
-# ADMIN_ENABLED, ADMIN_CORE_URL.
+# ADMIN_ENABLED, ADMIN_CORE_URL, RETENTION_INTERVAL_MS.
 
 FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \

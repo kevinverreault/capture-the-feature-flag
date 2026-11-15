@@ -180,7 +180,7 @@ importers:
         version: 24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0)
       '@nx/vitest':
         specifier: 24.0.6
-        version: 24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@nx/eslint@24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@zkochan/js-yaml@0.0.7)(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))(vitest@5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)))
+        version: 24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@nx/eslint@24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@zkochan/js-yaml@0.0.7)(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))(vitest@5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)))
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -219,7 +219,7 @@ importers:
         version: 8.72.2(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
       vitest:
         specifier: ^5.1.0
-        version: 5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))
+        version: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))
 
   apps/admin:
     dependencies:
@@ -321,6 +321,9 @@ importers:
       '@types/pg':
         specifier: ^8.23.1
         version: 8.23.1
+      node-html-parser:
+        specifier: ^6.1.13
+        version: 6.1.13
       prisma:
         specifier: ^7.10.1
         version: 7.10.1(@types/node@24.19.2)(@types/react@19.3.0)(magicast@0.5.5)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3)
@@ -351,6 +354,9 @@ importers:
       pino-http:
         specifier: ^11.0.0
         version: 11.0.0
+      prom-client:
+        specifier: ^15.1.3
+        version: 15.1.3
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -1763,6 +1769,10 @@ packages:
   '@nx/workspace@24.0.6':
     resolution: {integrity: sha512-kOANsH9ks4A+s4iD7IgHpYhdk2tX5PPUxrQg5fuSWOdc/t9LmQjp/2e9HnKbzszp1i+vjl/1E/sPcLRU5U/Ztg==}
 
+  '@opentelemetry/api@1.10.0':
+    resolution: {integrity: sha512-lMkyes8iHrG+mk6WH7X70MdCLI2RS0FwNBY1PyQ8UemaijE2m5mv5A0Niy3HtbYTFrgkUEQjFMXmSAk2hQDuPQ==}
+    engines: {node: '>=8.0.0'}
+
   '@oslojs/encoding@1.1.0':
     resolution: {integrity: sha512-70wQhgYmndg4GCPxPPxPGevRKqTIJ2Nh4OkiMWmDAVYsTQ+Ta7Sq+rPevXyXGdzr30/qZBnyOalCszoMxlyldQ==}
 
@@ -2654,6 +2664,9 @@ packages:
 
   better-result@2.10.0:
     resolution: {integrity: sha512-oQhh0y1qo2/ZKdAAEvHZAqKKiHOFU5k/bW96fE2ScgQOVkJRiHwB+nOS1SgFsYqRlxMDWvefXi9Q3px7QvgNDw==}
+
+  bintrees@1.0.2:
+    resolution: {integrity: sha512-VOMgTMwjAaUG580SXn3LacVgjurrbMme7ZZNYGSSV7mmtY6QQRh0Eg3pwIcntQ77DErK1L0NxkbetjcoXzVwKw==}
 
   bl@4.1.0:
     resolution: {integrity: sha512-1W07cM9gS6DcLperZfFSj+bWLtaPGSOHWhPiGzXmvVJbRLdG82sH/Kn8EtW1VqWVA54AKf2h5k5BbnIbwF3h6w==}
@@ -4270,6 +4283,11 @@ packages:
     resolution: {integrity: sha512-cdGef/drWFoydD1JsMzuFf8100nZl+GT+yacc2bEced5f9Rjk4z+WtFUTBu9PhOi9j/jfmBPu0mMEY4wIdAF8A==}
     engines: {node: '>= 0.6.0'}
 
+  prom-client@15.1.3:
+    resolution: {integrity: sha512-6ZiOBfCywsD4k1BN9IX0uZhF+tJkV8q8llP64G5Hajs4JOeVLPCwpPVcpXy3BwYiUGgyJzsJJQeOIv7+hDSq8g==}
+    engines: {node: ^16 || ^18 || >=20}
+    deprecated: prom-client has been replaced by @prometheus-io/client
+
   proper-lockfile@4.1.2:
     resolution: {integrity: sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==}
 
@@ -4689,6 +4707,9 @@ packages:
 
   tar-stream@3.2.2:
     resolution: {integrity: sha512-+8NeqHRjQWH9nYlwo2gamAMImZCVzI4UoEgDpWorBt9OEfppiZn+uSkskzQKPWIZyji/C8fpWO7u69G0DX0tbg==}
+
+  tdigest@0.1.3:
+    resolution: {integrity: sha512-zbRt+lT+/H4fRItHshczHErVCQnitJk8MfMT24MqFJf3YL7SJJPqGIGeuOdvxXxM/AHFzKBl7WoyaYwqO9s3Kw==}
 
   teex@1.0.1:
     resolution: {integrity: sha512-eYE6iEI62Ni1H8oIa7KlDU6uQBtqr4Eajni3wX7rpfXD8ysFx8z0+dri+KWEPWpBsxXfxu58x/0jvTVT1ekOSg==}
@@ -6834,7 +6855,7 @@ snapshots:
   '@nx/nx-win32-x64-msvc@24.0.6':
     optional: true
 
-  '@nx/vitest@24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@nx/eslint@24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@zkochan/js-yaml@0.0.7)(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))(vitest@5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)))':
+  '@nx/vitest@24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@nx/eslint@24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@zkochan/js-yaml@0.0.7)(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))(vitest@5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)))':
     dependencies:
       '@nx/devkit': 24.0.6(nx@24.0.6)
       '@nx/js': 24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0)
@@ -6844,7 +6865,7 @@ snapshots:
     optionalDependencies:
       '@nx/eslint': 24.0.6(@babel/traverse@7.29.14(supports-color@7.2.0))(@zkochan/js-yaml@0.0.7)(eslint@10.15.0(jiti@2.7.0)(supports-color@7.2.0))(nx@24.0.6)(supports-color@7.2.0)
       vite: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
-      vitest: 5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))
+      vitest: 5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))
     transitivePeerDependencies:
       - '@babel/traverse'
       - '@swc-node/register'
@@ -6868,6 +6889,8 @@ snapshots:
     transitivePeerDependencies:
       - '@swc-node/register'
       - '@swc/core'
+
+  '@opentelemetry/api@1.10.0': {}
 
   '@oslojs/encoding@1.1.0': {}
 
@@ -7937,6 +7960,8 @@ snapshots:
       tweetnacl: 0.14.5
 
   better-result@2.10.0: {}
+
+  bintrees@1.0.2: {}
 
   bl@4.1.0:
     dependencies:
@@ -9658,6 +9683,11 @@ snapshots:
 
   process@0.11.10: {}
 
+  prom-client@15.1.3:
+    dependencies:
+      '@opentelemetry/api': 1.10.0
+      tdigest: 0.1.3
+
   proper-lockfile@4.1.2:
     dependencies:
       graceful-fs: 4.2.12
@@ -10237,6 +10267,10 @@ snapshots:
       - bare-buffer
       - react-native-b4a
 
+  tdigest@0.1.3:
+    dependencies:
+      bintrees: 1.0.2
+
   teex@1.0.1:
     dependencies:
       streamx: 2.28.1
@@ -10495,7 +10529,7 @@ snapshots:
     optionalDependencies:
       vite: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
 
-  vitest@5.1.0(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)):
+  vitest@5.1.0(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)):
     dependencies:
       '@types/chai': 5.2.3
       '@vitest/mocker': 5.1.0(vite@8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0))
@@ -10512,6 +10546,7 @@ snapshots:
       vite: 8.3.8(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
       why-is-node-running: 3.2.1
     optionalDependencies:
+      '@opentelemetry/api': 1.10.0
       '@types/node': 24.19.2
     transitivePeerDependencies:
       - msw

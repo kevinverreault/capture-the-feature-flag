@@ -1,0 +1,181 @@
+---
+import type { EvaluationRange } from '@ctff/core-api-client';
+import Table from '@ds/components/ui/Table.astro';
+import {
+  axisLabel,
+  bucketTime,
+  compactCount,
+  describeCounts,
+  type EvaluationChart,
+  hasAxisLabel,
+  niceTicks,
+  variationCells,
+  variationColumns,
+} from '../../lib/dashboard';
+import ChartLegend from './ChartLegend.astro';
+import ChartTooltip from './ChartTooltip.astro';
+import StackedSegments from './StackedSegments.astro';
+
+interface Props {
+  chart: EvaluationChart;
+  range: EvaluationRange;
+  /** What the chart counts, for its accessible name: "Evaluations over the last 24 hours". */
+  label: string;
+}
+
+const { chart, range, label } = Astro.props;
+const ticks = niceTicks(Math.max(0, ...chart.buckets.map((bucket) => bucket.total)));
+const top = ticks.at(-1) ?? 1;
+const percent = (value: number) => `${((value / top) * 100).toFixed(3)}%`;
+// Tooltips near either end open inwards, so they stay inside the chart.
+const edge = Math.ceil(chart.buckets.length / 6);
+---
+
+<figure class="chart timeline" aria-label={label}>
+  <ChartLegend variations={chart.variations} />
+  <div class="plot">
+    <div class="y-ticks" aria-hidden="true">
+      {ticks.map((tick) => <span style={`bottom: ${percent(tick)}`}>{compactCount(tick)}</span>)}
+    </div>
+    <div class="area">
+      <div class="gridlines" aria-hidden="true">
+        {ticks.map((tick) => <span class:list={[tick === 0 && 'baseline']} style={`bottom: ${percent(tick)}`} />)}
+      </div>
+      <ol class="columns">
+        {
+          chart.buckets.map((bucket, index) => (
+            <li
+              tabindex="0"
+              class:list={['chart-target', index < edge && 'start', index >= chart.buckets.length - edge && 'end']}
+              aria-label={`${bucketTime(bucket.start)} UTC: ${describeCounts(chart.variations, bucket.counts)}`}
+            >
+              <StackedSegments
+                class="stack"
+                direction="up"
+                counts={bucket.counts}
+                style={`height: ${percent(bucket.total)}`}
+              />
+              {hasAxisLabel(bucket.start, range) && (
+                <span class="x-label" aria-hidden="true">
+                  {axisLabel(bucket.start, range)}
+                </span>
+              )}
+              <ChartTooltip variations={chart.variations} counts={bucket.counts} heading={`${bucketTime(bucket.start)} UTC`} />
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+  <figcaption>Times are UTC. The last {range === '24h' ? 'hour' : '6 hours'} is still filling.</figcaption>
+  <details>
+    <summary>Show as a table</summary>
+    <Table
+      caption={label}
+      rowHeader="time"
+      columns={[{ key: 'time', label: 'Time (UTC)' }, ...variationColumns(chart.variations)]}
+      rows={chart.buckets.map((bucket) => ({
+        time: bucketTime(bucket.start),
+        ...variationCells(bucket.counts, bucket.total),
+      }))}
+    />
+  </details>
+</figure>
+
+<style>
+  .timeline {
+    display: grid;
+    gap: var(--space-sm);
+    margin: 0;
+    --plot-height: 12rem;
+  }
+
+  .plot {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-xs);
+    /* Room for the time axis labels under the plot. */
+    padding-bottom: 1.75em;
+  }
+
+  .y-ticks {
+    position: relative;
+    height: var(--plot-height);
+    min-width: 2.5em;
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--color-on-background) / 0.7);
+  }
+
+  .y-ticks span {
+    position: absolute;
+    right: 0;
+    transform: translateY(50%);
+    line-height: 1;
+  }
+
+  .area {
+    position: relative;
+    height: var(--plot-height);
+  }
+
+  .gridlines span {
+    position: absolute;
+    inset-inline: 0;
+    border-top: 1px solid hsl(var(--chart-grid));
+  }
+
+  .gridlines .baseline {
+    border-top-color: hsl(var(--chart-axis));
+  }
+
+  .columns {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .columns li {
+    display: flex;
+    flex: 1 1 0;
+    align-items: flex-end;
+    justify-content: center;
+    min-width: 0;
+    padding-inline: 1px;
+  }
+
+  /* The whole column is the target (.chart-target); the column of segments is at most 24px wide. */
+  .columns :global(.stack) {
+    width: 100%;
+    max-width: 24px;
+  }
+
+  .x-label {
+    position: absolute;
+    top: calc(100% + 0.4em);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--fs-sm);
+    white-space: nowrap;
+    color: hsl(var(--color-on-background) / 0.7);
+  }
+
+  .columns :global(.chart-tip) {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .start :global(.chart-tip) {
+    left: 0;
+    transform: none;
+  }
+
+  .end :global(.chart-tip) {
+    right: 0;
+    left: auto;
+    transform: none;
+  }
+</style>

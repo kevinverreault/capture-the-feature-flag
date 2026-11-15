@@ -86,10 +86,13 @@ describe('evaluator snapshot', () => {
     ],
     ['adding a flag', (p: string) => api.post(`/projects/${p}/flags`, { key: 'added', name: 'Added' })],
     ['editing a flag', (p: string) => api.patch(`/projects/${p}/flags/watched`, { version: 1, name: 'Edited' })],
-    ['deleting a flag', (p: string) => api.delete(`/projects/${p}/flags/watched`)],
+    ['archiving a flag', (p: string) => api.post(`/projects/${p}/flags/watched/archive`, {})],
+    ['restoring a flag', (p: string) => api.post(`/projects/${p}/flags/archived/restore`, {})],
   ])('sends a new ETag after %s', async (_change, change) => {
     const { projectKey, production } = await project();
     await api.post(`/projects/${projectKey}/flags`, { key: 'watched', name: 'Watched' });
+    await api.post(`/projects/${projectKey}/flags`, { key: 'archived', name: 'Archived' });
+    await api.post(`/projects/${projectKey}/flags/archived/archive`, {});
     const etag = (await snapshot(production)).headers.get('etag') ?? '';
     expect(etag).not.toBe('');
 

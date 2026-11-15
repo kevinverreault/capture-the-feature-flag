@@ -1,0 +1,81 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Button from '@ds/components/ui/Button.astro';
+import FlagFields from '../../../components/FlagFields.astro';
+import FormAlert from '../../../components/FormAlert.astro';
+import NotFound from '../../../components/NotFound.astro';
+import ProjectNav from '../../../components/ProjectNav.astro';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../lib/core';
+import { flagFieldsBody, flagFieldValues } from '../../../lib/flag-fields';
+import { handlePost, orNotFound, textField } from '../../../lib/forms';
+import { routes } from '../../../lib/routes';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const params = { path: { projectKey } };
+const post = await handlePost(Astro, {
+  create: {
+    fields: ['key', 'name', 'description', 'tags'],
+    conflictField: 'key',
+    send: async (form) => {
+      const body = {
+        key: textField(form, 'key'),
+        ...flagFieldsBody(form),
+      };
+      const flag = await unwrap(core.POST('/api/v1/projects/{projectKey}/flags', { params, body }));
+      return { location: routes.flag(flag.projectKey, flag.key), flash: `Flag ${flag.name} created` };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
+
+const [projects, project] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
+]);
+if (!project) Astro.response.status = 404;
+---
+
+{
+  project ? (
+    <AdminLayout title={`Create a flag · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="flags" />
+
+      <section aria-labelledby="create-flag">
+        <h2 id="create-flag" class="text-xl">
+          Create a flag
+        </h2>
+        <p>It starts with targeting off in every environment, until you switch its targeting on.</p>
+        <form method="post" class="stack">
+          <FormAlert messages={errors.form} />
+          <FormField
+            label="Key"
+            hint="Lowercase kebab-case, such as rare-bird-alerts. Your code refers to the flag by it, so it cannot be changed later."
+            error={errors.fields['key']}
+          >
+            <Input name="key" value={post.value('key') ?? ''} required />
+          </FormField>
+          <FlagFields
+            values={flagFieldValues(post.value)}
+            errors={errors}
+          />
+          <Button type="submit" variant="primary">
+            Create flag
+          </Button>
+        </form>
+      </section>
+
+      <Button href={routes.flags(project.key)} variant="muted" decoration="ghost">
+        Back to flags
+      </Button>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Project not found" projects={projects}>
+      <NotFound>There is no project {projectKey}.</NotFound>
+    </AdminLayout>
+  )
+}

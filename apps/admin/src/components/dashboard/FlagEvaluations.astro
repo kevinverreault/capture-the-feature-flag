@@ -1,0 +1,125 @@
+---
+import Badge from '@ds/components/ui/Badge.astro';
+import Table from '@ds/components/ui/Table.astro';
+import { compactCount, describeCounts, type EvaluationChart, variationCells, variationColumns } from '../../lib/dashboard';
+import { routes } from '../../lib/routes';
+import ChartLegend from './ChartLegend.astro';
+import ChartTooltip from './ChartTooltip.astro';
+import StackedSegments from './StackedSegments.astro';
+
+interface Props {
+  chart: EvaluationChart;
+  projectKey: string;
+  /** What the chart counts, for its accessible name: "Evaluations per flag over the last 24 hours". */
+  label: string;
+}
+
+/** How many flags get a bar; the table view lists them all. */
+const shownFlags = 10;
+
+const { chart, projectKey, label } = Astro.props;
+const shown = chart.flags.slice(0, shownFlags);
+const max = Math.max(1, ...shown.map((flag) => flag.total));
+---
+
+<figure class="chart flag-evaluations" aria-label={label}>
+  <ChartLegend variations={chart.variations} />
+  <ol class="bars">
+    {
+      shown.map((flag) => (
+        <li data-flag={flag.key}>
+          <span class="flag-label">
+            <a href={routes.flag(projectKey, flag.key)}>{flag.name}</a>
+            {flag.archived && <Badge variant="muted">Archived</Badge>}
+          </span>
+          <span class="chart-target track" tabindex="0" aria-label={`${flag.name}: ${describeCounts(chart.variations, flag.counts)}`}>
+            <StackedSegments
+              direction="right"
+              counts={flag.counts}
+              style={`height: 16px; width: ${((flag.total / max) * 100).toFixed(3)}%`}
+            />
+            <span class="value" aria-hidden="true">
+              {compactCount(flag.total)}
+            </span>
+            <ChartTooltip variations={chart.variations} counts={flag.counts} />
+          </span>
+        </li>
+      ))
+    }
+  </ol>
+  {
+    chart.flags.length > shown.length && (
+      <figcaption>
+        The {shown.length} most evaluated flags; the table lists all {chart.flags.length}.
+      </figcaption>
+    )
+  }
+  <details>
+    <summary>Show per environment as a table</summary>
+    <Table
+      caption={`${label}, per environment`}
+      rowHeader="flag"
+      columns={[
+        { key: 'flag', label: 'Flag' },
+        { key: 'environment', label: 'Environment' },
+        ...variationColumns(chart.variations),
+      ]}
+      rows={chart.rows.map((row) => ({
+        flag: row.flagName,
+        environment: row.environmentKey,
+        ...variationCells(row.counts, row.total),
+      }))}
+    />
+  </details>
+</figure>
+
+<style>
+  .flag-evaluations {
+    display: grid;
+    gap: var(--space-sm);
+    margin: 0;
+  }
+
+  .bars {
+    display: grid;
+    grid-template-columns: minmax(8rem, max-content) 1fr;
+    gap: var(--space-xs) var(--space-sm);
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bars li {
+    display: contents;
+  }
+
+  .flag-label {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
+    overflow-wrap: anywhere;
+  }
+
+  .flag-label a {
+    color: inherit;
+    font-weight: 700;
+  }
+
+  /* The whole row of the bar is the target (.chart-target), not only its painted part. */
+  .track {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+    min-height: 2rem;
+    padding-inline: 2px;
+    border-left: 1px solid hsl(var(--chart-axis));
+  }
+
+  .value {
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+</style>

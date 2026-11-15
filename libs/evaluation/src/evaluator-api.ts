@@ -60,3 +60,55 @@ export interface EvaluatorErrorBody {
   error: EvaluatorError | (string & {});
   message: string;
 }
+
+/**
+ * Evaluation telemetry, which Evaluators add up in memory and send to Core about every minute
+ * (`POST /api/v1/evaluator/telemetry`, ADR 0001). A batch lost when an Evaluator crashes is acceptable.
+ */
+export interface TelemetryBatch {
+  environments: EnvironmentTelemetry[];
+}
+
+/** The telemetry of one environment, named by its SDK key. */
+export interface EnvironmentTelemetry {
+  sdkKey: string;
+  counts: EvaluationCount[];
+  seenContexts: SeenContext[];
+}
+
+/** How many evaluations of one flag served one variation within one minute. */
+export interface EvaluationCount {
+  flagKey: string;
+  /** Index into the flag's `variations`. Only evaluations that served a variation are counted. */
+  variationIndex: number;
+  /** The start of the minute, as an ISO 8601 timestamp with zero seconds (e.g. `2026-11-15T12:34:00.000Z`). */
+  minute: string;
+  count: number;
+}
+
+/** A context that was evaluated in the environment, and when it was last. */
+export interface SeenContext {
+  context: Context;
+  /** An ISO 8601 timestamp. */
+  lastSeen: string;
+}
+
+/** The start, in epoch milliseconds, of the minute a moment (in epoch milliseconds) falls in. */
+export function minuteStartMs(ms: number): number {
+  return ms - (((ms % 60_000) + 60_000) % 60_000);
+}
+
+/** The start of the minute a moment falls in, as `EvaluationCount.minute` expects it. */
+export function minuteOf(moment: Date | number): string {
+  return new Date(minuteStartMs(typeof moment === 'number' ? moment : moment.getTime())).toISOString();
+}
+
+/**
+ * What identifies a seen context within its environment: its attributes, canonically. The Evaluator and Core both
+ * record a seen context once per key. A context without attributes describes no one to inspect, so it has no key
+ * (`null`) and isn't recorded. Takes a context `normalizeContext()` accepted.
+ */
+export function seenContextKey(context: Context): string | null {
+  if (context.user_id === undefined && context.country === undefined) return null;
+  return JSON.stringify([context.user_id ?? null, context.country ?? null]);
+}
