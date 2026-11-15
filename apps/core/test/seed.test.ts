@@ -41,6 +41,32 @@ describe('the demo seed', () => {
     }
   });
 
+  it('targets rare-bird-alerts by country: on for CA, false for everyone else', async () => {
+    const targeting = await apiClient(core.baseUrl).get('/projects/birdwatch/flags/rare-bird-alerts/targeting');
+    expect(targeting.body).toHaveLength(2);
+    for (const environment of targeting.body) {
+      expect(environment).toMatchObject({
+        on: true,
+        defaultVariation: 1,
+        individualTargets: [],
+        rules: [{ attribute: 'country', operator: 'in', values: ['CA'], variation: 0 }],
+      });
+    }
+  });
+
+  it('targets photo-id-beta at individual birders: true for Chiara, false for everyone else', async () => {
+    const targeting = await apiClient(core.baseUrl).get('/projects/birdwatch/flags/photo-id-beta/targeting');
+    expect(targeting.body).toHaveLength(2);
+    for (const environment of targeting.body) {
+      expect(environment).toMatchObject({
+        on: true,
+        defaultVariation: 1,
+        individualTargets: [{ variation: 0, userIds: ['chiara'] }],
+        rules: [],
+      });
+    }
+  });
+
   it('records its changes in the audit log as the seed', async () => {
     const entries = await apiClient(core.baseUrl).get('/audit-entries?projectKey=birdwatch&limit=200');
     expect(entries.body.entries.length).toBeGreaterThan(0);

@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import pg from 'pg';
 import type { Logger } from 'pino';
+import type { IndividualTargetDto, RuleDto } from '../targeting/targeting.dto.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { FlagsService } from '../flags/flags.service.js';
@@ -13,18 +14,33 @@ export const seedActor = 'seed';
 /** Held while one Core checks and seeds, so replicas starting together on an empty database seed it once. */
 const seedLockId = 72707370;
 
+/** The variations of every flag, by index: a boolean flag serves `[true, false]`. */
+const serveTrue = 0;
+const serveFalse = 1;
+
+/** The targeting the seed gives a flag in every environment, on top of the off-state targeting of a new flag. */
+interface SeedTargeting {
+  on: true;
+  defaultVariation?: number;
+  individualTargets?: IndividualTargetDto[];
+  rules?: RuleDto[];
+}
+
 interface SeedFlag {
   key: string;
   name: string;
   description: string;
   tags: string[];
-  /** Whether targeting is switched on in every environment. Flags not switched on keep their off-state targeting. */
-  on?: boolean;
+  /** The targeting switched on in every environment. Flags without it keep their off-state targeting. */
+  targeting?: SeedTargeting;
 }
 
 /**
- * The Birdwatch demo (apps/birdwatch-api and apps/birdwatch-web): its project, environments and flags.
- * `new-sighting-form` is a kill switch, so it starts on, serving its default variation `true`.
+ * The Birdwatch demo (apps/birdwatch-api and apps/birdwatch-web): its project, environments and flags, with their
+ * targeting switched on in every environment:
+ * - `new-sighting-form` is a kill switch, serving its default variation `true` to everyone.
+ * - `rare-bird-alerts` serves `true` to birders in Canada (`country in [CA]`), and `false` to everyone else.
+ * - `photo-id-beta` serves `true` to the birders it targets individually (Chiara), and `false` to everyone else.
  */
 export const birdwatchSeed = {
   project: { key: 'birdwatch', name: 'Birdwatch' },
@@ -38,19 +54,29 @@ export const birdwatchSeed = {
       name: 'New sighting form',
       description: 'Kill switch for the "Log a sighting" form in Birdwatch and the endpoint behind it.',
       tags: ['birdwatch', 'kill-switch'],
-      on: true,
+      targeting: { on: true },
     },
     {
       key: 'rare-bird-alerts',
       name: 'Rare bird alerts',
       description: 'Shows the rare-bird alert banner in Birdwatch, targeted by country.',
       tags: ['birdwatch'],
+      targeting: {
+        on: true,
+        defaultVariation: serveFalse,
+        rules: [{ attribute: 'country', operator: 'in', values: ['CA'], variation: serveTrue }],
+      },
     },
     {
       key: 'photo-id-beta',
       name: 'Photo ID (beta)',
       description: 'Shows the "Photo ID (beta)" button in Birdwatch, targeted at individual birders.',
       tags: ['birdwatch', 'beta'],
+      targeting: {
+        on: true,
+        defaultVariation: serveFalse,
+        individualTargets: [{ variation: serveTrue, userIds: ['chiara'] }],
+      },
     },
   ] satisfies SeedFlag[],
 };
@@ -97,16 +123,16 @@ async function seedProject(app: INestApplication): Promise<void> {
     if (!environmentKeys.has(environment.key)) await environmentsService.create(project.key, environment, seedActor);
   }
   const listedFlags = await flagsService.list(project.key, { includeArchived: true });
-  for (const { on, ...flag } of flags as SeedFlag[]) {
+  for (const { targeting: seeded, ...flag } of flags as SeedFlag[]) {
     const listed = listedFlags.find((candidate) => candidate.key === flag.key);
     if (!listed) await flagsService.create(project.key, flag, seedActor);
     // An archived flag's targeting can't change: it stays as the admin left it.
-    if (!on || listed?.archived) continue;
+    if (!seeded || listed?.archived) continue;
     for (const environment of environments) {
       const targeting = await targetingService.get(project.key, flag.key, environment.key);
       // Version 1 is targeting nobody has changed since the flag was created; anything else is left as it is.
-      if (targeting.version !== 1 || targeting.on === on) continue;
-      await targetingService.update(project.key, flag.key, environment.key, { version: 1, on }, seedActor);
+      if (targeting.version !== 1) continue;
+      await targetingService.update(project.key, flag.key, environment.key, { version: 1, ...seeded }, seedActor);
     }
   }
 }

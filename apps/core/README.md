@@ -24,7 +24,15 @@ Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --fi
 
 ## The demo seed
 
-Core seeds the [Birdwatch](../birdwatch-api/README.md) demo before it reports ready ([src/seed/demo-seed.ts](src/seed/demo-seed.ts)): the `birdwatch` project, its `development` and `production` environments, and the flags `new-sighting-form`, `rare-bird-alerts` and `photo-id-beta`. `new-sighting-form` is a kill switch, so its targeting is on in both environments and it serves `true`. The other two keep the off-state targeting of a new flag.
+Core seeds the [Birdwatch](../birdwatch-api/README.md) demo before it reports ready ([src/seed/demo-seed.ts](src/seed/demo-seed.ts)): the `birdwatch` project, its `development` and `production` environments, and the flags `new-sighting-form`, `rare-bird-alerts` and `photo-id-beta`. Their targeting is switched on in both environments, to show off each kind of targeting:
+
+| Flag                | Targeting                                                                                        |
+| :------------------ | :----------------------------------------------------------------------------------------------- |
+| `new-sighting-form` | A kill switch: no targets or rules, so everyone gets the default variation `true`                |
+| `rare-bird-alerts`  | The rule `country in [CA]` serves `true`; everyone else gets the default variation `false`       |
+| `photo-id-beta`     | An individual target serves `true` to `chiara`; everyone else gets the default variation `false` |
+
+So Alice and Dev (CA) see the rare-bird alert banner and Bram (NL) and Chiara (IT) don't, and only Chiara sees "Photo ID (beta)".
 
 The seed runs to completion once per database, which it records in the `completed_seeds` table; after that, it does nothing, so an operator who deletes the demo doesn't get it back. Until then, every start runs it, and each step skips what is already there: a seed interrupted halfway (Core killed during it) is finished on the next start, and a database that already had projects of its own gets the demo next to them. Targeting is only switched on where nobody has changed it since the flag was created (version 1). The seed goes through the same services as the API, so its changes have audit entries, by the actor `seed`. Replicas starting together seed once. `SEED_DEMO=false` turns it off, for instance when Terraform creates the project instead.
 
