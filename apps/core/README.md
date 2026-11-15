@@ -41,7 +41,7 @@ Several Evaluators and Core replicas can write telemetry at once. Each batch is 
 
 ## Contexts
 
-- `GET /api/v1/context-attributes` lists the context attributes: their `key` (as in contexts and rules), `name`, `type` (`string`, or `country_code` for ISO 3166-1 alpha-2) and `description`. They are stored as data, so custom ones can be added later; V1 has only the built-in `user_id` and `country`, which the migration creates and which cannot be edited (`builtIn: true`): any other method on `/context-attributes` answers `405`.
+- `GET /api/v1/context-attributes` lists the context attributes: their `key` (as in contexts and rules), `name`, `type` (`string`, or `country_code` for ISO 3166-1 alpha-2) and `description`. They are stored as data, so custom ones can be added later; V1 has only the built-in `user_id` and `country`, which the migration creates and which cannot be edited (`builtIn: true`): creating one (`POST`) or replacing, changing or deleting one (`PUT`, `PATCH`, `DELETE` on `/context-attributes/{key}`) answers `405`.
 - `POST /api/v1/projects/{projectKey}/environments/{environmentKey}/evaluate`, with `{ "context": { "user_id": …, "country": … } }`, evaluates every flag of the project that is not archived for the context, ordered by flag key, with its name, variation, variation index and evaluation reason. Core builds the environment's snapshot as it serves it to Evaluators and runs the shared `evaluate()` of `@ctff/evaluation` on it, so the answers are the Evaluator's. A malformed context gets `400`. It changes nothing and records no telemetry. The admin app's Contexts explorer shows it.
 
 ## The admin app

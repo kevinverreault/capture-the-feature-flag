@@ -32,6 +32,16 @@ export const evaluationErrorKinds = [
 ] as const;
 export type EvaluationErrorKind = (typeof evaluationErrorKinds)[number];
 
+/** The kinds of evaluation reason, as `EvaluationReason` names them. */
+export const evaluationReasonKinds = [
+  'OFF',
+  'TARGET_MATCH',
+  'RULE_MATCH',
+  'DEFAULT',
+  'FLAG_NOT_FOUND',
+  'ERROR',
+] as const satisfies readonly EvaluationReason['kind'][];
+
 /** Why an evaluation produced its variation. `ErrorKind` is widened by callers that add error kinds of their own. */
 export type EvaluationReason<ErrorKind extends string = EvaluationErrorKind> =
   | { kind: 'OFF' }

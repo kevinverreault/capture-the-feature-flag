@@ -1,4 +1,4 @@
-import { All, Controller, Get, MethodNotAllowedException } from '@nestjs/common';
+import { Controller, Delete, Get, MethodNotAllowedException, Patch, Post, Put } from '@nestjs/common';
 import { ApiExcludeEndpoint, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { ContextAttributeDto } from './context-attributes.dto.js';
 import { ContextAttributesService } from './context-attributes.service.js';
@@ -20,16 +20,30 @@ export class ContextAttributesController {
   }
 
   /** Creating an attribute: refused with 405, as V1 has no custom attributes. */
-  @All()
+  @Post()
   @ApiExcludeEndpoint()
-  create(): never {
+  refuseCreate(): never {
     throw readOnly();
   }
 
-  /** Changing or deleting an attribute: refused with 405, as the built-in ones cannot be edited. */
-  @All(':key')
+  /** Replacing an attribute: refused with 405, as the built-in ones cannot be edited. */
+  @Put(':key')
   @ApiExcludeEndpoint()
-  change(): never {
+  refuseReplace(): never {
+    throw readOnly();
+  }
+
+  /** Changing an attribute: refused with 405, as the built-in ones cannot be edited. */
+  @Patch(':key')
+  @ApiExcludeEndpoint()
+  refuseChange(): never {
+    throw readOnly();
+  }
+
+  /** Deleting an attribute: refused with 405, as the built-in ones cannot be edited. */
+  @Delete(':key')
+  @ApiExcludeEndpoint()
+  refuseDelete(): never {
     throw readOnly();
   }
 }

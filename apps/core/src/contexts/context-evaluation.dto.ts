@@ -1,11 +1,8 @@
-import { type Context, evaluationErrorKinds, type EvaluationResult } from '@ctff/evaluation';
+import { type Context, evaluationErrorKinds, evaluationReasonKinds, type EvaluationResult } from '@ctff/evaluation';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsObject, ValidateNested } from 'class-validator';
 import { ContextDto } from '../telemetry/telemetry.dto.js';
-
-/** The evaluation reasons, as `EvaluationReason['kind']` names them. */
-const reasonKinds = ['OFF', 'TARGET_MATCH', 'RULE_MATCH', 'DEFAULT', 'FLAG_NOT_FOUND', 'ERROR'] as const;
 
 export class EvaluateContextDto {
   @ApiProperty({ type: ContextDto, description: 'The context to evaluate every flag for.' })
@@ -17,8 +14,8 @@ export class EvaluateContextDto {
 
 /** Why an evaluation produced its variation (`EvaluationReason` from @ctff/evaluation). */
 export class EvaluationReasonDto {
-  @ApiProperty({ enum: reasonKinds, enumName: 'EvaluationReasonKind' })
-  kind!: (typeof reasonKinds)[number];
+  @ApiProperty({ enum: evaluationReasonKinds, enumName: 'EvaluationReasonKind' })
+  kind!: (typeof evaluationReasonKinds)[number];
 
   @ApiProperty({
     required: false,

@@ -47,6 +47,7 @@ describe('context attributes', () => {
     ]) {
       expect(response.status).toBe(405);
     }
+    expect((await api.get('/context-attributes/country')).status).toBe(404);
     expect((await api.get('/context-attributes')).body).toEqual(before);
   });
 });
@@ -81,6 +82,7 @@ describe('seen contexts', () => {
       [{ user_id: 'Malice' }, 20],
       [{ user_id: 'bob', country: 'US' }, 10],
       [{ country: 'FR' }, 5],
+      [{ user_id: '50%_off' }, 40],
     ]);
   });
   afterAll(() => core?.stop());
@@ -96,6 +98,7 @@ describe('seen contexts', () => {
       { user_id: 'bob', country: 'US' },
       { user_id: 'Malice' },
       { user_id: 'alice', country: 'CA' },
+      { user_id: '50%_off' },
     ]);
   });
 
@@ -107,8 +110,10 @@ describe('seen contexts', () => {
     expect(contexts((await seenContexts('?userId=bob&limit=1')).body)).toEqual([{ user_id: 'bob', country: 'US' }]);
     expect((await seenContexts('?userId=nobody')).body).toEqual([]);
     // Wildcards are matched as themselves.
-    expect((await seenContexts('?userId=%25')).body).toEqual([]);
-    expect((await seenContexts('?userId=_')).body).toEqual([]);
+    expect(contexts((await seenContexts('?userId=%25')).body)).toEqual([{ user_id: '50%_off' }]);
+    expect(contexts((await seenContexts('?userId=0%25_O')).body)).toEqual([{ user_id: '50%_off' }]);
+    expect(contexts((await seenContexts('?userId=c_')).body)).toEqual([]);
+    expect(contexts((await seenContexts('?userId=a%25e')).body)).toEqual([]);
     expect((await seenContexts('?userId=%5C')).body).toEqual([]);
   });
 
