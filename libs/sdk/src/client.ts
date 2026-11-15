@@ -3,6 +3,7 @@ import {
   type EvaluationErrorKind,
   type EvaluationReason,
   type EvaluationRequest,
+  evaluatorErrors,
   type FlagEvaluation,
   sdkKeyHeader,
 } from '@ctff/evaluation';
@@ -60,7 +61,8 @@ export function createClient(options: ClientOptions): Client {
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(timeoutMs),
       });
-      const answer: unknown = await response.json().catch(() => undefined);
+      // Reading the body can still time out (caught below); only a body that isn't JSON is tolerated here.
+      const answer = parseJson(await response.text());
       if (!response.ok) return error(errorKindOf(answer));
       const evaluation = asFlagEvaluation(answer);
       if (!evaluation) return error('EVALUATOR_ERROR');
@@ -81,7 +83,7 @@ export function createClient(options: ClientOptions): Client {
 /** The error kind an Evaluator error answer names (`UNKNOWN_SDK_KEY`, `NOT_READY`), or `EVALUATOR_ERROR`. */
 function errorKindOf(answer: unknown): EvaluationErrorKind {
   const error = isObject(answer) ? answer['error'] : undefined;
-  return error === 'UNKNOWN_SDK_KEY' || error === 'NOT_READY' ? error : 'EVALUATOR_ERROR';
+  return evaluatorErrors.find((known) => known === error) ?? 'EVALUATOR_ERROR';
 }
 
 /** The answer as a single-flag evaluation, or `null` when it isn't one. */
@@ -91,6 +93,14 @@ function asFlagEvaluation(answer: unknown): FlagEvaluation | null {
   const served = typeof value === 'boolean' && Number.isInteger(variationIndex);
   const notServed = value === null && variationIndex === null;
   return served || notServed ? (answer as unknown as FlagEvaluation) : null;
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

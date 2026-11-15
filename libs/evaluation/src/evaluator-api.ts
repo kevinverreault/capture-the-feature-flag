@@ -29,10 +29,19 @@ export interface EvaluationRequest {
 /** The Evaluator's answer to a single-flag evaluation request. */
 export type FlagEvaluation = EvaluationResult & { flagKey: string };
 
+/** The errors the Evaluator names in its error answers, so SDKs can report them as such. */
+export const evaluatorErrors = [
+  /** `404`: the SDK key names no environment the Evaluator holds a snapshot of. */
+  'UNKNOWN_SDK_KEY',
+  /** `503`: the Evaluator hasn't loaded its first snapshots yet. */
+  'NOT_READY',
+] as const;
+export type EvaluatorError = (typeof evaluatorErrors)[number];
+
 /** The body of an error answer from the Evaluator, such as `404` for an unknown SDK key. */
 export interface EvaluatorErrorBody {
   statusCode: number;
-  /** `UNKNOWN_SDK_KEY` or `NOT_READY` for errors an SDK reports as such; otherwise a generic HTTP error name. */
-  error: string;
+  /** One of `evaluatorErrors`, or a generic HTTP error name (such as `Bad Request`) for other errors. */
+  error: EvaluatorError | (string & {});
   message: string;
 }

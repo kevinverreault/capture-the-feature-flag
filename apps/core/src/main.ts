@@ -1,3 +1,4 @@
+import { sdkKeyHeader } from '@ctff/evaluation';
 import { pino } from 'pino';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
@@ -5,7 +6,7 @@ import { applyMigrations } from './database/migrate.js';
 
 const config = loadConfig();
 // SDK keys identify environments and will become credentials, so they never reach the logs.
-const logger = pino({ level: config.logLevel, redact: ['req.headers["x-ctff-sdk-key"]'] });
+const logger = pino({ level: config.logLevel, redact: [`req.headers["${sdkKeyHeader}"]`] });
 
 try {
   await applyMigrations(config.databaseUrl, logger);

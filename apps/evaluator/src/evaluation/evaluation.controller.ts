@@ -1,4 +1,4 @@
-import { evaluate, type FlagEvaluation, sdkKeyHeader } from '@ctff/evaluation';
+import { evaluate, type EvaluatorErrorBody, type FlagEvaluation, sdkKeyHeader } from '@ctff/evaluation';
 import {
   BadRequestException,
   Body,
@@ -12,7 +12,7 @@ import {
   Headers,
 } from '@nestjs/common';
 import { SnapshotPoller } from '../snapshots/snapshot-poller.js';
-import { snapshotPollerToken } from '../snapshots/snapshots.provider.js';
+import { snapshotPollerToken } from '../snapshots/snapshot-polling.js';
 
 /** Evaluations for SDKs, answered from memory. The SDK key travels in a header, so it stays out of URLs and logs. */
 @Controller('evaluate')
@@ -32,15 +32,21 @@ export class EvaluationController {
   ): FlagEvaluation {
     if (!sdkKey) throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
     if (!this.snapshots.ready) {
-      throw new ServiceUnavailableException({
+      const notReady: EvaluatorErrorBody = {
         statusCode: 503,
         error: 'NOT_READY',
         message: 'The Evaluator has not loaded its first snapshot yet',
-      });
+      };
+      throw new ServiceUnavailableException(notReady);
     }
     const snapshot = this.snapshots.snapshot(sdkKey);
     if (!snapshot) {
-      throw new NotFoundException({ statusCode: 404, error: 'UNKNOWN_SDK_KEY', message: 'Unknown SDK key' });
+      const unknownSdkKey: EvaluatorErrorBody = {
+        statusCode: 404,
+        error: 'UNKNOWN_SDK_KEY',
+        message: 'Unknown SDK key',
+      };
+      throw new NotFoundException(unknownSdkKey);
     }
     const context = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['context'] : body;
     return { flagKey, ...evaluate(snapshot, flagKey, context as never) };

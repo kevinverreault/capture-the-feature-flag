@@ -1,6 +1,6 @@
 import { Controller, Get, Inject, ServiceUnavailableException } from '@nestjs/common';
 import { SnapshotPoller } from '../snapshots/snapshot-poller.js';
-import { snapshotPollerToken } from '../snapshots/snapshots.provider.js';
+import { snapshotPollerToken } from '../snapshots/snapshot-polling.js';
 
 /** Liveness and readiness for orchestrators, outside /api/v1. */
 @Controller('health')

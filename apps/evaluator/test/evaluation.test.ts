@@ -162,6 +162,30 @@ describe('the fallback value', () => {
     }
   });
 
+  it('is returned with a TIMEOUT error when the Evaluator starts answering but is too slow to finish', async () => {
+    const stalling = createServer((_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.write('{"flagKey":');
+    });
+    await new Promise<void>((resolve) => stalling.listen(0, '127.0.0.1', resolve));
+    const { port } = stalling.address() as AddressInfo;
+    try {
+      const client = createClient({
+        evaluatorUrl: `http://127.0.0.1:${port}`,
+        sdkKey: 'ctff-env-production',
+        timeoutMs: 100,
+      });
+      expect(await client.variationDetail('rare-bird-alerts', alice, true)).toEqual({
+        value: true,
+        variationIndex: null,
+        reason: { kind: 'ERROR', errorKind: 'TIMEOUT' },
+      });
+    } finally {
+      stalling.closeAllConnections();
+      await new Promise((resolve) => stalling.close(resolve));
+    }
+  });
+
   it('is returned with an EVALUATOR_ERROR when the answer is not an evaluation', async () => {
     const other = createServer((_request, response) => {
       response.writeHead(200, { 'content-type': 'application/json' }).end('{"hello":"world"}');

@@ -5,7 +5,7 @@ import type { EvaluatorConfig } from './config.js';
 import { EvaluationController } from './evaluation/evaluation.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { SnapshotPoller } from './snapshots/snapshot-poller.js';
-import { SnapshotPolling, snapshotPollerToken } from './snapshots/snapshots.provider.js';
+import { SnapshotPolling, snapshotPollerToken } from './snapshots/snapshot-polling.js';
 
 @Module({})
 export class AppModule {
