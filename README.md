@@ -4,7 +4,7 @@ A self-hosted feature flag platform for a single operator: define flags per proj
 
 ## Bootstrap the workspace
 
-Prerequisites: Node 24 (see [.nvmrc](.nvmrc)), Git, and Corepack (it ships with Node). Docker is needed to build images and for the Core tests (Testcontainers).
+Prerequisites: Node 24 (see [.nvmrc](.nvmrc)), Git, and Corepack (it ships with Node). Docker is needed to build images and for the Core and Terraform provider tests (Testcontainers). The [Terraform provider](apps/terraform-provider-ctff/README.md) also needs Go (see its `go.mod`) and the Terraform CLI.
 
 ```bash
 git clone --recurse-submodules https://github.com/kevinverreault/capture-the-feature-flag.git
@@ -43,6 +43,8 @@ The workspace uses pnpm workspaces and Nx. Every project is a pnpm package whose
 | `test`         | `vitest run`                                                                             |
 | `build`        | Builds into the project's `dist/`                                                        |
 | `docker-build` | Projects that ship an image: `docker build` from the repo root                           |
+
+The Go Terraform provider follows the same targets with Go tools: `gofmt` for `lint`, `go vet` for `typecheck`, `go build` and `go test`.
 
 Run a target for one project with `pnpm nx run <project>:<target>`, for every project with `pnpm nx run-many -t <target>`, or only for projects changed since `main` with `pnpm nx affected -t <target>`.
 

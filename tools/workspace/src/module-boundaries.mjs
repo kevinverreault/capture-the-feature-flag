@@ -12,6 +12,7 @@ export const scopeTags = [
   'scope:evaluator',
   'scope:birdwatch',
   'scope:showcase',
+  'scope:terraform',
   'scope:shared',
 ];
 

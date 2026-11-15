@@ -49,6 +49,7 @@ export class FlagsService {
               name: input.name,
               description: input.description ?? '',
               tags: input.tags ?? [],
+              managedBy: input.managedBy ?? null,
               variations: [...booleanVariations],
             },
           });
@@ -79,7 +80,13 @@ export class FlagsService {
       () =>
         this.prisma.flag.updateMany({
           where: { id: flag.id, version: input.version },
-          data: { name: input.name, description: input.description, tags: input.tags, version: { increment: 1 } },
+          data: {
+            name: input.name,
+            description: input.description,
+            tags: input.tags,
+            managedBy: input.managedBy,
+            version: { increment: 1 },
+          },
         }),
       `Flag ${key}`,
       input.version,
@@ -104,6 +111,7 @@ function toFlagDto(project: Project, flag: Flag): FlagDto {
     tags: flag.tags,
     variations: flag.variations as Variation[],
     version: flag.version,
+    managedBy: flag.managedBy,
     createdAt: flag.createdAt,
     updatedAt: flag.updatedAt,
   };

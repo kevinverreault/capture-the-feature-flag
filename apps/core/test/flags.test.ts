@@ -132,6 +132,40 @@ describe('flags', () => {
     expect(edited.body).toMatchObject({ key, name: 'Still repeated' });
   });
 
+  it('is managed by nothing unless the creator says otherwise', async () => {
+    const created = await api.post(flags(), { key: uniqueKey('unmanaged'), name: 'Unmanaged' });
+    expect(created.body).toMatchObject({ managedBy: null });
+  });
+
+  it('stores and returns the tool a flag is managed by', async () => {
+    const key = uniqueKey('managed');
+    const created = await api.post(flags(), { key, name: 'Managed', managedBy: 'terraform' });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ managedBy: 'terraform' });
+    expect((await api.get(`${flags()}/${key}`)).body).toMatchObject({ managedBy: 'terraform' });
+    expect((await api.get(flags())).body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ key, managedBy: 'terraform' })]),
+    );
+  });
+
+  it('marks an existing flag as managed, and releases it again with null', async () => {
+    const key = uniqueKey('adopted');
+    await api.post(flags(), { key, name: 'Adopted' });
+    const adopted = await api.patch(`${flags()}/${key}`, { version: 1, managedBy: 'terraform' });
+    expect(adopted.body).toMatchObject({ managedBy: 'terraform', version: 2 });
+
+    const kept = await api.patch(`${flags()}/${key}`, { version: 2, name: 'Renamed' });
+    expect(kept.body).toMatchObject({ managedBy: 'terraform', name: 'Renamed', version: 3 });
+
+    const released = await api.patch(`${flags()}/${key}`, { version: 3, managedBy: null });
+    expect(released.status).toBe(200);
+    expect(released.body).toMatchObject({ managedBy: null, version: 4 });
+  });
+
+  it.each(['', 'Terraform', 'terraform cloud', 42])('rejects the managed-by marker %j with 400', async (managedBy) => {
+    expect((await api.post(flags(), { key: uniqueKey('bad-marker'), name: 'Bad', managedBy })).status).toBe(400);
+  });
+
   it('deletes a flag', async () => {
     const key = uniqueKey('deleted');
     await api.post(flags(), { key, name: 'Deleted' });

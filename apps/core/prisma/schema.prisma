@@ -47,6 +47,8 @@ model Flag {
   /// The ordered list of variations; boolean flags always have [true, false] (ADR 0002).
   variations  Json
   version     Int         @default(1)
+  /// The tool managing the flag as code (e.g. "terraform"), or null when it is managed by hand.
+  managedBy   String?     @map("managed_by")
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
   project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
