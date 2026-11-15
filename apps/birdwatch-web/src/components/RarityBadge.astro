@@ -1,0 +1,17 @@
+---
+import Badge from '@ds/components/ui/Badge.astro';
+import type { Rarity } from '../lib/api';
+
+interface Props {
+  rarity: Rarity;
+}
+
+const { rarity } = Astro.props;
+const variants: Record<Rarity, 'danger' | 'secondary' | 'muted'> = {
+  rare: 'danger',
+  uncommon: 'secondary',
+  common: 'muted',
+};
+---
+
+<Badge variant={variants[rarity]}>{rarity}</Badge>

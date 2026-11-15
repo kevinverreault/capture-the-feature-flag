@@ -1,26 +1,23 @@
 ---
-import Badge from '@ds/components/ui/Badge.astro';
 import Card from '@ds/components/ui/Card.astro';
-import type { FeedSighting, Rarity } from '../lib/api';
-import { countryName, formatObservedAt } from '../lib/format';
+import RarityBadge from './RarityBadge.astro';
+import type { FeedSighting } from '../lib/api';
+import { countryName, formatObservedAt, speciesHref } from '../lib/format';
 
 interface Props {
   sighting: FeedSighting;
 }
 
 const { sighting } = Astro.props;
-const rarityBadge: Record<Rarity, 'danger' | 'secondary' | 'muted'> = {
-  rare: 'danger',
-  uncommon: 'secondary',
-  common: 'muted',
-};
 ---
 
 <Card as="li" data-testid="sighting">
   <div slot="header">
-    <div class="title">
-      <h2 class="text-lg">{sighting.species.commonName}</h2>
-      <Badge variant={rarityBadge[sighting.species.rarity]}>{sighting.species.rarity}</Badge>
+    <div class="title-row">
+      <h2 class="text-lg">
+        <a href={speciesHref(sighting.species.id)}>{sighting.species.commonName}</a>
+      </h2>
+      <RarityBadge rarity={sighting.species.rarity} />
     </div>
     <p class="muted text-sm"><em>{sighting.species.scientificName}</em></p>
   </div>
@@ -35,13 +32,6 @@ const rarityBadge: Record<Rarity, 'danger' | 'secondary' | 'muted'> = {
 </Card>
 
 <style>
-  .title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
   .notes {
     margin-top: var(--space-xs);
     font-style: italic;

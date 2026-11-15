@@ -14,6 +14,7 @@
     "build": "astro build",
     "typecheck": "astro check",
     "lint": "eslint .",
+    "test": "vitest run",
     "start": "node server.js",
     "docker-build": "docker build -f Dockerfile -t ctff-birdwatch-web:local ../.."
   },

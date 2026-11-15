@@ -9,7 +9,7 @@ ctff_flag.rare_bird_alerts birdwatch/rare-bird-alerts
 ctff_flag.photo_id_beta birdwatch/photo-id-beta
 ctff_flag_environment.new_sighting_form["development"] birdwatch/new-sighting-form/development
 ctff_flag_environment.new_sighting_form["production"] birdwatch/new-sighting-form/production
-ctff_flag_environment.rare_bird_alerts_development birdwatch/rare-bird-alerts/development
-ctff_flag_environment.rare_bird_alerts_production birdwatch/rare-bird-alerts/production
+ctff_flag_environment.rare_bird_alerts["development"] birdwatch/rare-bird-alerts/development
+ctff_flag_environment.rare_bird_alerts["production"] birdwatch/rare-bird-alerts/production
 ctff_flag_environment.photo_id_beta["development"] birdwatch/photo-id-beta/development
 ctff_flag_environment.photo_id_beta["production"] birdwatch/photo-id-beta/production

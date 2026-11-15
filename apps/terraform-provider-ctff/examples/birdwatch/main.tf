@@ -22,13 +22,14 @@ locals {
     production  = "Production"
   }
 
-  # Where rare bird alerts are shown in production. Countries are uppercase ISO 3166-1 alpha-2 codes.
-  rare_bird_alert_countries = ["CA", "US"]
+  # Where rare bird alerts are shown. Countries are uppercase ISO 3166-1 alpha-2 codes.
+  rare_bird_alert_countries = ["CA"]
 
   # The birders trying photo ID before everyone else.
-  photo_id_beta_testers = ["alice"]
+  photo_id_beta_testers = ["chiara"]
 }
 
+# The same demo Core's seed creates (apps/core/src/seed/demo-seed.ts), so either can set it up.
 resource "ctff_project" "birdwatch" {
   key  = "birdwatch"
   name = "Birdwatch"
@@ -47,7 +48,7 @@ resource "ctff_flag" "new_sighting_form" {
   project_key = ctff_project.birdwatch.key
   key         = "new-sighting-form"
   name        = "New sighting form"
-  description = "Kill switch for the form that logs a sighting."
+  description = "Kill switch for the \"Log a sighting\" form in Birdwatch and the endpoint behind it."
   tags        = ["birdwatch", "kill-switch"]
 }
 
@@ -61,27 +62,21 @@ resource "ctff_flag_environment" "new_sighting_form" {
   default_variation = local.serve_true
 }
 
-# A country rule: alerts for birders in the listed countries in production, and for every birder in development.
+# A country rule: the alert banner for birders in the listed countries, false for everyone else.
 resource "ctff_flag" "rare_bird_alerts" {
   project_key = ctff_project.birdwatch.key
   key         = "rare-bird-alerts"
   name        = "Rare bird alerts"
-  description = "Banner for rare sightings nearby."
-  tags        = ["birdwatch", "alerts"]
+  description = "Shows the rare-bird alert banner in Birdwatch, targeted by country."
+  tags        = ["birdwatch"]
 }
 
-resource "ctff_flag_environment" "rare_bird_alerts_development" {
-  project_key       = ctff_project.birdwatch.key
-  flag_key          = ctff_flag.rare_bird_alerts.key
-  environment_key   = ctff_environment.birdwatch["development"].key
-  on                = true
-  default_variation = local.serve_true
-}
+resource "ctff_flag_environment" "rare_bird_alerts" {
+  for_each = ctff_environment.birdwatch
 
-resource "ctff_flag_environment" "rare_bird_alerts_production" {
   project_key       = ctff_project.birdwatch.key
   flag_key          = ctff_flag.rare_bird_alerts.key
-  environment_key   = ctff_environment.birdwatch["production"].key
+  environment_key   = each.value.key
   on                = true
   default_variation = local.serve_false
   rules = [
@@ -94,12 +89,12 @@ resource "ctff_flag_environment" "rare_bird_alerts_production" {
   ]
 }
 
-# Individual targets: photo ID for the beta testers only, in every environment.
+# Individual targets: the "Photo ID (beta)" button for the beta testers only, false for everyone else.
 resource "ctff_flag" "photo_id_beta" {
   project_key = ctff_project.birdwatch.key
   key         = "photo-id-beta"
-  name        = "Photo ID beta"
-  description = "Identify a bird from a photo when logging a sighting."
+  name        = "Photo ID (beta)"
+  description = "Shows the \"Photo ID (beta)\" button in Birdwatch, targeted at individual birders."
   tags        = ["birdwatch", "beta"]
 }
 

@@ -7,6 +7,7 @@ import {
 import { Flags, RequireFlag } from '@ctff/nestjs';
 import { BadRequestException, Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { type BirderRequest, loggedInBirder } from '../session/auth.guard.js';
+import { forBirder } from '../session/for-birder.js';
 import { checkNewSighting } from './new-sighting.js';
 import { SightingStore } from './sighting-store.js';
 
@@ -17,7 +18,7 @@ export class SightingsController {
   /** The sighting feed, with the logged-in birder and their flags. */
   @Get()
   feed(@Req() request: BirderRequest, @Flags() flags: AllFlags): FeedResponse {
-    return { birder: loggedInBirder(request), flags, sightings: this.store.feed() };
+    return { ...forBirder(request, flags, this.store), sightings: this.store.feed() };
   }
 
   /**

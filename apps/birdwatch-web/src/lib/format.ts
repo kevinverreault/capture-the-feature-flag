@@ -1,3 +1,8 @@
+/** The page of a species. */
+export function speciesHref(speciesId: string): string {
+  return `/species/${encodeURIComponent(speciesId)}`;
+}
+
 const dateTime = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
 const regions = new Intl.DisplayNames(['en'], { type: 'region' });
 

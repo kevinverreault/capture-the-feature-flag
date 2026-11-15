@@ -6,6 +6,11 @@
 // sighting while new-sighting-form serves true, and that switching its targeting off through Core's API hides "Log a
 // sighting" and makes the API answer 404 within one poll interval. It switches its targeting back on at the end.
 //
+// Then the targeting showcase, as the seed configures it: Alice (CA) sees the rare-bird alert banner and Bram (NL)
+// doesn't, only Chiara sees "Photo ID (beta)", the flag inspector shows each flag's evaluation reason with a link
+// to the flag in the admin app, and switching the targeting of rare-bird-alerts off makes it serve its off
+// variation, with the evaluation reason OFF.
+//
 // Environment: CORE_URL (default http://localhost:3000), BIRDWATCH_API_URL (default http://localhost:4001),
 // BIRDWATCH_WEB_URL (default http://localhost:4000) and POLL_INTERVAL_MS (the Evaluator's, default 2000).
 
@@ -20,7 +25,7 @@ const pollIntervalMs = Number(process.env['POLL_INTERVAL_MS'] ?? 2000);
  */
 const pollGraceMs = 3000;
 const killSwitch = 'new-sighting-form';
-const targetingPath = `/projects/birdwatch/flags/${killSwitch}/targeting/development`;
+const targetingPath = (flagKey: string) => `/projects/birdwatch/flags/${flagKey}/targeting/development`;
 
 async function json(url: string, init: RequestInit = {}): Promise<{ status: number; body: Record<string, unknown> }> {
   const response = await fetch(url, {
@@ -46,15 +51,14 @@ async function until(attempt: () => Promise<boolean>, timeoutMs: number): Promis
   }
 }
 
-/** Switches the targeting of the kill switch on or off in development, through Core's API. */
-async function setTargeting(on: boolean): Promise<void> {
-  const { body } = await json(`${coreUrl}/api/v1${targetingPath}`);
-  const { status } = await json(`${coreUrl}/api/v1${targetingPath}`, {
+/** Switches the targeting of a flag on or off in development, through Core's API. */
+async function setTargeting(flagKey: string, on: boolean): Promise<void> {
+  const { body } = await json(`${coreUrl}/api/v1${targetingPath(flagKey)}`);
+  const { status } = await json(`${coreUrl}/api/v1${targetingPath(flagKey)}`, {
     method: 'PATCH',
     body: JSON.stringify({ version: body['version'], on }),
   });
-  if (status !== 200)
-    throw new Error(`Switching the targeting of ${killSwitch} ${on ? 'on' : 'off'} answered ${status}`);
+  if (status !== 200) throw new Error(`Switching the targeting of ${flagKey} ${on ? 'on' : 'off'} answered ${status}`);
 }
 
 async function webLogIn(birderId: string): Promise<string> {
@@ -69,10 +73,86 @@ async function webLogIn(birderId: string): Promise<string> {
   return cookie.split(';')[0] as string;
 }
 
-async function feedShowsLogASighting(cookie: string): Promise<boolean> {
+async function feedPage(cookie: string): Promise<string> {
   const response = await fetch(webUrl, { headers: { cookie }, redirect: 'manual' });
   if (response.status !== 200) throw new Error(`The feed answered ${response.status}`);
-  return (await response.text()).includes('data-testid="log-sighting"');
+  return response.text();
+}
+
+async function feedShowsLogASighting(cookie: string): Promise<boolean> {
+  return (await feedPage(cookie)).includes('data-testid="log-sighting"');
+}
+
+/** The HTML of a flag's row in the flag inspector of a page, and what follows it. */
+function inspectedRow(page: string, flagKey: string): string | undefined {
+  return page.split('data-testid="inspected-flag"').find((part) => part.includes(`data-flag="${flagKey}"`));
+}
+
+/** The evaluation reason the flag inspector of a page shows for a flag, such as `RULE_MATCH`. */
+function inspectedReason(page: string, flagKey: string): string | undefined {
+  return inspectedRow(page, flagKey)?.match(/data-reason="([A-Z_]+)"/)?.[1];
+}
+
+/** The variation the flag inspector of a page shows for a flag: `true`, `false`, or `null` when none was served. */
+function inspectedVariation(page: string, flagKey: string): string | undefined {
+  return inspectedRow(page, flagKey)?.match(/data-variation="([a-z]+)"/)?.[1];
+}
+
+/** The link of a flag in the flag inspector of a page. */
+function inspectedLink(page: string, flagKey: string): string | undefined {
+  return inspectedRow(page, flagKey)
+    ?.match(/href="([^"]+)"/)?.[1]
+    ?.replaceAll('&amp;', '&');
+}
+
+const showsAlert = (page: string) => page.includes('data-testid="rare-bird-alert"');
+const showsPhotoId = (page: string) => page.includes('data-testid="photo-id"');
+
+async function targetingShowcase(): Promise<void> {
+  const alice = await webLogIn('alice');
+  const alicePage = await feedPage(alice);
+  const bramPage = await feedPage(await webLogIn('bram'));
+  const chiaraPage = await feedPage(await webLogIn('chiara'));
+  check(
+    showsAlert(alicePage) && !showsAlert(bramPage),
+    'Alice (CA) sees the rare-bird alert banner and Bram (NL) does not',
+  );
+  check(
+    showsPhotoId(chiaraPage) && !showsPhotoId(alicePage) && !showsPhotoId(bramPage),
+    'only Chiara sees "Photo ID (beta)"',
+  );
+  check(
+    inspectedReason(alicePage, 'rare-bird-alerts') === 'RULE_MATCH' &&
+      inspectedReason(bramPage, 'rare-bird-alerts') === 'DEFAULT' &&
+      inspectedReason(chiaraPage, 'photo-id-beta') === 'TARGET_MATCH',
+    'the flag inspector shows RULE_MATCH and DEFAULT for rare-bird-alerts, and TARGET_MATCH for photo-id-beta',
+  );
+  const link = inspectedLink(alicePage, 'rare-bird-alerts');
+  const admin = link ? await fetch(link) : undefined;
+  check(
+    admin?.status === 200 && (await admin.text()).includes('rare-bird-alerts'),
+    `the flag inspector links to rare-bird-alerts in the admin app (${link ?? 'no link'})`,
+  );
+  const species = await fetch(`${webUrl}/species/snowy-owl`, { headers: { cookie: alice } });
+  check(species.status === 200 && (await species.text()).includes('Snowy Owl'), 'the species pages render');
+
+  await setTargeting('rare-bird-alerts', false);
+  try {
+    const off = await until(async () => {
+      const page = await feedPage(alice);
+      return (
+        !showsAlert(page) &&
+        inspectedReason(page, 'rare-bird-alerts') === 'OFF' &&
+        inspectedVariation(page, 'rare-bird-alerts') === 'false'
+      );
+    }, pollIntervalMs + pollGraceMs);
+    check(
+      off,
+      'with its targeting off, rare-bird-alerts serves its off variation false (OFF) and Alice no longer sees the banner',
+    );
+  } finally {
+    await setTargeting('rare-bird-alerts', true);
+  }
 }
 
 async function logSighting(token: string): Promise<number> {
@@ -106,7 +186,7 @@ async function main(): Promise<void> {
   const cookie = await webLogIn('alice');
   check(await feedShowsLogASighting(cookie), 'the website shows Alice the feed with "Log a sighting"');
 
-  await setTargeting(false);
+  await setTargeting(killSwitch, false);
   try {
     const switched = performance.now();
     const hidden = await until(async () => !(await feedShowsLogASighting(cookie)), pollIntervalMs + pollGraceMs);
@@ -116,8 +196,10 @@ async function main(): Promise<void> {
     );
     check((await logSighting(token as string)) === 404, `the endpoint answers 404 while ${killSwitch} serves false`);
   } finally {
-    await setTargeting(true);
+    await setTargeting(killSwitch, true);
   }
+
+  await targetingShowcase();
 }
 
 try {
