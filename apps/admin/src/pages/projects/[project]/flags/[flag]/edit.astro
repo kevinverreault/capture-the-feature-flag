@@ -11,6 +11,7 @@ import ProjectNav from '../../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
 import { coreApi } from '../../../../../lib/core';
 import { flagFieldsBody, flagFieldValues } from '../../../../../lib/flag-fields';
+import { setFlash } from '../../../../../lib/flash';
 import { handlePost, orNotFound, textField } from '../../../../../lib/forms';
 import { routes } from '../../../../../lib/routes';
 
@@ -42,6 +43,11 @@ const [projects, project, flag] = await Promise.all([
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }))),
 ]);
 if (!project || !flag) Astro.response.status = 404;
+// An archived flag is kept as it was archived (Core rejects edits to it), so it is restored on its page first.
+if (flag?.archived) {
+  setFlash(Astro.cookies, `Flag ${flagKey} is archived: restore it before editing it`);
+  return Astro.redirect(routes.flag(projectKey, flagKey), 303);
+}
 ---
 
 {

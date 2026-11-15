@@ -104,4 +104,17 @@ describe('archived flags', () => {
     const archived = (await api.post(`${flag(key)}/archive`, {})).body;
     expect((await api.post(`${flag(key)}/archive`, {})).body).toEqual(archived);
   });
+
+  it('rejects edits and targeting changes to an archived flag with 409, so a restore serves what it had', async () => {
+    const key = await createFlag('frozen');
+    await api.post(`${flag(key)}/archive`, {});
+    const edit = await api.patch(flag(key), { version: 2, name: 'Edited' });
+    expect(edit.status).toBe(409);
+    expect(edit.body.message).toContain('archived');
+    expect((await api.patch(`${flag(key)}/targeting/production`, { version: 1, on: true })).status).toBe(409);
+
+    await api.post(`${flag(key)}/restore`, {});
+    expect((await api.get(flag(key))).body).toMatchObject({ name: 'Flag', version: 3 });
+    expect((await api.get(`${flag(key)}/targeting/production`)).body).toMatchObject({ on: false, version: 1 });
+  });
 });

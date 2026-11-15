@@ -26,7 +26,9 @@ export class TargetingController {
 
   @Patch(':environmentKey')
   @ApiOkResponse({ type: TargetingDto })
-  @ApiConflictResponse({ description: 'The targeting changed since the version the change is based on.' })
+  @ApiConflictResponse({
+    description: 'The targeting changed since the version the change is based on, or its flag is archived.',
+  })
   update(
     @Param('projectKey') projectKey: string,
     @Param('flagKey') flagKey: string,

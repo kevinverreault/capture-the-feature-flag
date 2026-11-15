@@ -100,7 +100,8 @@ const unplacedMessages = unplaced
   ? [...post.errors.form, ...Object.values(post.errors.fields).filter((message) => message !== undefined)]
   : [];
 /** Core's refusal of an archive, restore or delete, e.g. deleting a flag restored since the page was loaded. */
-const lifecycleMessages = post.action !== undefined && post.action !== 'targeting' ? post.errors.form : [];
+const lifecycleActions: readonly (string | undefined)[] = ['archive', 'restore', 'delete'];
+const lifecycleMessages = lifecycleActions.includes(post.action) ? post.errors.form : [];
 ---
 
 {

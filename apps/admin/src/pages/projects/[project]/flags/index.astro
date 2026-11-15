@@ -25,7 +25,7 @@ const [projects, project, environments, flags] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params }))),
-    // Archived flags too, so a project whose flags are all archived doesn't read as having none.
+  // Archived flags too, so a project whose flags are all archived doesn't read as having none.
   orNotFound(
     unwrap(core.GET('/api/v1/projects/{projectKey}/flags', { params: { ...params, query: { includeArchived: true } } })),
   ),
@@ -34,7 +34,7 @@ if (!project || !environments || !flags) Astro.response.status = 404;
 
 const listed = filterFlags(flags ?? [], { showArchived });
 const tags = listedTags(listed);
-const shown = filterFlags(listed, { search, tag, showArchived });
+const shown = filterFlags(flags ?? [], { search, tag, showArchived });
 const filtered = search.trim() !== '' || tag !== '';
 const isOn = (flag: (typeof shown)[number], environmentKey: string) =>
   flag.targeting.some((state) => state.environmentKey === environmentKey && state.on);

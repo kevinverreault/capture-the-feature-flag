@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { updateAtVersion } from '../common/persistence.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
-import { FlagsService } from '../flags/flags.service.js';
+import { assertNotArchived, FlagsService } from '../flags/flags.service.js';
 import type { Environment, Flag, Targeting } from '../generated/prisma/client.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import type { TargetingDto, UpdateTargetingDto } from './targeting.dto.js';
@@ -42,10 +42,12 @@ export class TargetingService {
     input: UpdateTargetingDto,
   ): Promise<TargetingDto> {
     const { flag, environment, targeting } = await this.find(projectKey, flagKey, environmentKey);
+    assertNotArchived(flag);
     await updateAtVersion(
       () =>
         this.prisma.targeting.updateMany({
-          where: { id: targeting.id, version: input.version },
+          // Also filtered on the flag, so targeting of a flag archived meanwhile is left as it was archived.
+          where: { id: targeting.id, version: input.version, flag: { archivedAt: null } },
           data: { on: input.on, version: { increment: 1 } },
         }),
       `Targeting of ${flagKey} in ${environmentKey}`,

@@ -6,16 +6,16 @@ It talks to Core only through [`@ctff/core-api-client`](../../libs/core-api-clie
 
 ## Pages
 
-| Path                                     | What it does                                                                                      |
-| :--------------------------------------- | :------------------------------------------------------------------------------------------------ |
-| `/projects`                              | Lists the projects; creates one                                                                   |
-| `/projects/{project}/flags`              | Lists the flags with their targeting on/off per environment; search by key or name, filter by tag |
-| `/projects/{project}/new-flag`           | Creates a flag (key, name, optional description and tags)                                         |
-| `/projects/{project}/flags/{flag}`       | Shows a flag, with a tab per environment and its targeting switch (`?environment=` opens a tab)   |
-| `/projects/{project}/flags/{flag}/edit`  | Edits the flag's name, description and tags; shows the key, which cannot change                   |
-| `/projects/{project}/environments`       | Lists a project's environments with their SDK keys; creates one                                   |
-| `/projects/{project}/environments/{env}` | Shows and copies the SDK key; renames or deletes the environment                                  |
-| `/projects/{project}/settings`           | Renames or deletes the project                                                                    |
+| Path                                     | What it does                                                                                                                                                                             |
+| :--------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/projects`                              | Lists the projects; creates one                                                                                                                                                          |
+| `/projects/{project}/flags`              | Lists the flags with their targeting on/off per environment; search by key or name, filter by tag, show archived                                                                         |
+| `/projects/{project}/new-flag`           | Creates a flag (key, name, optional description and tags)                                                                                                                                |
+| `/projects/{project}/flags/{flag}`       | Shows a flag, with a tab per environment and its targeting switch (`?environment=` opens a tab); archives it, or restores or permanently deletes it (after a confirmation) once archived |
+| `/projects/{project}/flags/{flag}/edit`  | Edits the flag's name, description and tags; shows the key, which cannot change. An archived flag goes back to its page, to be restored first                                            |
+| `/projects/{project}/environments`       | Lists a project's environments with their SDK keys; creates one                                                                                                                          |
+| `/projects/{project}/environments/{env}` | Shows and copies the SDK key; renames or deletes the environment                                                                                                                         |
+| `/projects/{project}/settings`           | Renames or deletes the project                                                                                                                                                           |
 
 The header's project switcher lists every project. Forms are plain server-rendered posts: on success the page redirects (`303`) and shows a confirmation once; when Core rejects the submission, the form is rendered again with Core's status, and each validation message next to the input for the property Core names (messages about other properties show above the form). Flag tags are typed in one input, separated by commas. A project opens on its flags. The create page lives outside `/flags/` so that no flag key can take its address.
 
@@ -39,4 +39,4 @@ A form post must come from the admin app's own pages: Astro checks its `Origin` 
 
 - `build`: `astro build` into `dist/` (Core's build depends on it).
 - `typecheck`: `astro check`.
-- `test`: the unit tests of the pure helpers in `src/lib`. The pages are covered by Core's S2 tests (`apps/core/test/admin.test.ts` and `admin-flags.test.ts`) and, with #23, by the Playwright end-to-end suite over compose.
+- `test`: the unit tests of the pure helpers in `src/lib`. The pages are covered by Core's S2 tests (`apps/core/test/admin.test.ts`, `admin-flags.test.ts` and `admin-archived-flags.test.ts`) and, with #23, by the Playwright end-to-end suite over compose.

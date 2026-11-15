@@ -518,7 +518,7 @@
             }
           },
           "409": {
-            "description": "The flag changed since the version the edit is based on."
+            "description": "The flag changed since the version the edit is based on, or is archived."
           }
         },
         "tags": [
@@ -770,7 +770,7 @@
             }
           },
           "409": {
-            "description": "The targeting changed since the version the change is based on."
+            "description": "The targeting changed since the version the change is based on, or its flag is archived."
           }
         },
         "tags": [

@@ -37,7 +37,7 @@ export class FlagsController {
 
   @Patch(':flagKey')
   @ApiOkResponse({ type: FlagDto })
-  @ApiConflictResponse({ description: 'The flag changed since the version the edit is based on.' })
+  @ApiConflictResponse({ description: 'The flag changed since the version the edit is based on, or is archived.' })
   update(
     @Param('projectKey') projectKey: string,
     @Param('flagKey') flagKey: string,

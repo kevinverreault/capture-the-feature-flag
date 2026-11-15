@@ -123,4 +123,20 @@ describe('admin app: archived flags', () => {
     expect(await refused.text()).toContain('archive it before deleting it');
     expect((await api.get(flag)).status).toBe(200);
   });
+
+  it('sends the edit page of an archived flag back to the flag, which must be restored first', async () => {
+    const projectKey = await project('kill-switch');
+    const flag = `/projects/${projectKey}/flags/kill-switch`;
+    await api.post(`${flag}/archive`, {});
+
+    for (const response of [
+      await admin.get(`${flag}/edit`),
+      await admin.post(`${flag}/edit`, { version: '2', name: 'Edited' }),
+    ]) {
+      expect(response.status).toBe(303);
+      expect(response.headers.get('location')).toBe(flag);
+      expect(await followed(response)).toContain('restore it before editing it');
+    }
+    expect((await api.get(flag)).body.name).toBe('kill-switch');
+  });
 });

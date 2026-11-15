@@ -90,9 +90,11 @@ export class FlagsService {
     const project = await this.projects.find(projectKey);
     const flag = await this.find(project, key);
     assertKeyUnchanged('flag', flag.key, input.key);
+    assertNotArchived(flag);
     await updateAtVersion(
       () =>
         this.prisma.flag.updateMany({
+          // Archiving bumps the version, so a flag archived since it was loaded is rejected too.
           where: { id: flag.id, version: input.version },
           data: {
             name: input.name,
@@ -109,28 +111,27 @@ export class FlagsService {
   }
 
   /** Archives the flag, leaving its targeting as it is; archiving an archived flag changes nothing. */
-  async archive(projectKey: string, key: string): Promise<FlagDto> {
-    const project = await this.projects.find(projectKey);
-    const flag = await this.find(project, key);
-    await this.prisma.flag.updateMany({
-      where: { id: flag.id, archivedAt: null },
-      data: { archivedAt: new Date(), version: { increment: 1 } },
-    });
-    return toFlagDto(project, await this.find(project, key));
+  archive(projectKey: string, key: string): Promise<FlagDto> {
+    return this.setArchived(projectKey, key, true);
   }
 
   /** Restores an archived flag, with the targeting it had; restoring a flag that isn't archived changes nothing. */
-  async restore(projectKey: string, key: string): Promise<FlagDto> {
+  restore(projectKey: string, key: string): Promise<FlagDto> {
+    return this.setArchived(projectKey, key, false);
+  }
+
+  /** Archives or restores the flag, bumping its version only when that changes it. */
+  private async setArchived(projectKey: string, key: string, archived: boolean): Promise<FlagDto> {
     const project = await this.projects.find(projectKey);
     const flag = await this.find(project, key);
     await this.prisma.flag.updateMany({
-      where: { id: flag.id, archivedAt: { not: null } },
-      data: { archivedAt: null, version: { increment: 1 } },
+      where: { id: flag.id, archivedAt: archived ? null : { not: null } },
+      data: { archivedAt: archived ? new Date() : null, version: { increment: 1 } },
     });
     return toFlagDto(project, await this.find(project, key));
   }
 
-  /** Permanently deletes an archived flag with its targeting in every environment; a live flag is rejected with 409. */
+  /** Permanently deletes an archived flag with its targeting in every environment; any other is rejected with 409. */
   async delete(projectKey: string, key: string): Promise<void> {
     const project = await this.projects.find(projectKey);
     const flag = await this.find(project, key);
@@ -139,6 +140,13 @@ export class FlagsService {
     if (count === 0 && (await this.prisma.flag.count({ where: { id: flag.id } })) > 0) {
       throw new ConflictException(`Flag ${key} is not archived; archive it before deleting it`);
     }
+  }
+}
+
+/** Rejects a change to an archived flag with 409: it stays as it was archived until restored. */
+export function assertNotArchived(flag: Flag): void {
+  if (flag.archivedAt !== null) {
+    throw new ConflictException(`Flag ${flag.key} is archived; restore it before changing it`);
   }
 }
 
