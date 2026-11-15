@@ -18,6 +18,15 @@
       "@ctff/core"
     ],
     "targets": {
+      "lint": {
+        "dependsOn": []
+      },
+      "typecheck": {
+        "dependsOn": []
+      },
+      "build": {
+        "dependsOn": []
+      },
       "test": {
         "dependsOn": [
           "^build"

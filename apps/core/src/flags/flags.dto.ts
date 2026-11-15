@@ -5,6 +5,7 @@ import {
   ArrayMaxSize,
   ArrayUnique,
   IsArray,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -12,7 +13,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { ImmutableKey, IsKey, IsName, IsOmittable, keyMaxLength, keyPattern } from '../common/keys.js';
+import { ImmutableKey, IsKey, IsName, IsOmittable } from '../common/keys.js';
 
 const tagPattern = /^\S(?:.*\S)?$/;
 
@@ -38,8 +39,12 @@ function IsTags(): PropertyDecorator {
   );
 }
 
+/** The tools that can mark a flag as managed by them. V1 has one: the Terraform provider. */
+export const managedByValues = ['terraform'] as const;
+export type ManagedBy = (typeof managedByValues)[number];
+
 const managedByDescription =
-  'The tool that manages the flag as code, in lowercase kebab-case (the Terraform provider sets "terraform"). ' +
+  'The tool managing the flag as code: "terraform" when the Terraform provider manages it, null otherwise. ' +
   'The admin app shows a badge and warns before edits. It is informational: it does not lock the flag.';
 
 /** The "managed by" marker. An update may also send null, handing the flag back to manual management. */
@@ -48,16 +53,11 @@ function IsManagedBy({ nullable }: { nullable: boolean }): PropertyDecorator {
     ApiProperty({
       required: false,
       nullable,
-      type: String,
+      enum: managedByValues,
       description: nullable ? `${managedByDescription} Send null to clear it.` : managedByDescription,
-      pattern: keyPattern.source,
-      maxLength: keyMaxLength,
-      example: 'terraform',
     }),
     nullable ? IsOptional() : IsOmittable(),
-    IsString(),
-    MaxLength(keyMaxLength),
-    Matches(keyPattern, { message: 'managedBy must be lowercase kebab-case (e.g. terraform)' }),
+    IsIn(managedByValues, { message: `managedBy must be one of: ${managedByValues.join(', ')}` }),
   );
 }
 
@@ -75,7 +75,7 @@ export class CreateFlagDto {
   tags?: string[];
 
   @IsManagedBy({ nullable: false })
-  managedBy?: string;
+  managedBy?: ManagedBy;
 }
 
 export class UpdateFlagDto {
@@ -97,7 +97,7 @@ export class UpdateFlagDto {
   tags?: string[];
 
   @IsManagedBy({ nullable: true })
-  managedBy?: string | null;
+  managedBy?: ManagedBy | null;
 }
 
 export class FlagDto {
@@ -126,8 +126,8 @@ export class FlagDto {
   @ApiProperty({ description: 'Incremented on every edit; send it back with the next edit.' })
   version!: number;
 
-  @ApiProperty({ type: String, nullable: true, description: managedByDescription, example: 'terraform' })
-  managedBy!: string | null;
+  @ApiProperty({ enum: managedByValues, nullable: true, description: managedByDescription })
+  managedBy!: ManagedBy | null;
 
   @ApiProperty()
   createdAt!: Date;

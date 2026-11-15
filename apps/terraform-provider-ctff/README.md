@@ -45,7 +45,7 @@ output "production_sdk_key" {
 | `ctff_flag`        | `project_key`, `key`, `name`, `description`, `tags` (set) | `id`, `version`, `managed_by` | `<project>/<flag>` |
 
 - **Keys are immutable.** Changing a `key` or `project_key` replaces the resource. Replacing a flag deletes its targeting in every environment, and replacing an environment gives it a new SDK key. Keys are checked at plan time with Core's rule (lowercase kebab-case, at most 64 characters).
-- **Every request sends `X-CTFF-Actor: terraform`**, so Core attributes the changes to Terraform.
+- **Every request sends `X-CTFF-Actor: terraform`**, the actor that Core records on audit entries (#12).
 - **Flags are marked as managed by `terraform`** through Core's `managedBy` field, so the admin app can show a badge and warn before an edit. Nothing is locked: edits made in the admin app show up as drift on the next plan, and applying puts the configuration back. An imported flag gets the marker on the first apply after the import.
 - **Flag edits are versioned.** The provider sends the `version` it last read. If the flag changes between that read and the apply, Core answers `409` and the apply fails, so the plan can be reviewed again.
 - Destroying a project deletes its environments, flags and targeting, and destroying an environment deletes the targeting of every flag in it. A resource that was deleted outside Terraform is planned for creation again.

@@ -18,6 +18,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 
 	"github.com/kevinverreault/capture-the-feature-flag/apps/terraform-provider-ctff/internal/client"
@@ -154,7 +155,7 @@ func (r *flagResource) Create(ctx context.Context, req resource.CreateRequest, r
 		apiError(&resp.Diagnostics, "create the flag", err)
 		return
 	}
-	r.setState(ctx, &resp.State, &resp.Diagnostics, flag)
+	setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
 }
 
 func (r *flagResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -172,7 +173,7 @@ func (r *flagResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		apiError(&resp.Diagnostics, "read the flag", err)
 		return
 	}
-	r.setState(ctx, &resp.State, &resp.Diagnostics, flag)
+	setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
 }
 
 func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
@@ -198,7 +199,7 @@ func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 		apiError(&resp.Diagnostics, "update the flag", err)
 		return
 	}
-	r.setState(ctx, &resp.State, &resp.Diagnostics, flag)
+	setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
 }
 
 func (r *flagResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -223,11 +224,8 @@ func (r *flagResource) ImportState(ctx context.Context, req resource.ImportState
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key"), key)...)
 }
 
-type stateSetter interface {
-	Set(ctx context.Context, val any) diag.Diagnostics
-}
-
-func (r *flagResource) setState(ctx context.Context, state stateSetter, diags *diag.Diagnostics, flag *client.Flag) {
+// setFlagState records the flag as Core returned it. Tags are a set, so their order in Core doesn't matter.
+func setFlagState(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics, flag *client.Flag) {
 	tags := append([]string{}, flag.Tags...)
 	sort.Strings(tags)
 	tagSet, d := types.SetValueFrom(ctx, types.StringType, tags)

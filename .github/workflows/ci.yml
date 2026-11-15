@@ -31,6 +31,7 @@ jobs:
           cache-dependency-path: apps/terraform-provider-ctff/go.sum
       - uses: hashicorp/setup-terraform@v3
         with:
+          terraform_version: 1.17.2
           terraform_wrapper: false
       - run: pnpm nx affected -t lint typecheck test build
 

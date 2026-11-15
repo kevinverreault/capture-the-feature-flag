@@ -162,7 +162,7 @@ describe('flags', () => {
     expect(released.body).toMatchObject({ managedBy: null, version: 4 });
   });
 
-  it.each(['', 'Terraform', 'terraform cloud', 42])('rejects the managed-by marker %j with 400', async (managedBy) => {
+  it.each(['', 'Terraform', 'pulumi', 42])('rejects the managed-by marker %j with 400', async (managedBy) => {
     expect((await api.post(flags(), { key: uniqueKey('bad-marker'), name: 'Bad', managedBy })).status).toBe(400);
   });
 
