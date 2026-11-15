@@ -27,6 +27,8 @@ This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000
 
 On an empty database, Core seeds the `birdwatch` demo project ([the demo seed](apps/core/README.md#the-demo-seed)), used by **Birdwatch**, the birding demo: its website, [birdwatch-web](apps/birdwatch-web/README.md), is on <http://localhost:4000>, and its API, [birdwatch-api](apps/birdwatch-api/README.md), on <http://localhost:4001>. Log in as a birder, and switch the targeting of `new-sighting-form` off in the admin app (project Birdwatch, environment Development): "Log a sighting" disappears within seconds. Switch between birders to see targeting at work: Alice (CA) gets the rare-bird alert banner from a `country in [CA]` rule and Bram (NL) doesn't, only Chiara gets "Photo ID (beta)" as an individual target, and the flag inspector at the bottom of each page shows the context, what each flag serves and why, with a link to the flag in the admin app.
 
+The [showcase website](apps/showcase/README.md), which presents the product and has the quickstart and the SDK, NestJS and Terraform guides, is on <http://localhost:8080>.
+
 To manage flags as code, `docker compose --profile terraform up` also builds the [Terraform provider](apps/terraform-provider-ctff/README.md) and applies its [example configuration](apps/terraform-provider-ctff/examples/birdwatch/main.tf), which declares the Birdwatch project with its environments, flags and targeting. It takes over the project the demo seed created; with `SEED_DEMO=false`, Terraform creates it instead.
 
 ## Layout

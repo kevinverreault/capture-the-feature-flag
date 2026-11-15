@@ -1,0 +1,101 @@
+---
+import Badge from '@ds/components/ui/Badge.astro';
+import Button from '@ds/components/ui/Button.astro';
+import Card from '@ds/components/ui/Card.astro';
+import CodeSample from '../components/CodeSample.astro';
+import SiteLayout from '../layouts/SiteLayout.astro';
+
+const features = [
+  {
+    title: 'Targeting per environment',
+    badge: 'Targeting',
+    body: 'Each flag has its own targeting in every environment. Switch targeting off to serve the off variation to everyone, or on to let individual targets, ordered rules on user_id or country, and the default variation decide.',
+  },
+  {
+    title: 'An Evaluator that scales on its own',
+    badge: 'Evaluation',
+    body: 'Evaluators answer from an in-memory snapshot of the targeting they poll from Core, with no database connection. Run as many as you need; they keep serving the last snapshot while Core is down, and expose Prometheus metrics.',
+  },
+  {
+    title: 'A TypeScript SDK and a NestJS module',
+    badge: 'SDK',
+    body: 'variation, variationDetail and allFlags never throw: when a flag can’t be evaluated, your code gets the fallback value it passed. The NestJS module adds @Flags() and the @RequireFlag guard.',
+  },
+  {
+    title: 'Flags as code',
+    badge: 'Terraform',
+    body: 'A Terraform provider manages projects, environments, flags and targeting. Flags it manages carry a badge in the admin app, and edits made there show up as drift on the next plan.',
+  },
+  {
+    title: 'An admin app for the whole lifecycle',
+    badge: 'Admin',
+    body: 'Create flags, edit their targeting, archive and restore them, and read the audit entry of every change: who made it, when, and what changed.',
+  },
+  {
+    title: 'See what is evaluated',
+    badge: 'Telemetry',
+    body: 'A dashboard of evaluation counts per flag and variation, stale flags that nothing evaluates anymore, and a Contexts explorer that shows what every flag serves to a seen context.',
+  },
+];
+---
+
+<SiteLayout
+  title="Home"
+  description="Capture The Feature Flag is a self-hosted feature flag platform: targeting per environment, a scalable Evaluator, a TypeScript SDK and flags as code with Terraform."
+>
+  <section class="hero section">
+    <p class="ff-sans-condensed text-lg muted">Self-hosted feature flags</p>
+    <h1 class="ff-serif text-3xl">Ship the code. Decide later who sees it.</h1>
+    <p class="text-lg lead">
+      Capture The Feature Flag is a feature flag platform you run yourself, in containers, for your own services.
+      Define flags once per project, control their targeting in each environment, and evaluate them from your code
+      in milliseconds. No SaaS, no seats, no data leaving your network.
+    </p>
+    <div class="actions">
+      <Button href="/quickstart/" variant="primary" size="large">Start in one command</Button>
+      <Button href="/how-it-works/" variant="secondary" decoration="outline" size="large">How it works</Button>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">What you get</h2>
+    <ul class="cards">
+      {
+        features.map((feature) => (
+          <Card as="li">
+            <Fragment slot="header">
+              <Badge variant="outline">{feature.badge}</Badge>
+              <h3 class="text-xl">{feature.title}</h3>
+            </Fragment>
+            <p>{feature.body}</p>
+          </Card>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">One command, the whole system</h2>
+    <div class="prose">
+      <p>
+        <code>docker compose up</code> starts PostgreSQL, Core with the admin app, an Evaluator, and Birdwatch, a
+        birding demo whose flags you can change while you watch.
+      </p>
+    </div>
+    <CodeSample lang="bash" code="docker compose up" />
+    <div class="actions">
+      <Button href="/quickstart/" variant="primary">Read the quickstart</Button>
+      <Button href="/guides/sdk/" variant="muted" decoration="ghost">Evaluate your first flag</Button>
+    </div>
+  </section>
+</SiteLayout>
+
+<style>
+  .hero {
+    padding-block: var(--space-lg) var(--space-md);
+  }
+
+  .lead {
+    max-width: 44rem;
+  }
+</style>

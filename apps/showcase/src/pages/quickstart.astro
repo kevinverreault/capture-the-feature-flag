@@ -1,0 +1,96 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import Table from '@ds/components/ui/Table.astro';
+import CodeSample from '../components/CodeSample.astro';
+import SiteLayout from '../layouts/SiteLayout.astro';
+
+const clone = `git clone --recurse-submodules https://github.com/kevinverreault/capture-the-feature-flag.git
+cd capture-the-feature-flag
+docker compose up`;
+
+const services = [
+  { service: 'Core and the admin app', url: 'http://localhost:3000', what: 'The admin app; the API is under /api/v1 and its OpenAPI UI at /api/docs' },
+  { service: 'Evaluator', url: 'http://localhost:3001', what: 'Where SDKs evaluate flags; Prometheus metrics at /metrics' },
+  { service: 'Birdwatch website', url: 'http://localhost:4000', what: 'The birding demo, with a flag inspector on every page' },
+  { service: 'Birdwatch API', url: 'http://localhost:4001', what: 'The demo’s backend, which evaluates flags with @ctff/nestjs' },
+  { service: 'Showcase', url: 'http://localhost:8080', what: 'This site' },
+];
+---
+
+<SiteLayout
+  title="Quickstart"
+  description="Run Capture The Feature Flag on your machine with docker compose up, then change a flag’s targeting and watch the Birdwatch demo follow."
+>
+  <section class="section">
+    <h1 class="ff-serif text-3xl">Quickstart</h1>
+    <div class="prose">
+      <p class="text-lg">
+        Everything runs in containers: one command starts the database, the services and a demo. You need Docker
+        with Compose, and Git.
+      </p>
+    </div>
+    <CodeSample lang="bash" title="Start the stack" code={clone} />
+    <div class="prose">
+      <p>
+        Compose builds the images on the first run, then starts PostgreSQL 17, Core, an Evaluator, Birdwatch and
+        this site. <code>docker compose up --wait</code> returns once every service reports healthy. Every image
+        runs as a non-root user, takes its configuration from environment variables and logs JSON.
+      </p>
+    </div>
+    <Table caption="What runs where" columns={[
+      { key: 'service', label: 'Service' },
+      { key: 'url', label: 'Address' },
+      { key: 'what', label: 'What it is' },
+    ]} rows={services} rowHeader="service" />
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">Watch a flag change</h2>
+    <div class="prose">
+      <p>
+        On an empty database, Core seeds <code>birdwatch</code>, the demo project, with the environments
+        <code>development</code> and <code>production</code> and three flags.
+      </p>
+      <ol>
+        <li>
+          Open Birdwatch on <a href="http://localhost:4000">localhost:4000</a> and log in as Alice, a birder in
+          Canada. The flag inspector at the bottom of the page shows her context, what each flag serves her and why.
+        </li>
+        <li>
+          In the admin app on <a href="http://localhost:3000">localhost:3000</a>, open the Birdwatch project, then
+          the flag <code>new-sighting-form</code> in Development, and switch its targeting off.
+        </li>
+        <li>Reload Birdwatch: within a few seconds, one poll interval, “Log a sighting” is gone.</li>
+        <li>
+          Switch birders. Alice (CA) gets the rare-bird alert banner from the <code>country in [CA]</code> rule of
+          <code>rare-bird-alerts</code>, and Bram (NL) doesn’t. Only Chiara, an individual target of
+          <code>photo-id-beta</code>, gets “Photo ID (beta)”.
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">Your own flags</h2>
+    <div class="prose">
+      <p>
+        Create a project in the admin app, then its environments: each one gets an SDK key, shown on the
+        environment’s page. Pass it to the SDK with the Evaluator’s address, as in the
+        <a href="/guides/sdk/">SDK and NestJS guide</a>. A new flag starts with targeting off in every environment,
+        serving its off variation, <code>false</code>.
+      </p>
+      <p>
+        To start without the demo project, set <code>SEED_DEMO=false</code>. To declare the demo as code instead,
+        <code>docker compose --profile terraform up</code> also applies the provider’s example configuration; see
+        the <a href="/guides/terraform/">Terraform guide</a>.
+      </p>
+    </div>
+    <CodeSample lang="bash" title="Variations" code={`SEED_DEMO=false docker compose up      # without the demo project
+docker compose --profile terraform up  # and apply the example Terraform configuration
+docker compose down --volumes          # stop, and delete the database`} />
+    <Alert variant="warning" icon="triangle-alert" title="No authentication in V1">
+      Neither the admin app nor the API asks who you are, and an SDK key identifies an environment without
+      authenticating anyone. Run the stack on a network you trust.
+    </Alert>
+  </section>
+</SiteLayout>

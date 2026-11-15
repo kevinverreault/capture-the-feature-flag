@@ -1,0 +1,63 @@
+/* Page-level layout shared by the showcase pages; components come from the design system. */
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-xs);
+}
+
+p {
+  margin: 0;
+}
+
+/* A page's sections, each a heading followed by its content. */
+.section {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+/* Prose: a readable measure for running text. */
+.prose {
+  display: grid;
+  gap: var(--space-sm);
+  max-width: 48rem;
+}
+
+.prose ul,
+.prose ol {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  display: grid;
+  gap: var(--space-xs);
+}
+
+code {
+  font-size: 0.9em;
+}
+
+:not(pre) > code {
+  padding: 0.1em 0.3em;
+  border-radius: 0.25rem;
+  background-color: hsl(var(--color-surface) / 0.6);
+}
+
+/* A grid of cards. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row of buttons, such as a hero's calls to action. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.muted {
+  opacity: 0.75;
+}

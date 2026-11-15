@@ -59,7 +59,8 @@ jobs:
       # The end-to-end script below evaluates through the built SDK.
       - run: pnpm nx run @ctff/sdk:build
       # --wait returns once every service with a health check reports healthy (Core: migrated, seeded and ready;
-      # Evaluator: first snapshots loaded; birdwatch-api: SDK key found; birdwatch-web: birdwatch-api ready).
+      # Evaluator: first snapshots loaded; birdwatch-api: SDK key found; birdwatch-web: birdwatch-api ready;
+      # showcase: nginx serving).
       - run: docker compose up --build --detach --wait --wait-timeout 300
       - name: Services run as non-root
         run: |
@@ -67,6 +68,7 @@ jobs:
           test "$(docker compose exec -T evaluator id -u)" != "0"
           test "$(docker compose exec -T birdwatch-api id -u)" != "0"
           test "$(docker compose exec -T birdwatch-web id -u)" != "0"
+          test "$(docker compose exec -T showcase id -u)" != "0"
       - name: Core serves its API on the migrated database
         run: |
           curl --fail --silent --show-error http://localhost:3000/health/ready
@@ -75,6 +77,12 @@ jobs:
             -H 'content-type: application/json' -d '{"key":"smoke-test","name":"Smoke test"}'
       - name: Core serves the admin app, which reads the API
         run: curl --fail --silent --show-error http://localhost:3000/projects | grep --quiet 'Smoke test'
+      - name: The showcase serves its pages statically
+        run: |
+          for page in / /how-it-works/ /quickstart/ /guides/sdk/ /guides/terraform/ /roadmap/; do
+            curl --fail --silent --show-error "http://localhost:8080$page" | grep --quiet 'Capture The Feature Flag'
+          done
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' http://localhost:8080/no-such-page)" = 404
       - name: The SDK sees targeting switched on through Core within one poll interval
         run: echo "SDK_KEY=$(node apps/evaluator/scripts/compose-smoke.ts switch-on)" >> "$GITHUB_ENV"
       - name: Birdwatch logs sightings while new-sighting-form is on, hides the form within one poll interval, and shows the targeting showcase

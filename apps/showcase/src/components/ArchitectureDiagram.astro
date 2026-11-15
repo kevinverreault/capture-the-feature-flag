@@ -1,0 +1,127 @@
+---
+/**
+ * The architecture at a glance: who talks to whom. Drawn inline so it follows the design system's theme.
+ * Every box has the same size; the arrows are drawn between box edges.
+ */
+const box = { width: 230, height: 84 };
+const nodes = {
+  admin: { x: 20, y: 30, title: 'Admin app', detail: 'in your browser' },
+  terraform: { x: 20, y: 168, title: 'Terraform provider', detail: 'flags as code' },
+  service: { x: 20, y: 306, title: 'Your service', detail: '@ctff/sdk or @ctff/nestjs' },
+  core: { x: 360, y: 99, title: 'Core', detail: 'API at /api/v1 + admin app' },
+  evaluator: { x: 360, y: 306, title: 'Evaluator × N', detail: 'targeting in memory' },
+  postgres: { x: 680, y: 99, title: 'PostgreSQL 17', detail: 'owned by Core' },
+} as const;
+---
+
+<figure class="architecture">
+  <svg viewBox="0 0 930 420" role="img" aria-labelledby="architecture-title architecture-desc">
+    <title id="architecture-title">How the parts of Capture The Feature Flag fit together</title>
+    <desc id="architecture-desc">
+      The admin app and the Terraform provider call Core's API. Core alone reads and writes PostgreSQL. Evaluators
+      poll Core for targeting snapshots and send it evaluation telemetry. Your service evaluates flags through the
+      SDK, which asks an Evaluator.
+    </desc>
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head"></path>
+      </marker>
+    </defs>
+
+    <!-- Admin app → Core -->
+    <path d="M 250 72 C 300 72, 310 120, 360 125" class="link" marker-end="url(#arrow)"></path>
+    <text x="268" y="62" class="label">HTTP</text>
+    <!-- Terraform → Core -->
+    <path d="M 250 210 C 300 210, 310 165, 360 160" class="link" marker-end="url(#arrow)"></path>
+    <text x="262" y="232" class="label">/api/v1</text>
+    <!-- Core ↔ PostgreSQL -->
+    <path d="M 590 141 L 680 141" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)"></path>
+    <text x="606" y="131" class="label">Prisma</text>
+    <!-- Evaluator → Core: snapshots and telemetry -->
+    <path d="M 445 306 L 445 183" class="link" marker-end="url(#arrow)"></path>
+    <text x="455" y="236" class="label">polls snapshots (ETag)</text>
+    <text x="455" y="256" class="label">sends telemetry ≈ 60 s</text>
+    <!-- Your service → Evaluator -->
+    <path d="M 250 348 L 360 348" class="link" marker-end="url(#arrow)"></path>
+    <text x="262" y="338" class="label">evaluate</text>
+
+    {
+      Object.entries(nodes).map(([key, node]) => (
+        <g class:list={['node', key]}>
+          <rect x={node.x} y={node.y} width={box.width} height={box.height} rx="10"></rect>
+          <text x={node.x + box.width / 2} y={node.y + 36} class="title">
+            {node.title}
+          </text>
+          <text x={node.x + box.width / 2} y={node.y + 60} class="detail">
+            {node.detail}
+          </text>
+        </g>
+      ))
+    }
+  </svg>
+</figure>
+
+<style>
+  .architecture {
+    margin: 0;
+    padding: var(--space-sm);
+    border-radius: var(--border);
+    border: 1px solid hsl(var(--color-on-background) / 0.15);
+    overflow-x: auto;
+  }
+
+  svg {
+    display: block;
+    width: 100%;
+    min-width: 40rem;
+    height: auto;
+    color: hsl(var(--color-on-background));
+  }
+
+  .node rect {
+    fill: hsl(var(--color-surface) / 0.5);
+    stroke: currentColor;
+    stroke-opacity: 0.4;
+  }
+
+  .node.core rect,
+  .node.evaluator rect {
+    fill: hsl(var(--color-primary) / 0.25);
+    stroke: hsl(var(--color-primary));
+    stroke-opacity: 1;
+  }
+
+  .title,
+  .detail {
+    fill: currentColor;
+    text-anchor: middle;
+  }
+
+  .title {
+    font-family: var(--ff-sans-condensed);
+    font-size: 20px;
+    font-weight: 700;
+  }
+
+  .detail {
+    font-size: 14px;
+    opacity: 0.8;
+  }
+
+  .link {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-opacity: 0.7;
+  }
+
+  .arrow-head {
+    fill: currentColor;
+    fill-opacity: 0.7;
+  }
+
+  .label {
+    fill: currentColor;
+    font-size: 14px;
+  }
+</style>

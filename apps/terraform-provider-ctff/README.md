@@ -113,6 +113,8 @@ With a dev override, skip `terraform init` and run `terraform plan` / `apply` di
 
 The acceptance tests in [internal/provider](internal/provider) drive the provider through the Terraform CLI against a real Core on PostgreSQL 17. They need Go, the `terraform` CLI on the `PATH` (or `TF_ACC_TERRAFORM_PATH`), and Node. Nx builds Core first, because the provider declares an implicit dependency on it. This also means a Core change re-runs these tests in `nx affected`. The `test` target is never cached, because its outcome also depends on the Terraform CLI and the Core it runs against. The other targets' caches include `go version`.
 
+The showcase's Terraform guide shows a configuration that its `typecheck` target validates against this provider's build ([apps/showcase](../showcase/README.md#code-samples)), so a schema change that breaks it fails there too.
+
 `TestAccValidationRulesMatchCore` compares the provider's plan-time validation rules (keys, names, descriptions, tags, targeting limits, rule attributes and operators), which repeat Core's, with the OpenAPI document Core generates from its own rules. `TestCountryCodesMatchEvaluationLibrary` compares the provider's country codes with the evaluation library's.
 
 - By default the tests start Core's build (`apps/core/dist/main.js`) on a fresh database, in a Testcontainers `postgres:17-alpine`.

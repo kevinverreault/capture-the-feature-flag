@@ -1,0 +1,122 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import Card from '@ds/components/ui/Card.astro';
+import Table from '@ds/components/ui/Table.astro';
+import ArchitectureDiagram from '../components/ArchitectureDiagram.astro';
+import SiteLayout from '../layouts/SiteLayout.astro';
+
+const parts = [
+  {
+    title: 'Core',
+    body: 'Owns every project, environment, flag and its targeting, in PostgreSQL. It alone has the database schema and its migrations, and exposes a versioned REST API at /api/v1 with an OpenAPI document. Every change through it becomes an audit entry, with its actor and a before/after diff.',
+  },
+  {
+    title: 'Admin app',
+    body: 'Served by Core on the same origin. It calls Core’s API over HTTP like any other client: the flags list, the targeting editor, archived flags, audit entries, the dashboard, context attributes, the Contexts explorer and settings.',
+  },
+  {
+    title: 'Evaluator',
+    body: 'Answers evaluation requests from memory, so it scales separately from Core. It polls Core for a targeting snapshot of each environment, with ETag so an unchanged snapshot costs nothing, and keeps the last good snapshot while Core is unreachable. It reports ready once it has its first snapshots, and exposes Prometheus metrics at /metrics.',
+  },
+  {
+    title: 'SDK and NestJS module',
+    body: '@ctff/sdk evaluates remotely: every call is one request to an Evaluator, with a 500 ms timeout by default and no local cache. When no variation can be served, it returns the fallback value your code passed instead of throwing. @ctff/nestjs wires it into a NestJS app.',
+  },
+  {
+    title: 'Terraform provider',
+    body: 'Manages projects, environments, flags and targeting as code, through the same /api/v1. Its changes are attributed to the actor terraform, and the flags it manages are marked as managed by Terraform in the admin app.',
+  },
+];
+
+const reasons = [
+  { reason: 'OFF', when: 'Targeting is off, so the off variation is served.' },
+  { reason: 'TARGET_MATCH', when: 'The context’s user_id is in an individual target.' },
+  { reason: 'RULE_MATCH', when: 'A rule matched the context; the first one that matches wins.' },
+  { reason: 'DEFAULT', when: 'Targeting is on and no individual target or rule matched: the default variation.' },
+  { reason: 'FLAG_NOT_FOUND', when: 'The environment has no such flag, or it is archived: the fallback value.' },
+  { reason: 'ERROR', when: 'The evaluation couldn’t happen (Evaluator unreachable, malformed context…): the fallback value.' },
+];
+---
+
+<SiteLayout
+  title="How it works"
+  description="The architecture of Capture The Feature Flag: Core, the admin app, Evaluators, the SDK and the Terraform provider, and how a flag is evaluated."
+>
+  <section class="section">
+    <h1 class="ff-serif text-3xl">How it works</h1>
+    <div class="prose">
+      <p class="text-lg">
+        Projects hold environments and flags. A flag is defined once per project, and has its own targeting in each
+        environment. Core stores all of it; Evaluators serve it.
+      </p>
+    </div>
+    <ArchitectureDiagram />
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">The parts</h2>
+    <ul class="cards">
+      {
+        parts.map((part) => (
+          <Card as="li">
+            <h3 slot="header" class="text-xl">
+              {part.title}
+            </h3>
+            <p>{part.body}</p>
+          </Card>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">How a flag is evaluated</h2>
+    <div class="prose">
+      <p>
+        An evaluation works out which variation one flag serves to one context in one environment. Flags are
+        boolean, with two variations, <code>true</code> and <code>false</code>. A context is made of two context
+        attributes: <code>user_id</code>, any non-empty string, and <code>country</code>, an ISO 3166-1 alpha-2
+        code such as <code>CA</code>.
+      </p>
+      <ol>
+        <li>If targeting is off, the off variation is served.</li>
+        <li>If the context’s <code>user_id</code> is in an individual target, that target’s variation is served.</li>
+        <li>
+          Otherwise the rules are tried in order, such as <code>country in [CA, US]</code> or
+          <code>user_id not in [bram]</code>, and the first one that matches serves its variation. A rule on an
+          attribute the context doesn’t have never matches, not even a <code>not in</code> rule.
+        </li>
+        <li>If nothing matched, the default variation is served.</li>
+      </ol>
+      <p>Each evaluation comes with its evaluation reason:</p>
+    </div>
+    <Table caption="Evaluation reasons" columns={[
+      { key: 'reason', label: 'Reason' },
+      { key: 'when', label: 'When' },
+    ]} rows={reasons} rowHeader="reason" striped />
+    <Alert variant="info" icon="info" title="Default variation or fallback value?">
+      The default variation is part of targeting, chosen in the admin app or in Terraform, and served when
+      targeting is on and nothing else matched. The fallback value is what your code passes to the SDK, and gets
+      back when no variation can be served at all: the flag is unknown or archived, or the Evaluator can’t be
+      reached in time.
+    </Alert>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">From a change to your service</h2>
+    <div class="prose">
+      <p>
+        A change made in the admin app or applied with Terraform is saved by Core, which bumps the targeting’s
+        version: a stale edit is refused with <code>409 Conflict</code> rather than silently overwriting someone
+        else’s. Each Evaluator picks the new snapshot up on its next poll, so within one poll interval every
+        Evaluator serves the new targeting.
+      </p>
+      <p>
+        The other way round, Evaluators add up evaluation counts (per flag, variation and minute) and the contexts
+        they saw, and send them to Core about every 60 seconds. That is what the dashboard, stale flags and the
+        Contexts explorer show. Core keeps them for 30 days by default, and at most 1,000 seen contexts per
+        environment; both are settings.
+      </p>
+    </div>
+  </section>
+</SiteLayout>
