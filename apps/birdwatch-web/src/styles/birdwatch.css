@@ -40,6 +40,18 @@ p {
   justify-content: space-between;
 }
 
+/* A heading with what goes beside it, such as a rarity badge; a link in it reads as the heading. */
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.title-row a {
+  color: inherit;
+}
+
 /* A row of buttons, such as a page heading's actions. */
 .actions {
   display: flex;

@@ -5,6 +5,7 @@ import type { IndividualTargetDto, RuleDto } from '../targeting/targeting.dto.js
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { FlagsService } from '../flags/flags.service.js';
+import { falseVariation, trueVariation } from '../flags/variations.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { TargetingService } from '../targeting/targeting.service.js';
 
@@ -13,10 +14,6 @@ export const seedActor = 'seed';
 
 /** Held while one Core checks and seeds, so replicas starting together on an empty database seed it once. */
 const seedLockId = 72707370;
-
-/** The variations of every flag, by index: a boolean flag serves `[true, false]`. */
-const trueVariation = 0;
-const falseVariation = 1;
 
 /** The targeting the seed gives a flag in every environment, on top of the off-state targeting of a new flag. */
 interface SeedTargeting {

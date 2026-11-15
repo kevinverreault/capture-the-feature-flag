@@ -10,16 +10,16 @@ Every other `/api` route needs `Authorization: Bearer <token>`, and answers `401
 
 ## API
 
-| Route                  | What it does                                                                                                      |
-| :--------------------- | :---------------------------------------------------------------------------------------------------------------- |
-| `GET /api/birders`     | The birders a visitor can log in as (no token needed)                                                             |
-| `POST /api/session`    | Logs in as `{ "birderId": "alice" }`: `{ token, expiresInSeconds, birder }`, or `404` for an unknown birder       |
-| `GET /api/sightings`   | The sighting feed, most recently observed first, with the birder and their flags                                  |
-| `POST /api/sightings`  | Logs a sighting (`speciesId`, `location`, `count`, optional `notes` and `observedAt`), behind `new-sighting-form` |
-| `GET /api/species`     | Every species, with the birder and their flags                                                                    |
-| `GET /api/species/:id` | One species and its sightings, most recently observed first, with the birder and their flags, or `404`            |
-| `GET /health/live`     | Liveness                                                                                                          |
-| `GET /health/ready`    | Readiness: the API only listens once it has its SDK key, so once it answers it is ready                           |
+| Route                         | What it does                                                                                                      |
+| :---------------------------- | :---------------------------------------------------------------------------------------------------------------- |
+| `GET /api/birders`            | The birders a visitor can log in as (no token needed)                                                             |
+| `POST /api/session`           | Logs in as `{ "birderId": "alice" }`: `{ token, expiresInSeconds, birder }`, or `404` for an unknown birder       |
+| `GET /api/sightings`          | The sighting feed, most recently observed first, with the birder and their flags                                  |
+| `POST /api/sightings`         | Logs a sighting (`speciesId`, `location`, `count`, optional `notes` and `observedAt`), behind `new-sighting-form` |
+| `GET /api/species`            | Every species, with the birder and their flags                                                                    |
+| `GET /api/species/:speciesId` | One species and its sightings, most recently observed first, with the birder and their flags, or `404`            |
+| `GET /health/live`            | Liveness                                                                                                          |
+| `GET /health/ready`           | Readiness: the API only listens once it has its SDK key, so once it answers it is ready                           |
 
 The response shapes, the limits of a new sighting and the demo's flag keys live in [`@ctff/birdwatch-contract`](../../libs/birdwatch-contract/README.md), which the website uses too. The flags come as the SDK's `AllFlags` (see [`allFlags`](../../libs/sdk/README.md#allflags)), loaded with `@Flags()`, so one request makes one Evaluator call. When the Evaluator can't be asked, `values` is empty and the website falls back to `false`. Every route for the logged-in birder also answers with the `context` the flags were evaluated for (for the website's flag inspector) and `rareBirdAlerts`, the latest three sightings of rare species, which only come while `rare-bird-alerts` serves `true` ([src/session/for-birder.ts](src/session/for-birder.ts)).
 

@@ -13,7 +13,7 @@ const { sighting } = Astro.props;
 
 <Card as="li" data-testid="sighting">
   <div slot="header">
-    <div class="title">
+    <div class="title-row">
       <h2 class="text-lg">
         <a href={speciesHref(sighting.species.id)}>{sighting.species.commonName}</a>
       </h2>
@@ -32,17 +32,6 @@ const { sighting } = Astro.props;
 </Card>
 
 <style>
-  .title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  .title a {
-    color: inherit;
-  }
-
   .notes {
     margin-top: var(--space-xs);
     font-style: italic;

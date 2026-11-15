@@ -18,7 +18,7 @@ const { species } = page.loaded;
       species.map((bird) => (
         <Card as="li" data-testid="species">
           <div slot="header">
-            <div class="title">
+            <div class="title-row">
               <h2 class="text-lg">
                 <a href={speciesHref(bird.id)}>{bird.commonName}</a>
               </h2>
@@ -34,16 +34,3 @@ const { species } = page.loaded;
     }
   </ul>
 </BirdwatchLayout>
-
-<style>
-  .title {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  .title a {
-    color: inherit;
-  }
-</style>

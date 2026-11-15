@@ -60,7 +60,7 @@ const variationBadge = (value: boolean | null) => (value === null ? 'outline' : 
                         <code>{row.key}</code>
                       )}
                     </th>
-                    <td data-testid="flag-variation">
+                    <td data-testid="flag-variation" data-variation={String(row.value)}>
                       <Badge variant={variationBadge(row.value)}>{row.value === null ? 'none' : String(row.value)}</Badge>
                     </td>
                     <td data-testid="flag-reason" data-reason={row.reasonKind}>

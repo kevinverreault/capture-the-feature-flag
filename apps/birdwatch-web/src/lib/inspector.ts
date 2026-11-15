@@ -8,6 +8,18 @@ export interface AdminApp {
   environmentKey: string;
 }
 
+/**
+ * The admin app the flag inspector links to, from CTFF_ADMIN_URL (without trailing slashes; none means no links),
+ * CTFF_PROJECT (`birdwatch`) and CTFF_ENVIRONMENT (`development`), which should name birdwatch-api's environment.
+ */
+export function adminAppFromEnv(env: Record<string, string | undefined>): AdminApp {
+  return {
+    url: env['CTFF_ADMIN_URL']?.trim().replace(/\/+$/, '') ?? '',
+    projectKey: env['CTFF_PROJECT']?.trim() || 'birdwatch',
+    environmentKey: env['CTFF_ENVIRONMENT']?.trim() || 'development',
+  };
+}
+
 /** One row of the flag inspector. */
 export interface InspectedFlag {
   key: string;

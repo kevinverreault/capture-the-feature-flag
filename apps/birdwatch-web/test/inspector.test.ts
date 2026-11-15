@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adminFlagUrl, inspectedFlags, reasonLabel } from '../src/lib/inspector';
+import { adminAppFromEnv, adminFlagUrl, inspectedFlags, reasonLabel } from '../src/lib/inspector';
 
 describe('reasonLabel', () => {
   it('names the evaluation reason as the Evaluator does', () => {
@@ -54,5 +54,21 @@ describe('inspectedFlags', () => {
       { key: 'photo-id-beta', value: null, reason: 'ERROR (MALFORMED_FLAG)' },
       { key: 'rare-bird-alerts', value: true, reason: 'RULE_MATCH (rule 1)' },
     ]);
+  });
+});
+
+describe('adminAppFromEnv', () => {
+  it("reads the admin app's address without trailing slashes, with the project and environment", () => {
+    expect(
+      adminAppFromEnv({ CTFF_ADMIN_URL: ' http://localhost:3000/ ', CTFF_PROJECT: 'demo', CTFF_ENVIRONMENT: 'prod' }),
+    ).toEqual({ url: 'http://localhost:3000', projectKey: 'demo', environmentKey: 'prod' });
+  });
+
+  it('has no address, and the demo project and environment, when unset or empty', () => {
+    expect(adminAppFromEnv({ CTFF_PROJECT: '', CTFF_ENVIRONMENT: ' ' })).toEqual({
+      url: '',
+      projectKey: 'birdwatch',
+      environmentKey: 'development',
+    });
   });
 });
