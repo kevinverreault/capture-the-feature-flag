@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterFlags, flagListCaption, listedTags } from '../src/lib/flag-list.js';
+import { filterFlags, flagListCaption, listedFlags, listedTags } from '../src/lib/flag-list.js';
 
 const flags = [
   { key: 'new-sighting-form', name: 'New sighting form', tags: ['birdwatch', 'kill-switch'] },
@@ -35,6 +35,28 @@ describe('filterFlags', () => {
   it('applies the search and the tag together', () => {
     expect(keys(filterFlags(flags, { search: 'form', tag: 'birdwatch' }))).toEqual(['new-sighting-form']);
     expect(filterFlags(flags, { search: 'photo', tag: 'birdwatch' })).toEqual([]);
+  });
+});
+
+describe('listedFlags', () => {
+  const withArchived = [
+    { key: 'new-sighting-form', name: 'New sighting form', tags: ['birdwatch'], archived: false },
+    { key: 'old-feed', name: 'Old feed', tags: ['birdwatch'], archived: true },
+    { key: 'photo-id-beta', name: 'Photo ID (beta)', tags: [] },
+  ];
+
+  it('leaves archived flags out unless they are asked for', () => {
+    expect(keys(listedFlags(withArchived, { includeArchived: false }))).toEqual(['new-sighting-form', 'photo-id-beta']);
+    expect(keys(listedFlags(withArchived, { includeArchived: true }))).toEqual([
+      'new-sighting-form',
+      'old-feed',
+      'photo-id-beta',
+    ]);
+  });
+
+  it('lets the search and tag filter find archived flags once they are listed', () => {
+    const listed = listedFlags(withArchived, { includeArchived: true });
+    expect(keys(filterFlags(listed, { search: 'old', tag: 'birdwatch' }))).toEqual(['old-feed']);
   });
 });
 

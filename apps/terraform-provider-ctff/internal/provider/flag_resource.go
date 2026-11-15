@@ -170,6 +170,14 @@ func (r *flagResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		apiError(&resp.Diagnostics, "read the flag", err)
 		return
 	}
+	if flag.Archived {
+		resp.Diagnostics.AddWarning(
+			"Flag is archived",
+			fmt.Sprintf("The flag %s in project %s was archived outside Terraform: it is not served, so SDKs get their "+
+				"fallback value, and Core rejects changes to it until it is restored in the admin app.",
+				flag.Key, flag.ProjectKey),
+		)
+	}
 	setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
 }
 

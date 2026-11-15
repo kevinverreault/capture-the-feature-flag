@@ -136,6 +136,16 @@ export class FlagDto {
   @ApiProperty({ enum: managedByValues, nullable: true, description: managedByDescription })
   managedBy!: ManagedBy | null;
 
+  @ApiProperty({
+    description:
+      'Whether the flag is archived: hidden from the flag list and left out of snapshots, so SDKs get their ' +
+      'fallback value with FLAG_NOT_FOUND. Restoring it brings back its targeting as it was.',
+  })
+  archived!: boolean;
+
+  @ApiProperty({ type: Date, nullable: true, description: 'When the flag was archived, or null while it is not.' })
+  archivedAt!: Date | null;
+
   @ApiProperty()
   createdAt!: Date;
 

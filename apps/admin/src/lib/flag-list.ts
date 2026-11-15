@@ -3,6 +3,8 @@ export interface ListedFlag {
   key: string;
   name: string;
   tags: readonly string[];
+  /** Archived flags are only listed when asked for (see {@link listedFlags}). */
+  archived?: boolean;
 }
 
 export interface FlagFilter {
@@ -12,7 +14,15 @@ export interface FlagFilter {
   tag?: string | undefined;
 }
 
-/** The flags matching the flag list's search and tag filter, in their original order. */
+/** The flags the flag list lists: archived flags only when `includeArchived` ("Show archived") is on. */
+export function listedFlags<T extends ListedFlag>(
+  flags: readonly T[],
+  { includeArchived }: { includeArchived: boolean },
+): T[] {
+  return includeArchived ? [...flags] : flags.filter((flag) => flag.archived !== true);
+}
+
+/** The listed flags matching the flag list's search and tag filter, in their original order. */
 export function filterFlags<T extends ListedFlag>(flags: readonly T[], { search, tag }: FlagFilter): T[] {
   const needle = search?.trim().toLowerCase() ?? '';
   return flags.filter(

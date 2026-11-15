@@ -50,6 +50,6 @@ export interface FlagSnapshot {
 export interface EnvironmentSnapshot {
   projectKey: string;
   environmentKey: string;
-  /** Every flag of the project, with its targeting in this environment, ordered by flag key. */
+  /** Every flag of the project that is not archived, with its targeting in this environment, ordered by flag key. */
   flags: FlagSnapshot[];
 }

@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiConflictResponse, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Actor, RecordsAudit } from '../audit/actor.js';
-import { FlagListItemDto } from './flag-list.dto.js';
+import { FlagListItemDto, FlagListQueryDto } from './flag-list.dto.js';
 import { CreateFlagDto, FlagDto, UpdateFlagDto } from './flags.dto.js';
 import { FlagsService } from './flags.service.js';
 
@@ -11,9 +11,12 @@ export class FlagsController {
   constructor(private readonly flags: FlagsService) {}
 
   @Get()
-  @ApiOkResponse({ type: [FlagListItemDto], description: 'By key, each with its targeting on or off per environment.' })
-  list(@Param('projectKey') projectKey: string): Promise<FlagListItemDto[]> {
-    return this.flags.list(projectKey);
+  @ApiOkResponse({
+    type: [FlagListItemDto],
+    description: 'By key, each with its targeting on or off per environment. Archived flags only when asked for.',
+  })
+  list(@Param('projectKey') projectKey: string, @Query() query: FlagListQueryDto): Promise<FlagListItemDto[]> {
+    return this.flags.list(projectKey, { includeArchived: query.includeArchived ?? false });
   }
 
   @Post()
@@ -41,7 +44,7 @@ export class FlagsController {
   @Patch(':flagKey')
   @RecordsAudit()
   @ApiOkResponse({ type: FlagDto })
-  @ApiConflictResponse({ description: 'The flag changed since the version the edit is based on.' })
+  @ApiConflictResponse({ description: 'The flag changed since the version the edit is based on, or is archived.' })
   update(
     @Param('projectKey') projectKey: string,
     @Param('flagKey') flagKey: string,
@@ -51,10 +54,45 @@ export class FlagsController {
     return this.flags.update(projectKey, flagKey, body, actor);
   }
 
+  @Post(':flagKey/archive')
+  @RecordsAudit()
+  @HttpCode(200)
+  @ApiOkResponse({
+    type: FlagDto,
+    description:
+      'Archived: hidden from the flag list and left out of snapshots, with its targeting kept for a restore. ' +
+      'Archiving an archived flag changes nothing.',
+  })
+  archive(
+    @Param('projectKey') projectKey: string,
+    @Param('flagKey') flagKey: string,
+    @Actor() actor: string,
+  ): Promise<FlagDto> {
+    return this.flags.archive(projectKey, flagKey, actor);
+  }
+
+  @Post(':flagKey/restore')
+  @RecordsAudit()
+  @HttpCode(200)
+  @ApiOkResponse({
+    type: FlagDto,
+    description:
+      'Restored: listed and served again, with the targeting it had when archived. ' +
+      "Restoring a flag that isn't archived changes nothing.",
+  })
+  restore(
+    @Param('projectKey') projectKey: string,
+    @Param('flagKey') flagKey: string,
+    @Actor() actor: string,
+  ): Promise<FlagDto> {
+    return this.flags.restore(projectKey, flagKey, actor);
+  }
+
   @Delete(':flagKey')
   @HttpCode(204)
   @RecordsAudit()
-  @ApiNoContentResponse({ description: 'Deleted, with its targeting in every environment.' })
+  @ApiNoContentResponse({ description: 'Permanently deleted, with its targeting in every environment.' })
+  @ApiConflictResponse({ description: 'The flag is not archived: only an archived flag can be deleted.' })
   delete(
     @Param('projectKey') projectKey: string,
     @Param('flagKey') flagKey: string,

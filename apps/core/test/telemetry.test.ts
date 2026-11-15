@@ -186,6 +186,8 @@ describe('evaluation count ingestion', () => {
         }),
       ],
     };
+    // Only an archived flag can be deleted.
+    await api.post(`/projects/${projectKey}/flags/short-lived/archive`, {});
     const [responses] = await Promise.all([
       Promise.all(Array.from({ length: 20 }, () => send(api, batch))),
       api.delete(`/projects/${projectKey}/flags/short-lived`),
@@ -206,6 +208,7 @@ describe('evaluation count ingestion', () => {
       ],
     });
     expect((await counts(projectKey)).body).toHaveLength(1);
+    await api.post(`/projects/${projectKey}/flags/short-lived/archive`, {});
     await api.delete(`/projects/${projectKey}/flags/short-lived`);
     expect((await counts(projectKey)).body).toEqual([]);
   });

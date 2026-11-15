@@ -4,6 +4,7 @@ import { updateAtVersion } from '../common/persistence.js';
 import { lockAndReload } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
+import { assertNotArchived, notArchived } from '../flags/archived.js';
 import { FlagsService } from '../flags/flags.service.js';
 import type { Environment, Flag, Targeting } from '../generated/prisma/client.js';
 import { ProjectsService } from '../projects/projects.service.js';
@@ -45,6 +46,7 @@ export class TargetingService {
     actor: string,
   ): Promise<TargetingDto> {
     const { project, flag, environment, targeting: found } = await this.find(projectKey, flagKey, environmentKey);
+    assertNotArchived(flag);
     const updated = await this.prisma.$transaction(async (tx) => {
       const targeting = await lockAndReload(tx, 'targeting', found.id, () =>
         targetingNotFound(flagKey, environmentKey),
@@ -52,7 +54,8 @@ export class TargetingService {
       await updateAtVersion(
         () =>
           tx.targeting.updateMany({
-            where: { id: targeting.id, version: input.version },
+            // Also filtered on the flag, so targeting of a flag archived meanwhile is left as it was archived.
+            where: { id: targeting.id, version: input.version, flag: notArchived },
             data: { on: input.on, version: { increment: 1 } },
           }),
         `Targeting of ${flagKey} in ${environmentKey}`,

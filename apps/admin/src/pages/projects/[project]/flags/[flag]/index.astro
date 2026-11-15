@@ -7,6 +7,7 @@ import Badge from '@ds/components/ui/Badge.astro';
 import Button from '@ds/components/ui/Button.astro';
 import AuditEntries from '../../../../../components/AuditEntries.astro';
 import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
+import ConfirmDelete from '../../../../../components/ConfirmDelete.astro';
 import FormAlert from '../../../../../components/FormAlert.astro';
 import NotFound from '../../../../../components/NotFound.astro';
 import ProjectNav from '../../../../../components/ProjectNav.astro';
@@ -14,13 +15,21 @@ import AdminLayout from '../../../../../layouts/AdminLayout.astro';
 import { flagVariations } from '../../../../../lib/audit';
 import { coreApi } from '../../../../../lib/core';
 import { noFormErrors } from '../../../../../lib/form-errors';
-import { handlePost, orNotFound, textField } from '../../../../../lib/forms';
+import { type FormAction, handlePost, orNotFound, textField } from '../../../../../lib/forms';
 import { routes } from '../../../../../lib/routes';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
 const flagKey = Astro.params.flag ?? '';
 const params = { path: { projectKey, flagKey } };
+/** A form that archives, restores or deletes the whole flag, then goes to `location` with `flash`. */
+const flagAction = (call: () => Promise<unknown>, location: string, flash: string): FormAction => ({
+  fields: [],
+  send: async () => {
+    await call();
+    return { location, flash };
+  },
+});
 const post = await handlePost(Astro, {
   targeting: {
     fields: ['on'],
@@ -45,6 +54,21 @@ const post = await handlePost(Astro, {
       };
     },
   },
+  archive: flagAction(
+    () => unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/archive', { params })),
+    routes.flag(projectKey, flagKey),
+    `Flag ${flagKey} archived`,
+  ),
+  restore: flagAction(
+    () => unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/restore', { params })),
+    routes.flag(projectKey, flagKey),
+    `Flag ${flagKey} restored`,
+  ),
+  delete: flagAction(
+    () => unwrap(core.DELETE('/api/v1/projects/{projectKey}/flags/{flagKey}', { params })),
+    routes.flags(projectKey),
+    `Flag ${flagKey} deleted`,
+  ),
 });
 if (post.redirect) return post.redirect;
 
@@ -82,6 +106,17 @@ const unplaced = postedEnvironment !== undefined && !tabs?.some((tab) => tab.env
 const unplacedMessages = unplaced
   ? [...post.errors.form, ...Object.values(post.errors.fields).filter((message) => message !== undefined)]
   : [];
+/**
+ * Why a submission was rejected, shown above the flag's sections rather than in a targeting tab: Core's refusal
+ * to archive, restore or delete the flag (e.g. deleting a flag restored since the page was loaded), or a targeting
+ * switch flipped on a page loaded before the flag was archived (an archived flag shows no targeting tabs).
+ */
+const flagMessages =
+  post.action === 'targeting'
+    ? flag?.archived
+      ? ['This flag was archived since this page was loaded, so the targeting change was not saved.']
+      : []
+    : post.errors.form;
 ---
 
 {
@@ -94,9 +129,13 @@ const unplacedMessages = unplaced
           <h2 id="flag-heading" class="text-xl">
             {flag.name}
           </h2>
-          <Button href={routes.editFlag(project.key, flag.key)} variant="secondary" size="small">
-            Edit details
-          </Button>
+          {flag.archived ? (
+            <Badge variant="muted">Archived</Badge>
+          ) : (
+            <Button href={routes.editFlag(project.key, flag.key)} variant="secondary" size="small">
+              Edit details
+            </Button>
+          )}
         </div>
         <p>
           Key <code>{flag.key}</code>
@@ -111,54 +150,100 @@ const unplacedMessages = unplaced
         )}
       </section>
 
-      <section aria-labelledby="targeting-heading" class="targeting">
-        <h2 id="targeting-heading" class="text-xl">
-          Targeting
-        </h2>
-        <FormAlert messages={unplacedMessages} />
-        {tabs.length === 0 ? (
+      <FormAlert messages={flagMessages} />
+
+      {flag.archived ? (
+        <section aria-labelledby="archived-heading" class="danger-zone">
+          <h2 id="archived-heading" class="text-xl">
+            This flag is archived
+          </h2>
           <p>
-            This project has no environments yet: <a href={routes.environments(project.key)}>create one</a> to
-            switch this flag's targeting on in it.
+            It is hidden from the flag list and not served: SDKs get their fallback value for it. Restoring it serves
+            its targeting in every environment again, as it was when it was archived.
           </p>
-        ) : (
-          <flag-tabs data-selected={Astro.url.searchParams.get('environment') ?? postedEnvironment ?? ''}>
-            <Tabs label="Environments">
-              {tabs.map(({ environment, on, offVariation, version, errors }) => (
-                <TabPanel label={environment.name} data-environment={environment.key}>
-                  {errors.changedElsewhere && (
-                    <ChangedElsewhere
-                      what={`the targeting in ${environment.name}`}
-                      reloadHref={routes.flag(project.key, flag.key, environment.key)}
-                    />
-                  )}
-                  <FormAlert messages={errors.form} />
-                  <form method="post" class="targeting-switch">
-                    <input type="hidden" name="_action" value="targeting" />
-                    <input type="hidden" name="environment" value={environment.key} />
-                    <input type="hidden" name="version" value={version} />
-                    <label class="switch-label">
-                      <Switch name="on" checked={on} aria-describedby={`served-${environment.key}`} />
-                      Targeting {on ? 'on' : 'off'} in {environment.name}
-                      {errors.changedElsewhere && ' (not saved)'}
-                    </label>
-                    <p id={`served-${environment.key}`} class="served">
-                      {on
-                        ? 'Individual targets and rules decide what each context gets, then the default variation.'
-                        : `Every context gets the off variation, ${offVariation}.`}
-                    </p>
-                    <noscript>
-                      <Button type="submit" variant="primary" size="small">
-                        Save
-                      </Button>
-                    </noscript>
-                  </form>
-                </TabPanel>
-              ))}
-            </Tabs>
-          </flag-tabs>
-        )}
-      </section>
+          <div class="lifecycle-actions">
+            <form method="post">
+              <input type="hidden" name="_action" value="restore" />
+              <Button type="submit" variant="primary">
+                Restore flag
+              </Button>
+            </form>
+            <ConfirmDelete
+              title={`Permanently delete ${flag.name}?`}
+              description={`The flag ${flag.key} and its targeting in every environment are deleted. This cannot be undone.`}
+              actionLabel="Delete flag"
+            />
+          </div>
+        </section>
+      ) : (
+        <>
+          <section aria-labelledby="targeting-heading" class="targeting">
+            <h2 id="targeting-heading" class="text-xl">
+              Targeting
+            </h2>
+            <FormAlert messages={unplacedMessages} />
+            {tabs.length === 0 ? (
+              <p>
+                This project has no environments yet: <a href={routes.environments(project.key)}>create one</a> to
+                switch this flag's targeting on in it.
+              </p>
+            ) : (
+              <flag-tabs data-selected={Astro.url.searchParams.get('environment') ?? postedEnvironment ?? ''}>
+                <Tabs label="Environments">
+                  {tabs.map(({ environment, on, offVariation, version, errors }) => (
+                    <TabPanel label={environment.name} data-environment={environment.key}>
+                      {errors.changedElsewhere && (
+                        <ChangedElsewhere
+                          what={`the targeting in ${environment.name}`}
+                          reloadHref={routes.flag(project.key, flag.key, environment.key)}
+                        />
+                      )}
+                      <FormAlert messages={errors.form} />
+                      <form method="post" class="targeting-switch">
+                        <input type="hidden" name="_action" value="targeting" />
+                        <input type="hidden" name="environment" value={environment.key} />
+                        <input type="hidden" name="version" value={version} />
+                        <label class="switch-label">
+                          <Switch name="on" checked={on} aria-describedby={`served-${environment.key}`} />
+                          Targeting {on ? 'on' : 'off'} in {environment.name}
+                          {errors.changedElsewhere && ' (not saved)'}
+                        </label>
+                        <p id={`served-${environment.key}`} class="served">
+                          {on
+                            ? 'Individual targets and rules decide what each context gets, then the default variation.'
+                            : `Every context gets the off variation, ${offVariation}.`}
+                        </p>
+                        <noscript>
+                          <Button type="submit" variant="primary" size="small">
+                            Save
+                          </Button>
+                        </noscript>
+                      </form>
+                    </TabPanel>
+                  ))}
+                </Tabs>
+              </flag-tabs>
+            )}
+          </section>
+
+          <section aria-labelledby="archive-heading" class="danger-zone">
+            <h2 id="archive-heading" class="text-xl">
+              Archive this flag
+            </h2>
+            <p>
+              Once its code no longer reads it, archive it: it is hidden from the flag list and no longer served, so
+              SDKs get their fallback value. Its targeting is kept, and it can be restored. Only an archived flag can
+              be deleted.
+            </p>
+            <form method="post">
+              <input type="hidden" name="_action" value="archive" />
+              <Button type="submit" variant="danger" decoration="outline">
+                Archive flag
+              </Button>
+            </form>
+          </section>
+        </>
+      )}
 
       <section aria-labelledby="audit-entries" class="flag-audit">
         <h2 id="audit-entries" class="text-xl">
@@ -254,5 +339,11 @@ const unplacedMessages = unplaced
 
   flag-tabs {
     display: block;
+  }
+
+  .lifecycle-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
   }
 </style>

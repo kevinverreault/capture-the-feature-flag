@@ -148,22 +148,25 @@ describe('audit entries', () => {
     ]);
   });
 
-  it('records the create, update and delete of a flag, each once', async () => {
+  it('records the create, update, archive, restore and delete of a flag, each once', async () => {
     const projectKey = await project();
+    const path = `/projects/${projectKey}/flags/rare-bird-alerts`;
     await api.post(`/projects/${projectKey}/environments`, { key: 'production', name: 'Production' });
     await api.post(
       `/projects/${projectKey}/flags`,
       { key: 'rare-bird-alerts', name: 'Alerts', tags: ['alerts'] },
       as('Ada'),
     );
-    await api.patch(
-      `/projects/${projectKey}/flags/rare-bird-alerts`,
-      { version: 1, name: 'Rare bird alerts', managedBy: 'terraform' },
-      as('terraform'),
-    );
-    await api.delete(`/projects/${projectKey}/flags/rare-bird-alerts`, as('Grace'));
+    await api.patch(path, { version: 1, name: 'Rare bird alerts', managedBy: 'terraform' }, as('terraform'));
+    await api.post(`${path}/archive`, {}, as('Grace'));
+    await api.post(`${path}/restore`, {}, as('Linus'));
+    await api.post(`${path}/restore`, {}, as('Linus'));
+    expect((await api.delete(path, as('Grace'))).status).toBe(409);
+    await api.post(`${path}/archive`, {}, as('Grace'));
+    await api.post(`${path}/archive`, {}, as('Grace'));
+    expect((await api.delete(path, as('Grace'))).status).toBe(204);
 
-    const [deleted, updated, created, ...rest] = await entries(projectKey);
+    const [deleted, archivedAgain, restored, archived, updated, created, ...rest] = await entries(projectKey);
     const flag = { targetType: 'flag', flagKey: 'rare-bird-alerts', environmentKey: null };
     const createdState = {
       key: 'rare-bird-alerts',
@@ -172,9 +175,11 @@ describe('audit entries', () => {
       tags: ['alerts'],
       variations: [true, false],
       managedBy: null,
+      archived: false,
       version: 1,
     };
     const updatedState = { ...createdState, name: 'Rare bird alerts', managedBy: 'terraform', version: 2 };
+    const archivedState = { ...updatedState, archived: true, version: 3 };
     expect(created).toMatchObject({ ...flag, action: 'create', actor: 'Ada', before: null, after: createdState });
     expect(updated).toMatchObject({
       ...flag,
@@ -183,7 +188,29 @@ describe('audit entries', () => {
       before: createdState,
       after: updatedState,
     });
-    expect(deleted).toMatchObject({ ...flag, action: 'delete', actor: 'Grace', before: updatedState, after: null });
+    expect(archived).toMatchObject({
+      ...flag,
+      action: 'archive',
+      actor: 'Grace',
+      before: updatedState,
+      after: archivedState,
+    });
+    expect(restored).toMatchObject({
+      ...flag,
+      action: 'restore',
+      actor: 'Linus',
+      before: archivedState,
+      after: { ...updatedState, version: 4 },
+    });
+    // Restoring a restored flag and archiving an archived one change nothing, so they record nothing.
+    expect(archivedAgain).toMatchObject({ ...flag, action: 'archive', after: { ...archivedState, version: 5 } });
+    expect(deleted).toMatchObject({
+      ...flag,
+      action: 'delete',
+      actor: 'Grace',
+      before: { ...archivedState, version: 5 },
+      after: null,
+    });
     expect(rest.map((entry) => entry.targetType)).toEqual(['environment', 'project']);
   });
 
@@ -246,6 +273,7 @@ describe('audit entries', () => {
   it('lists the history of a flag key, across a delete and a new flag with the same key', async () => {
     const projectKey = await project();
     await api.post(`/projects/${projectKey}/flags`, { key: 'kill-switch', name: 'First' });
+    await api.post(`/projects/${projectKey}/flags/kill-switch/archive`, {});
     await api.delete(`/projects/${projectKey}/flags/kill-switch`);
     await api.post(`/projects/${projectKey}/flags`, { key: 'kill-switch', name: 'Second' });
 
@@ -253,6 +281,7 @@ describe('audit entries', () => {
     expect(own.map((entry) => `${entry.action} ${(entry.after ?? entry.before).name}`)).toEqual([
       'create Second',
       'delete First',
+      'archive First',
       'create First',
     ]);
   });

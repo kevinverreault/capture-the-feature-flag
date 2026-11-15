@@ -51,6 +51,8 @@ model Flag {
   version          Int               @default(1)
   /// The tool managing the flag as code, or null when it is managed by hand.
   managedBy        ManagedBy?        @map("managed_by")
+  /// When the flag was archived, or null while it is not. An archived flag is left out of snapshots.
+  archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
   project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)

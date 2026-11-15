@@ -1,5 +1,6 @@
 import type { Variation } from '@ctff/evaluation';
 import type { AuditAction, Environment, Flag, Prisma, Project, Targeting } from '../generated/prisma/client.js';
+import { isArchived } from '../flags/archived.js';
 import { toTargetingSnapshot } from '../targeting/targeting-snapshot.js';
 
 /** The state of an audit entry's target, as recorded before and after the change. */
@@ -85,6 +86,7 @@ export function flagState(flag: Flag): AuditState {
     tags: flag.tags,
     variations: flag.variations as Variation[],
     managedBy: flag.managedBy,
+    archived: isArchived(flag),
     version: flag.version,
   };
 }

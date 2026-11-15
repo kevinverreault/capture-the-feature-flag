@@ -166,9 +166,10 @@ describe('flags', () => {
     expect((await api.post(flags(), { key: uniqueKey('bad-marker'), name: 'Bad', managedBy })).status).toBe(400);
   });
 
-  it('deletes a flag', async () => {
+  it('deletes an archived flag', async () => {
     const key = uniqueKey('deleted');
     await api.post(flags(), { key, name: 'Deleted' });
+    await api.post(`${flags()}/${key}/archive`, {});
     expect((await api.delete(`${flags()}/${key}`)).status).toBe(204);
     expect((await api.get(`${flags()}/${key}`)).status).toBe(404);
   });
