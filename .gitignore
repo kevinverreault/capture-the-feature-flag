@@ -156,3 +156,9 @@ vite.config.ts.timestamp-*
 apps/core/src/generated/
 # Types generated from Core's OpenAPI document (the core-api-client:generate target)
 libs/core-api-client/src/generated/
+
+# Terraform working files, e.g. from applying apps/terraform-provider-ctff/examples locally
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*

@@ -9,6 +9,8 @@ import AuditEntries from '../../../../../components/AuditEntries.astro';
 import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
 import ConfirmDelete from '../../../../../components/ConfirmDelete.astro';
 import FormAlert from '../../../../../components/FormAlert.astro';
+import ManagedByBadge from '../../../../../components/ManagedByBadge.astro';
+import ManagedByWarning from '../../../../../components/ManagedByWarning.astro';
 import NotFound from '../../../../../components/NotFound.astro';
 import ProjectNav from '../../../../../components/ProjectNav.astro';
 import TargetingEditor from '../../../../../components/TargetingEditor.astro';
@@ -173,9 +175,12 @@ const flagMessages =
 
       <section aria-labelledby="flag-heading" class="flag-summary">
         <div class="section-heading">
-          <h2 id="flag-heading" class="text-xl">
-            {flag.name}
-          </h2>
+          <div class="flag-title">
+            <h2 id="flag-heading" class="text-xl">
+              {flag.name}
+            </h2>
+            <ManagedByBadge managedBy={flag.managedBy} />
+          </div>
           {flag.archived ? (
             <Badge variant="muted">Archived</Badge>
           ) : (
@@ -197,6 +202,7 @@ const flagMessages =
         )}
       </section>
 
+      <ManagedByWarning managedBy={flag.managedBy} what="this flag and its targeting" />
       <FormAlert messages={flagMessages} />
 
       {flag.archived ? (
@@ -367,6 +373,18 @@ const flagMessages =
   .flag-audit {
     display: grid;
     gap: var(--space-xs);
+  }
+
+  /* The flag's name with its "Managed by" badge, kept out of the heading so the heading is just the name. */
+  .flag-title {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
+  }
+
+  .flag-title h2 {
+    margin: 0;
   }
 
   .flag-summary p {

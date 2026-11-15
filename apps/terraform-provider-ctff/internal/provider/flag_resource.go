@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/setdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
@@ -45,6 +46,7 @@ type flagModel struct {
 	Tags        types.Set    `tfsdk:"tags"`
 	Version     types.Int64  `tfsdk:"version"`
 	ManagedBy   types.String `tfsdk:"managed_by"`
+	Archived    types.Bool   `tfsdk:"archived"`
 }
 
 func (r *flagResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
@@ -101,6 +103,14 @@ func (r *flagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 					),
 				},
 			},
+			"archived": schema.BoolAttribute{
+				Description: "Whether the flag is archived: not served, so SDKs get their fallback value, and kept as " +
+					"it is until restored. Defaults to false, so a flag archived in the admin app shows up as drift and " +
+					"applying restores it. Destroying the flag archives it before deleting it either way.",
+				Optional: true,
+				Computed: true,
+				Default:  booldefault.StaticBool(false),
+			},
 			"version": schema.Int64Attribute{
 				Description: "The flag's version in Core, incremented on every edit (by Terraform or anyone else).",
 				Computed:    true,
@@ -116,20 +126,47 @@ func (r *flagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 }
 
 // ModifyPlan plans a new version for any update. Terraform does that by itself when the configuration changed,
-// but not when only the "managed by" marker does (after an import, or when it was cleared outside Terraform).
+// but not when only the "managed by" marker does (after an import, or when it was cleared outside Terraform). It
+// also reports at plan time what archiving means for the apply: an archived flag's details can't change, and
+// neither can its targeting.
 func (r *flagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
-		return // Create or destroy.
+	if req.Plan.Raw.IsNull() {
+		return // Destroy.
 	}
 	var plan, state flagModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if !req.State.Raw.IsNull() {
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	}
 	if resp.Diagnostics.HasError() {
+		return
+	}
+	creating := req.State.Raw.IsNull()
+	wasArchived, archive := state.Archived.ValueBool(), plan.Archived.ValueBool()
+
+	if !wasArchived && archive {
+		resp.Diagnostics.AddWarning("The flag will be archived",
+			fmt.Sprintf("Archiving the flag %s stops serving it, and Core keeps its targeting as it is until it is "+
+				"restored, so a change to its ctff_flag_environment targeting in this same apply fails. Change the "+
+				"targeting before archiving the flag, or after restoring it.", plan.Key.ValueString()))
+	}
+	if creating {
+		return
+	}
+	if wasArchived && archive && plan.detailsKnown() && plan.detailsDiffer(state) {
+		archivedFlagEdit(&resp.Diagnostics, plan.Key.ValueString())
 		return
 	}
 	if !plan.ManagedBy.Equal(state.ManagedBy) {
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("version"), types.Int64Unknown())...)
 	}
+}
+
+// archivedFlagEdit reports a planned edit of a flag that is archived and stays archived, which Core rejects.
+func archivedFlagEdit(diags *diag.Diagnostics, key string) {
+	diags.AddError("Cannot edit an archived flag",
+		fmt.Sprintf("The flag %s is archived, and Core keeps an archived flag as it was archived. Set archived = "+
+			"false to restore it with the edit, or leave its details as they are.", key))
 }
 
 func (r *flagResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -152,6 +189,16 @@ func (r *flagResource) Create(ctx context.Context, req resource.CreateRequest, r
 		apiError(&resp.Diagnostics, "create the flag", err)
 		return
 	}
+	if plan.Archived.ValueBool() {
+		archived, err := r.client.ArchiveFlag(ctx, plan.ref())
+		if err != nil {
+			// The flag exists: record it, so the next apply archives it.
+			setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
+			apiError(&resp.Diagnostics, "archive the flag", err)
+			return
+		}
+		flag = archived
+	}
 	setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
 }
 
@@ -170,17 +217,20 @@ func (r *flagResource) Read(ctx context.Context, req resource.ReadRequest, resp 
 		apiError(&resp.Diagnostics, "read the flag", err)
 		return
 	}
-	if flag.Archived {
+	if flag.Archived && !state.Archived.ValueBool() {
 		resp.Diagnostics.AddWarning(
 			"Flag is archived",
 			fmt.Sprintf("The flag %s in project %s was archived outside Terraform: it is not served, so SDKs get their "+
-				"fallback value, and Core rejects changes to it until it is restored in the admin app.",
+				"fallback value, and Core rejects changes to it and its targeting until it is restored. Applying "+
+				"restores it, unless the configuration sets archived = true.",
 				flag.Key, flag.ProjectKey),
 		)
 	}
 	setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
 }
 
+// Update edits the flag's details and archives or restores it as planned. Core rejects edits to an archived flag,
+// so a flag being restored is restored before its details are edited, and one being archived is archived after.
 func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var plan, state flagModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
@@ -193,18 +243,65 @@ func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	// The edit is based on the version Terraform last read; Core rejects it if the flag changed since.
-	flag, err := r.client.UpdateFlag(ctx, plan.ref(), state.Version.ValueInt64(), input)
-	if client.IsConflict(err) {
-		resp.Diagnostics.AddError("The flag changed outside Terraform",
-			fmt.Sprintf("%s\n\nIt was edited after Terraform read it. Run terraform plan again to see the change, then apply.", err))
+	ref := plan.ref()
+	wasArchived, archive := state.Archived.ValueBool(), plan.Archived.ValueBool()
+	editDetails := plan.detailsDiffer(state)
+	if wasArchived && archive && editDetails {
+		// Caught at plan time too, unless a detail was only known at apply time.
+		archivedFlagEdit(&resp.Diagnostics, plan.Key.ValueString())
 		return
 	}
-	if err != nil {
-		apiError(&resp.Diagnostics, "update the flag", err)
-		return
+
+	// Edits are based on the version Terraform last read; Core rejects them if the flag changed since.
+	version := state.Version.ValueInt64()
+	var flag *client.Flag
+	if wasArchived && !archive {
+		// Restoring takes no version, so check it first: a flag changed since it was read is not restored.
+		current, err := r.client.GetFlag(ctx, ref)
+		if err != nil {
+			apiError(&resp.Diagnostics, "read the flag", err)
+			return
+		}
+		if current.Version != version {
+			changedOutsideTerraform(&resp.Diagnostics, "flag", fmt.Sprintf("Flag %s is at version %d, not %d.", ref.Key, current.Version, version))
+			return
+		}
+		if flag, err = r.client.RestoreFlag(ctx, ref); err != nil {
+			flagUpdateError(&resp.Diagnostics, "restore the flag", err)
+			return
+		}
+		version = flag.Version
+	}
+	var err error
+	if editDetails {
+		if flag, err = r.client.UpdateFlag(ctx, ref, version, input); err != nil {
+			flagUpdateError(&resp.Diagnostics, "update the flag", err)
+			return
+		}
+	}
+	if !wasArchived && archive {
+		if flag, err = r.client.ArchiveFlag(ctx, ref); err != nil {
+			flagUpdateError(&resp.Diagnostics, "archive the flag", err)
+			return
+		}
+	}
+	if flag == nil {
+		// Nothing to change in Core (e.g. after an import): record the flag as it is.
+		if flag, err = r.client.GetFlag(ctx, ref); err != nil {
+			apiError(&resp.Diagnostics, "read the flag", err)
+			return
+		}
 	}
 	setFlagState(ctx, &resp.State, &resp.Diagnostics, flag)
+}
+
+// flagUpdateError reports Core's refusal of a change; a 409 means the flag changed since Terraform read it.
+func flagUpdateError(diags *diag.Diagnostics, action string, err error) {
+	if client.IsConflict(err) {
+		changedOutsideTerraform(diags, "flag", err.Error())
+		return
+	}
+	apiError(diags, action, err)
 }
 
 func (r *flagResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
@@ -222,6 +319,19 @@ func (r *flagResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 // ImportState imports a flag as <project key>/<flag key>. The next apply marks it as managed by Terraform.
 func (r *flagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	importRef(ctx, req, resp)
+}
+
+// detailsDiffer reports whether the flag's editable details (name, description, tags, "managed by" marker)
+// differ from other's.
+func (m flagModel) detailsDiffer(other flagModel) bool {
+	return !m.Name.Equal(other.Name) || !m.Description.Equal(other.Description) ||
+		!m.Tags.Equal(other.Tags) || !m.ManagedBy.Equal(other.ManagedBy)
+}
+
+// detailsKnown reports whether every editable detail is known, as it is at plan time unless it comes from
+// something not created yet.
+func (m flagModel) detailsKnown() bool {
+	return !m.Name.IsUnknown() && !m.Description.IsUnknown() && !m.Tags.IsUnknown() && !m.ManagedBy.IsUnknown()
 }
 
 func (m flagModel) ref() client.Ref {
@@ -250,6 +360,7 @@ func setFlagState(ctx context.Context, state *tfsdk.State, diags *diag.Diagnosti
 		Tags:        tagSet,
 		Version:     types.Int64Value(flag.Version),
 		ManagedBy:   types.StringValue(managedBy),
+		Archived:    types.BoolValue(flag.Archived),
 	})...)
 }
 

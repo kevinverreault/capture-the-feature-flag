@@ -49,3 +49,42 @@ func TestAccProviderSendsTerraformActor(t *testing.T) {
 		},
 	})
 }
+
+// Every change the provider makes is attributed to terraform in the audit log, targeting changes included.
+func TestAccTerraformChangesAreAuditedAsTerraform(t *testing.T) {
+	projectKey := randomKey("project")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config: targetingConfig(projectKey, targetingOnByCountry),
+				Check: func(*terraform.State) error {
+					var page struct {
+						Entries []struct {
+							TargetType string `json:"targetType"`
+							Action     string `json:"action"`
+							Actor      string `json:"actor"`
+						} `json:"entries"`
+					}
+					if err := requestCore(t, "GET", "/audit-entries?limit=200&projectKey="+projectKey, nil, &page); err != nil {
+						return err
+					}
+					seen := map[string]bool{}
+					for _, entry := range page.Entries {
+						if entry.Actor != "terraform" {
+							return fmt.Errorf("%s %s is attributed to %q, want terraform", entry.Action, entry.TargetType, entry.Actor)
+						}
+						seen[entry.Action+" "+entry.TargetType] = true
+					}
+					for _, want := range []string{"create project", "create environment", "create flag", "update targeting"} {
+						if !seen[want] {
+							return fmt.Errorf("no %s audit entry (saw %v)", want, seen)
+						}
+					}
+					return nil
+				},
+			},
+		},
+	})
+}

@@ -45,7 +45,7 @@ func (p *ctffProvider) Metadata(_ context.Context, _ provider.MetadataRequest, r
 
 func (p *ctffProvider) Schema(_ context.Context, _ provider.SchemaRequest, resp *provider.SchemaResponse) {
 	resp.Schema = schema.Schema{
-		Description: "Manages Capture The Feature Flag projects, environments and flags through Core's API.",
+		Description: "Manages Capture The Feature Flag projects, environments, flags and targeting through Core's API.",
 		Attributes: map[string]schema.Attribute{
 			"base_url": schema.StringAttribute{
 				Description: "Core's base URL, without /api/v1. Defaults to the " + BaseURLEnv +
@@ -84,7 +84,7 @@ func (p *ctffProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 }
 
 func (p *ctffProvider) Resources(_ context.Context) []func() resource.Resource {
-	return []func() resource.Resource{NewProjectResource, NewEnvironmentResource, NewFlagResource}
+	return []func() resource.Resource{NewProjectResource, NewEnvironmentResource, NewFlagResource, NewFlagEnvironmentResource}
 }
 
 func (p *ctffProvider) DataSources(_ context.Context) []func() datasource.DataSource {

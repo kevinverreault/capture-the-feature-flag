@@ -6,6 +6,7 @@ import Button from '@ds/components/ui/Button.astro';
 import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
 import FlagFields from '../../../../../components/FlagFields.astro';
 import FormAlert from '../../../../../components/FormAlert.astro';
+import ManagedByWarning from '../../../../../components/ManagedByWarning.astro';
 import NotFound from '../../../../../components/NotFound.astro';
 import ProjectNav from '../../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
@@ -69,6 +70,7 @@ if (!project || !flag) Astro.response.status = 404;
           {errors.changedElsewhere && (
             <ChangedElsewhere what="this flag" reloadHref={routes.editFlag(project.key, flag.key)} />
           )}
+          <ManagedByWarning managedBy={flag.managedBy} what="this flag" />
           <FormAlert messages={errors.form} />
           {/* A rejected save keeps the version it was based on, so saving again can't overwrite a newer one. */}
           <input type="hidden" name="version" value={post.value('version') ?? String(flag.version)} />

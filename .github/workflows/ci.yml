@@ -89,3 +89,48 @@ jobs:
         run: docker compose logs
       - if: always()
         run: docker compose down --volumes
+
+  compose-terraform:
+    name: Compose Terraform profile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      # The documented command, detached. The one-shot terraform service applies the example configuration once Core
+      # is healthy, and exits with the apply's exit code.
+      - name: The terraform profile builds the provider and applies the example configuration
+        run: |
+          docker compose --profile terraform up --build --detach
+          docker compose --profile terraform wait terraform || true
+          container=$(docker compose --profile terraform ps --all --quiet terraform)
+          # Exited, not still running (an ExitCode of 0 alone would also match a running container).
+          test "$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$container")" = 'exited 0'
+      - run: docker compose up --detach --wait --wait-timeout 300
+      # Core's demo seed creates the project first (actor seed), with the same targeting as the example; Terraform
+      # adopts it and takes its flags over, so only the flags change on the first apply.
+      - name: Core holds the example configuration, managed by and attributed to terraform
+        run: |
+          curl --fail --silent --show-error http://localhost:3000/api/v1/projects/birdwatch/flags/rare-bird-alerts/targeting/production \
+            | jq --exit-status '.on == true and .rules[0].values == ["CA"]'
+          curl --fail --silent --show-error http://localhost:3000/api/v1/projects/birdwatch/flags \
+            | jq --exit-status 'length == 3 and all(.[]; .managedBy == "terraform")'
+          curl --fail --silent --show-error 'http://localhost:3000/api/v1/audit-entries?projectKey=birdwatch&limit=200' \
+            | jq --exit-status 'all(.entries[]; .actor == "seed" or .actor == "terraform")
+                and any(.entries[]; .actor == "terraform" and .targetType == "flag")'
+      # The restore is a targeting change, so its audit entry, the flag's latest, is attributed to terraform.
+      - name: Applying again restores targeting edited in the admin app
+        run: |
+          url=http://localhost:3000/api/v1/projects/birdwatch/flags/new-sighting-form/targeting/production
+          version=$(curl --fail --silent --show-error "$url" | jq .version)
+          curl --fail --silent --show-error -X PATCH "$url" -H 'content-type: application/json' \
+            -d "{\"version\": $version, \"on\": false}" > /dev/null
+          docker compose --profile terraform run --rm terraform
+          curl --fail --silent --show-error "$url" | jq --exit-status '.on == true'
+          curl --fail --silent --show-error 'http://localhost:3000/api/v1/audit-entries?projectKey=birdwatch&flagKey=new-sighting-form&limit=1' \
+            | jq --exit-status '.entries[0] | .actor == "terraform" and .targetType == "targeting"
+                and .environmentKey == "production"'
+      - if: failure()
+        run: docker compose --profile terraform logs
+      - if: always()
+        run: docker compose --profile terraform down --volumes

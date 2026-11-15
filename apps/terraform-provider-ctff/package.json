@@ -2,12 +2,13 @@
   "name": "@ctff/terraform-provider",
   "version": "0.0.0",
   "private": true,
-  "description": "terraform-provider-ctff: manages projects, environments and flags as code through Core's API (Go, Terraform Plugin Framework; ADR 0004).",
+  "description": "terraform-provider-ctff: manages projects, environments, flags and targeting as code through Core's API (Go, Terraform Plugin Framework; ADR 0004).",
   "scripts": {
     "build": "go build -o dist/terraform-provider-ctff .",
     "typecheck": "go vet ./...",
     "lint": "unformatted=$(gofmt -l .) && test -z \"$unformatted\" || { echo \"gofmt needed: $unformatted\"; exit 1; }",
-    "test": "TF_ACC=1 go test -count=1 ./..."
+    "test": "TF_ACC=1 go test -count=1 ./...",
+    "docker-build": "docker build -f Dockerfile -t ctff-terraform:local ../.."
   },
   "nx": {
     "tags": [

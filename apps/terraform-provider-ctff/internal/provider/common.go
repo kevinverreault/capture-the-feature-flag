@@ -67,15 +67,32 @@ func configureClient(req resource.ConfigureRequest, resp *resource.ConfigureResp
 // importRef starts the import of an environment or a flag from its ID, "<project key>/<key>"; Read fills in the
 // rest.
 func importRef(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	ref, err := client.ParseRef(req.ID)
+	importKeys(ctx, req, resp, client.ParseRef, func(ref client.Ref) map[string]string {
+		return map[string]string{"project_key": ref.ProjectKey, "key": ref.Key}
+	})
+}
+
+// importKeys starts an import: it parses the import ID into what addresses the resource, and records the key
+// attributes keys gives for it. Read fills in the rest.
+func importKeys[R any](ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse,
+	parse func(string) (R, error), keys func(R) map[string]string) {
+	ref, err := parse(req.ID)
 	if err != nil {
 		resp.Diagnostics.AddError("Invalid import ID", err.Error())
 		return
 	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), ref.ProjectKey)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("key"), ref.Key)...)
+	for name, value := range keys(ref) {
+		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(name), value)...)
+	}
 }
 
 func apiError(diags *diag.Diagnostics, action string, err error) {
 	diags.AddError("Could not "+action, err.Error())
+}
+
+// changedOutsideTerraform reports that Core rejected a change to what (such as "flag" or "targeting") because it
+// changed since Terraform read it.
+func changedOutsideTerraform(diags *diag.Diagnostics, what, detail string) {
+	diags.AddError("The "+what+" changed outside Terraform",
+		detail+"\n\nIt was edited after Terraform read it. Run terraform plan again to see the change, then apply.")
 }

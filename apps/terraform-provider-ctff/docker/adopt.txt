@@ -1,0 +1,15 @@
+# The resources of the example configuration with their import IDs. Core's demo seed creates the Birdwatch project
+# on first start, so a run without Terraform state (the first, or after the state volume was lost) imports those of
+# them that Core already has, then applies the configuration over them.
+ctff_project.birdwatch birdwatch
+ctff_environment.birdwatch["development"] birdwatch/development
+ctff_environment.birdwatch["production"] birdwatch/production
+ctff_flag.new_sighting_form birdwatch/new-sighting-form
+ctff_flag.rare_bird_alerts birdwatch/rare-bird-alerts
+ctff_flag.photo_id_beta birdwatch/photo-id-beta
+ctff_flag_environment.new_sighting_form["development"] birdwatch/new-sighting-form/development
+ctff_flag_environment.new_sighting_form["production"] birdwatch/new-sighting-form/production
+ctff_flag_environment.rare_bird_alerts["development"] birdwatch/rare-bird-alerts/development
+ctff_flag_environment.rare_bird_alerts["production"] birdwatch/rare-bird-alerts/production
+ctff_flag_environment.photo_id_beta["development"] birdwatch/photo-id-beta/development
+ctff_flag_environment.photo_id_beta["production"] birdwatch/photo-id-beta/production

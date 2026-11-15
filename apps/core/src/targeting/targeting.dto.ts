@@ -43,7 +43,13 @@ function IsVariationIndex(description: string, { optional = false } = {}): Prope
 /** A list of strings, such as user IDs or the values of a rule. */
 function IsStringList(description: string, { nonEmpty = false } = {}): PropertyDecorator {
   return applyDecorators(
-    ApiProperty({ type: [String], description, maxItems: maxListedValues, ...(nonEmpty ? { minItems: 1 } : {}) }),
+    ApiProperty({
+      type: 'array',
+      items: { type: 'string', maxLength: maxValueLength },
+      description,
+      maxItems: maxListedValues,
+      ...(nonEmpty ? { minItems: 1 } : {}),
+    }),
     IsArray(),
     ...(nonEmpty ? [ArrayNotEmpty({ message: '$property must list at least one value' })] : []),
     ArrayMaxSize(maxListedValues),
