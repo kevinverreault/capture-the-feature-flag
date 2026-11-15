@@ -1,4 +1,4 @@
-import type { EnvironmentSnapshot, FlagSnapshot, TargetingSnapshot } from '@ctff/evaluation';
+import type { EnvironmentSnapshot, FlagSnapshot, TargetingSnapshot, Variation } from '@ctff/evaluation';
 import { ApiProperty } from '@nestjs/swagger';
 import { IndividualTargetDto, RuleDto } from '../targeting/targeting.dto.js';
 
@@ -29,7 +29,7 @@ export class FlagSnapshotDto implements FlagSnapshot {
   key!: string;
 
   @ApiProperty({ type: [Boolean] })
-  variations!: boolean[];
+  variations!: Variation[];
 
   @ApiProperty()
   version!: number;

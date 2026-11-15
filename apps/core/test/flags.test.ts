@@ -124,6 +124,14 @@ describe('flags', () => {
     expect((await api.get(`${flags()}/${key}`)).body).toMatchObject({ key, version: 1 });
   });
 
+  it('accepts an edit that repeats the unchanged flag key', async () => {
+    const key = uniqueKey('repeated');
+    await api.post(flags(), { key, name: 'Repeated' });
+    const edited = await api.patch(`${flags()}/${key}`, { version: 1, key, name: 'Still repeated' });
+    expect(edited.status).toBe(200);
+    expect(edited.body).toMatchObject({ key, name: 'Still repeated' });
+  });
+
   it('deletes a flag', async () => {
     const key = uniqueKey('deleted');
     await api.post(flags(), { key, name: 'Deleted' });

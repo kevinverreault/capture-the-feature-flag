@@ -7,9 +7,12 @@
 export type Variation = boolean;
 
 /** The context attributes a rule can test. Both are built in: `user_id` and `country`. */
-export type ContextAttributeKey = 'user_id' | 'country';
+export const contextAttributeKeys = ['user_id', 'country'] as const;
+export type ContextAttributeKey = (typeof contextAttributeKeys)[number];
 
-export type RuleOperator = 'in' | 'not_in';
+/** The rule operators: `in` and `not in` (spelled `not_in` on the wire). */
+export const ruleOperators = ['in', 'not_in'] as const;
+export type RuleOperator = (typeof ruleOperators)[number];
 
 /** A list of user IDs that are always served one variation while targeting is on. */
 export interface IndividualTarget {

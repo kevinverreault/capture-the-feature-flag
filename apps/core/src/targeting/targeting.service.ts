@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { staleVersion } from '../common/conflicts.js';
+import { updateAtVersion } from '../common/persistence.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { FlagsService } from '../flags/flags.service.js';
@@ -42,11 +42,15 @@ export class TargetingService {
     input: UpdateTargetingDto,
   ): Promise<TargetingDto> {
     const { flag, environment, targeting } = await this.find(projectKey, flagKey, environmentKey);
-    const { count } = await this.prisma.targeting.updateMany({
-      where: { id: targeting.id, version: input.version },
-      data: { on: input.on, version: { increment: 1 } },
-    });
-    if (count === 0) throw staleVersion(`Targeting of ${flagKey} in ${environmentKey}`, input.version);
+    await updateAtVersion(
+      () =>
+        this.prisma.targeting.updateMany({
+          where: { id: targeting.id, version: input.version },
+          data: { on: input.on, version: { increment: 1 } },
+        }),
+      `Targeting of ${flagKey} in ${environmentKey}`,
+      input.version,
+    );
     const updated = await this.prisma.targeting.findUniqueOrThrow({ where: { id: targeting.id } });
     return toTargetingDto(flag, environment, updated);
   }

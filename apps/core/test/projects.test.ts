@@ -48,6 +48,12 @@ describe('projects', () => {
     expect((await api.get('/projects/other-key')).status).toBe(404);
   });
 
+  it('accepts a rename that repeats the unchanged project key', async () => {
+    const key = uniqueKey('repeated');
+    await api.post('/projects', { key, name: 'Before' });
+    expect((await api.patch(`/projects/${key}`, { key, name: 'After' })).status).toBe(200);
+  });
+
   it('deletes a project', async () => {
     const key = uniqueKey('deleted');
     await api.post('/projects', { key, name: 'Deleted' });

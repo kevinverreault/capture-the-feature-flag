@@ -11,10 +11,10 @@ export class CreateEnvironmentDto {
 
 export class UpdateEnvironmentDto {
   @ImmutableKey('environment')
-  key?: never;
+  key?: string;
 
   @ImmutableKey('SDK')
-  sdkKey?: never;
+  sdkKey?: string;
 
   @IsName('environment', { optional: true })
   name?: string;

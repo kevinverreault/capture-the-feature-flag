@@ -1,3 +1,4 @@
+import type { Variation } from '@ctff/evaluation';
 import { applyDecorators } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { ArrayMaxSize, ArrayUnique, IsArray, IsInt, IsString, Matches, MaxLength, Min } from 'class-validator';
@@ -48,7 +49,7 @@ export class UpdateFlagDto {
   version!: number;
 
   @ImmutableKey('flag')
-  key?: never;
+  key?: string;
 
   @IsName('flag', { optional: true })
   name?: string;
@@ -81,7 +82,7 @@ export class FlagDto {
     example: [true, false],
     description: 'The ordered variations; targeting refers to them by index. Boolean flags are always [true, false].',
   })
-  variations!: boolean[];
+  variations!: Variation[];
 
   @ApiProperty({ description: 'Incremented on every edit; send it back with the next edit.' })
   version!: number;

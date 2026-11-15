@@ -11,7 +11,7 @@ export class CreateProjectDto {
 
 export class UpdateProjectDto {
   @ImmutableKey('project')
-  key?: never;
+  key?: string;
 
   @IsName('project', { optional: true })
   name?: string;

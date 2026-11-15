@@ -1,4 +1,4 @@
-import type { IndividualTarget, Rule } from '@ctff/evaluation';
+import { contextAttributeKeys, type IndividualTarget, type Rule, ruleOperators } from '@ctff/evaluation';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsBoolean, IsInt, Min } from 'class-validator';
 import { IsOmittable } from '../common/keys.js';
@@ -12,10 +12,10 @@ export class IndividualTargetDto implements IndividualTarget {
 }
 
 export class RuleDto implements Rule {
-  @ApiProperty({ enum: ['user_id', 'country'] })
+  @ApiProperty({ enum: contextAttributeKeys })
   attribute!: Rule['attribute'];
 
-  @ApiProperty({ enum: ['in', 'not_in'] })
+  @ApiProperty({ enum: ruleOperators })
   operator!: Rule['operator'];
 
   @ApiProperty({ type: [String] })

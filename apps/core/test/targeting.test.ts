@@ -57,6 +57,24 @@ describe('targeting', () => {
     }
   });
 
+  it('never fails when flags are created while environments are deleted', async () => {
+    const projectKey = await project();
+    const environmentKeys = Array.from({ length: 15 }, (_, index) => `env-${index}`);
+    for (const key of environmentKeys) {
+      await api.post(`/projects/${projectKey}/environments`, { key, name: key });
+    }
+
+    const statuses = await Promise.all(
+      environmentKeys
+        .flatMap((key, index) => [
+          api.post(`/projects/${projectKey}/flags`, { key: `flag-${index}`, name: `Flag ${index}` }),
+          api.delete(`/projects/${projectKey}/environments/${key}`),
+        ])
+        .map(async (response) => (await response).status),
+    );
+    expect(statuses.filter((status) => status >= 300)).toEqual([]);
+  });
+
   it('switches targeting on and off in one environment only', async () => {
     const projectKey = await project('development', 'production');
     await api.post(`/projects/${projectKey}/flags`, { key: 'kill-switch', name: 'Kill switch' });

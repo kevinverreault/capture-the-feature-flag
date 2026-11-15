@@ -1,6 +1,6 @@
-import { applyDecorators } from '@nestjs/common';
+import { applyDecorators, BadRequestException } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmpty, IsNotEmpty, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { IsNotEmpty, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
 
 /** Lowercase kebab-case: lowercase letters and digits in groups joined by single hyphens, starting with a letter. */
 export const keyPattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -21,9 +21,23 @@ export function IsKey(what: string): PropertyDecorator {
   );
 }
 
-/** Rejects an attempt to change an immutable key in an update body. Not part of the documented schema. */
+/**
+ * An immutable key in an update body. Clients that send the whole resource back may repeat it; the service
+ * rejects any other value with {@link assertKeyUnchanged}.
+ */
 export function ImmutableKey(what: string): PropertyDecorator {
-  return IsEmpty({ message: `${what} key is immutable and cannot be changed` });
+  return applyDecorators(
+    ApiProperty({ required: false, description: `The current ${what} key, if sent. It cannot be changed.` }),
+    IsOmittable(),
+    IsString(),
+  );
+}
+
+/** Fails with 400 when an update body tries to change an immutable key. */
+export function assertKeyUnchanged(what: string, current: string, sent: string | undefined): void {
+  if (sent !== undefined && sent !== current) {
+    throw new BadRequestException([`${what} key is immutable and cannot be changed`]);
+  }
 }
 
 /** A display name: a non-blank string. Optional in update bodies. */

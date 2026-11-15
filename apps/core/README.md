@@ -20,7 +20,7 @@ Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --fi
 
 ## API
 
-Projects, environments and flags are addressed by their keys, which are lowercase kebab-case and immutable:
+Projects, environments and flags are addressed by their keys, which are lowercase kebab-case and immutable. An update body may repeat the current key (or SDK key), but any other value gets `400`:
 
 | Path                                                      | Methods                   |
 | :-------------------------------------------------------- | :------------------------ |

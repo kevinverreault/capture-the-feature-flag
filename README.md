@@ -113,5 +113,6 @@ To move the submodule to a newer design system commit: `git -C vendor/design-sys
 
 - `nx affected -t lint typecheck test build`,
 - `nx affected -t docker-build`, which builds the images of affected projects that define that target.
+- a compose smoke test: `docker compose up --build --wait`, then checks that Core is healthy, runs as non-root and serves its API on the migrated database.
 
 Nothing is published: images are built but not pushed, and packages are not released.

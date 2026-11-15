@@ -63,6 +63,14 @@ describe('environments', () => {
     expect((await api.patch(`${environments()}/${key}`, { sdkKey: 'ctff-env-chosen' })).status).toBe(400);
   });
 
+  it('accepts a rename that repeats the unchanged environment key and SDK key', async () => {
+    const key = uniqueKey('repeated');
+    const created = await api.post(environments(), { key, name: 'Before' });
+    const renamed = await api.patch(`${environments()}/${key}`, { key, sdkKey: created.body.sdkKey, name: 'After' });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body).toMatchObject({ key, name: 'After', sdkKey: created.body.sdkKey });
+  });
+
   it('deletes an environment', async () => {
     const key = uniqueKey('deleted');
     await api.post(environments(), { key, name: 'Deleted' });
