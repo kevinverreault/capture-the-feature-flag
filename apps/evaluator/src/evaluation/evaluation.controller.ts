@@ -1,5 +1,6 @@
 import {
   evaluate,
+  type EnvironmentListEntry,
   type EvaluationRequest,
   type EvaluatorErrorBody,
   type FlagEvaluation,
@@ -38,21 +39,21 @@ export class EvaluationController {
     @Body() body: unknown,
     @Res({ passthrough: true }) response: Response,
   ): FlagEvaluation {
-    const label = (result: string, environment?: { projectKey: string; environmentKey: string }) =>
+    const recordLabels = (result: string, environment?: Pick<EnvironmentListEntry, 'projectKey' | 'environmentKey'>) =>
       setEvaluationLabels(response, {
         project_key: environment?.projectKey ?? '',
         environment_key: environment?.environmentKey ?? '',
         result,
       });
     if (!sdkKey) {
-      label('MISSING_SDK_KEY');
+      recordLabels('MISSING_SDK_KEY');
       throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
     }
     const held = this.snapshots.environment(sdkKey);
     // The environment the SDK key names, if the Evaluator knows it.
-    const named = held.kind === 'loaded' ? held.snapshot : held.kind === 'loading' ? held : undefined;
+    const namedEnvironment = held.kind === 'loaded' ? held.snapshot : held.kind === 'loading' ? held : undefined;
     if (!this.snapshots.ready || held.kind === 'loading') {
-      label('NOT_READY', named);
+      recordLabels('NOT_READY', namedEnvironment);
       const notReady: EvaluatorErrorBody = {
         statusCode: 503,
         error: 'NOT_READY',
@@ -63,7 +64,7 @@ export class EvaluationController {
       throw new ServiceUnavailableException(notReady);
     }
     if (held.kind === 'unknown') {
-      label('UNKNOWN_SDK_KEY');
+      recordLabels('UNKNOWN_SDK_KEY');
       const unknownSdkKey: EvaluatorErrorBody = {
         statusCode: 404,
         error: 'UNKNOWN_SDK_KEY',
@@ -75,7 +76,7 @@ export class EvaluationController {
     const request: Partial<EvaluationRequest> =
       typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {};
     const evaluation = evaluate(held.snapshot, flagKey, request.context);
-    label(evaluation.reason.kind, named);
+    recordLabels(evaluation.reason.kind, namedEnvironment);
     return { flagKey, ...evaluation };
   }
 }

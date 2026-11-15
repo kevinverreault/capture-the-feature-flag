@@ -15,11 +15,15 @@ function parse(text: string): Sample[] {
     .split('\n')
     .filter((line) => line !== '' && !line.startsWith('#'))
     .map((line) => {
-      const match = /^([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{(.*)\})? (\S+)$/.exec(line);
-      if (!match) throw new Error(`Not a Prometheus sample: ${line}`);
+      const match = /^(?<name>[a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{(?<labels>.*)\})? (?<value>\S+)$/.exec(line);
+      if (!match?.groups?.['name']) throw new Error(`Not a Prometheus sample: ${line}`);
+      const { name, labels: rawLabels = '', value } = match.groups;
       const labels: Record<string, string> = {};
-      for (const [, key, value] of (match[2] ?? '').matchAll(/(\w+)="((?:[^"\\]|\\.)*)"/g)) labels[key!] = value!;
-      return { name: match[1]!, labels, value: Number(match[3]) };
+      for (const label of rawLabels.matchAll(/(?<key>\w+)="(?<value>(?:[^"\\]|\\.)*)"/g)) {
+        const { key, value: labelValue } = label.groups ?? {};
+        if (key !== undefined && labelValue !== undefined) labels[key] = labelValue;
+      }
+      return { name, labels, value: Number(value) };
     });
 }
 
@@ -84,16 +88,16 @@ describe('Prometheus metrics', () => {
     for (let i = 0; i < 5; i++) await production.variation('rare-bird-alerts', alice, false);
 
     const { samples } = await scrape(evaluator.url);
-    const production_ = { project_key: 'birdwatch', environment_key: 'production' };
+    const productionLabels = { project_key: 'birdwatch', environment_key: 'production' };
     const name = 'ctff_evaluator_evaluation_duration_seconds';
-    expect(value(samples, `${name}_count`, production_)).toBe(5);
-    const sum = value(samples, `${name}_sum`, production_);
+    expect(value(samples, `${name}_count`, productionLabels)).toBe(5);
+    const sum = value(samples, `${name}_sum`, productionLabels);
     expect(sum).toBeGreaterThan(0);
     // Five local evaluations take well under a second in all.
     expect(sum).toBeLessThan(1);
-    expect(value(samples, `${name}_bucket`, { ...production_, le: '+Inf' })).toBe(5);
-    expect(value(samples, `${name}_bucket`, { ...production_, le: '0.01' })).toBeDefined();
-    expect(value(samples, `${name}_bucket`, { ...production_, le: '0.005' })).toBeDefined();
+    expect(value(samples, `${name}_bucket`, { ...productionLabels, le: '+Inf' })).toBe(5);
+    expect(value(samples, `${name}_bucket`, { ...productionLabels, le: '0.01' })).toBeDefined();
+    expect(value(samples, `${name}_bucket`, { ...productionLabels, le: '0.005' })).toBeDefined();
   });
 
   it('reports the age of every snapshot held, which grows while Core is unreachable', async () => {
