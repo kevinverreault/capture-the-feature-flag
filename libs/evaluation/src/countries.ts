@@ -32,9 +32,9 @@ export const countryCodes: readonly string[] = [
   .join(' ')
   .split(' ');
 
-const known = new Set(countryCodes);
+const countryCodeSet = new Set(countryCodes);
 
 /** Whether `code` is an assigned ISO 3166-1 alpha-2 country code, in any case. */
 export function isCountryCode(code: string): boolean {
-  return known.has(code.toUpperCase());
+  return countryCodeSet.has(code.toUpperCase());
 }

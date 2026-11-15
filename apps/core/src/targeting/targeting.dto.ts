@@ -12,7 +12,6 @@ import {
   IsString,
   MaxLength,
   Min,
-  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { IsOmittable } from '../common/keys.js';
@@ -58,7 +57,6 @@ export class IndividualTargetDto implements IndividualTarget {
   variation!: number;
 
   @IsStringList('The user IDs always served this variation while targeting is on. Each is a non-empty string.')
-  @MinLength(1, { each: true, message: 'user IDs must be non-empty strings' })
   userIds!: string[];
 }
 

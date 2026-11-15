@@ -1,7 +1,11 @@
+import { contextAttributes } from './context-attributes.js';
 import {
+  type ContextAttributeKey,
   contextAttributeKeys,
   type EnvironmentSnapshot,
+  type FlagSnapshot,
   type Rule,
+  type RuleOperator,
   ruleOperators,
   type TargetingSnapshot,
   type Variation,
@@ -70,11 +74,9 @@ export function evaluate(
   const normalized = normalizeContext(context);
   if (!normalized) return error('MALFORMED_CONTEXT');
 
-  const served = decide(flag.targeting, normalized);
-  if (!served) return error('MALFORMED_FLAG');
-  const { variationIndex: index, reason } = served;
-  if (!Number.isInteger(index) || index < 0 || index >= flag.variations.length) return error('MALFORMED_FLAG');
-  return { value: flag.variations[index] as Variation, variationIndex: index, reason };
+  if (!isWellFormed(flag)) return error('MALFORMED_FLAG');
+  const { variationIndex, reason } = decide(flag.targeting, normalized);
+  return { value: flag.variations[variationIndex] as Variation, variationIndex, reason };
 }
 
 /** A variation index the targeting serves, with why. */
@@ -84,48 +86,80 @@ interface Served {
 }
 
 /**
- * The index of the variation the targeting serves to the context, with why, or `null` when the targeting is
- * malformed. While targeting is on: individual targets first, then the ordered rules (first match wins), then the
- * default variation. The index itself is checked against the flag's variations by the caller.
+ * The index of the variation well-formed targeting serves to the context, with why. While targeting is on:
+ * individual targets first, then the ordered rules (first match wins), then the default variation.
  */
-function decide(targeting: TargetingSnapshot, context: Context): Served | null {
+function decide(targeting: TargetingSnapshot, context: Context): Served {
   if (!targeting.on) return { variationIndex: targeting.offVariation, reason: { kind: 'OFF' } };
 
-  const { individualTargets } = targeting;
-  if (!Array.isArray(individualTargets)) return null;
-  for (const target of individualTargets) {
-    if (!isObject(target) || !isStringArray(target.userIds)) return null;
-    if (context.user_id !== undefined && target.userIds.includes(context.user_id)) {
-      return { variationIndex: target.variation, reason: { kind: 'TARGET_MATCH' } };
-    }
-  }
+  const userId = context.user_id;
+  const target =
+    userId === undefined ? undefined : targeting.individualTargets.find(({ userIds }) => userIds.includes(userId));
+  if (target) return { variationIndex: target.variation, reason: { kind: 'TARGET_MATCH' } };
 
-  const { rules } = targeting;
-  if (!Array.isArray(rules)) return null;
-  for (const [ruleIndex, rule] of rules.entries()) {
-    const matched = matches(rule, context);
-    if (matched === null) return null;
-    if (matched) return { variationIndex: rule.variation, reason: { kind: 'RULE_MATCH', ruleIndex } };
+  const ruleIndex = targeting.rules.findIndex((rule) => matches(rule, context));
+  if (ruleIndex >= 0) {
+    const rule = targeting.rules[ruleIndex] as Rule;
+    return { variationIndex: rule.variation, reason: { kind: 'RULE_MATCH', ruleIndex } };
   }
 
   return { variationIndex: targeting.defaultVariation, reason: { kind: 'DEFAULT' } };
 }
 
 /**
- * Whether the rule matches the context, or `null` when the rule is malformed. A context without the attribute the
- * rule tests never matches it, whichever the operator: `not in` only matches a value that is there.
+ * Whether the rule matches the (normalized) context. A context without the attribute the rule tests never matches
+ * it, whichever the operator: `not in` only matches a value that is there.
  */
-function matches(rule: Rule, context: Context): boolean | null {
-  if (!isObject(rule) || !isStringArray(rule.values)) return null;
-  if (!contextAttributeKeys.includes(rule.attribute) || !ruleOperators.includes(rule.operator)) return null;
+function matches(rule: Rule, context: Context): boolean {
   const value = context[rule.attribute];
   if (value === undefined) return false;
-  // Core stores rule countries in uppercase, and the context's country has been uppercased.
-  const listed = rule.values.includes(value);
+  const { normalize } = contextAttributes[rule.attribute];
+  const listed = rule.values.some((candidate) => normalize(candidate) === value);
   return rule.operator === 'in' ? listed : !listed;
 }
 
-function isObject(value: unknown): value is object {
+/**
+ * Whether the flag's targeting is well-formed as a whole, whatever the context: every part of it has the right
+ * shape and refers to a variation the flag has. Checking it all, not just the part an evaluation reaches, means
+ * malformed targeting is an error for every context alike. Snapshots are replaced, never changed, so the answer
+ * is kept per flag object.
+ */
+function isWellFormed(flag: FlagSnapshot): boolean {
+  let wellFormed = wellFormedFlags.get(flag);
+  if (wellFormed === undefined) {
+    wellFormed = checkWellFormed(flag);
+    wellFormedFlags.set(flag, wellFormed);
+  }
+  return wellFormed;
+}
+
+const wellFormedFlags = new WeakMap<FlagSnapshot, boolean>();
+
+function checkWellFormed({ variations, targeting }: FlagSnapshot): boolean {
+  if (!Array.isArray(variations) || !isObject(targeting) || typeof targeting.on !== 'boolean') return false;
+  const isVariation = (index: unknown) =>
+    Number.isInteger(index) && (index as number) >= 0 && (index as number) < variations.length;
+  const { offVariation, defaultVariation, individualTargets, rules } = targeting;
+  return (
+    isVariation(offVariation) &&
+    isVariation(defaultVariation) &&
+    Array.isArray(individualTargets) &&
+    individualTargets.every(
+      (target: unknown) => isObject(target) && isVariation(target.variation) && isStringArray(target.userIds),
+    ) &&
+    Array.isArray(rules) &&
+    rules.every(
+      (rule: unknown) =>
+        isObject(rule) &&
+        contextAttributeKeys.includes(rule.attribute as ContextAttributeKey) &&
+        ruleOperators.includes(rule.operator as RuleOperator) &&
+        isStringArray(rule.values) &&
+        isVariation(rule.variation),
+    )
+  );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -139,15 +173,13 @@ function isStringArray(value: unknown): value is string[] {
  */
 function normalizeContext(context: unknown): Context | null {
   if (!isObject(context)) return null;
-  const { user_id: userId, country } = context as Record<string, unknown>;
   const normalized: Context = {};
-  if (userId !== undefined && userId !== null) {
-    if (typeof userId !== 'string' || userId === '') return null;
-    normalized.user_id = userId;
-  }
-  if (country !== undefined && country !== null) {
-    if (typeof country !== 'string' || !/^[A-Za-z]{2}$/.test(country)) return null;
-    normalized.country = country.toUpperCase();
+  for (const key of contextAttributeKeys) {
+    const value = context[key];
+    if (value === undefined || value === null) continue;
+    const attribute = contextAttributes[key];
+    if (typeof value !== 'string' || !attribute.accepts(value)) return null;
+    normalized[key] = attribute.normalize(value);
   }
   return normalized;
 }

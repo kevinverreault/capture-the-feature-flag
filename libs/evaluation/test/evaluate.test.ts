@@ -289,6 +289,18 @@ describe('evaluate with rules', () => {
       ruleMatch(0, 0),
     ],
     [
+      'country rules match whatever the case of their values',
+      on(rule('country', 'in', ['ca'], 0)),
+      { country: 'CA' },
+      ruleMatch(0, 0),
+    ],
+    [
+      'country not in rules compare whatever the case of their values',
+      on(rule('country', 'not_in', ['ca'], 0)),
+      { country: 'CA' },
+      byDefault,
+    ],
+    [
       'rules are ignored while targeting is off',
       { ...on(rule('country', 'in', ['CA'], 0)), on: false },
       { country: 'CA' },
@@ -326,6 +338,20 @@ describe('evaluate with rules', () => {
       on({ ...rule('country', 'in', ['CA'], 0), values: 'CA' as unknown as string[] }),
     ],
     ['rules that are not a list', { on: true, rules: {} as unknown as Rule[] }],
+    [
+      'a malformed rule after the rule that matches',
+      on(rule('country', 'in', ['CA'], 0), {
+        ...rule('country', 'in', ['NL'], 0),
+        operator: 'like' as Rule['operator'],
+      }),
+    ],
+    ['a rule that does not match serving a variation the flag does not have', on(rule('country', 'in', ['NL'], 9))],
+    [
+      'an individual target that does not match with a fractional variation',
+      { on: true, individualTargets: [{ variation: 0.5, userIds: ['bob'] }] },
+    ],
+    ['an off variation the flag does not have while targeting is on', { on: true, offVariation: 2 }],
+    ['a default variation the flag does not have while targeting is off', { defaultVariation: 2 }],
     ['individual targets that are not a list', { on: true, individualTargets: null as unknown as [] }],
   ])('reports a MALFORMED_FLAG error for %s', (_case, targeting) => {
     expect(evaluate(snapshot(targeting), 'rare-bird-alerts', { user_id: 'alice', country: 'CA' })).toEqual(
