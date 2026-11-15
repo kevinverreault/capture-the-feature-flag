@@ -1,5 +1,5 @@
 // Command terraform-provider-ctff is the Terraform provider for Capture The Feature Flag (ADR 0004). It manages
-// projects, environments and flags through Core's public API.
+// projects, environments, flags and their targeting through Core's public API.
 package main
 
 import (

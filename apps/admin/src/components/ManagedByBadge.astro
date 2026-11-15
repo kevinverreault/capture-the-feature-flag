@@ -1,0 +1,18 @@
+---
+import Badge from '@ds/components/ui/Badge.astro';
+import { type ManagedBy, managingTool } from '../lib/managed-by';
+
+interface Props {
+  managedBy: ManagedBy | undefined;
+}
+
+const tool = managingTool(Astro.props.managedBy);
+---
+
+{
+  tool && (
+    <Badge variant="secondary" title={`This flag is managed as code by ${tool}; edits made here show up as drift.`}>
+      Managed by {tool}
+    </Badge>
+  )
+}

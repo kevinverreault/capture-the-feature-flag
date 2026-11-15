@@ -85,3 +85,34 @@ jobs:
         run: docker compose logs
       - if: always()
         run: docker compose down --volumes
+
+  compose-terraform:
+    name: Compose Terraform profile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      - run: docker compose --profile terraform build
+      - run: docker compose up --detach --wait --wait-timeout 300
+      # The one-shot terraform service applies the example configuration; its exit code is the apply's.
+      - name: The terraform profile applies the example configuration
+        run: docker compose --profile terraform run --rm terraform
+      - name: Core holds the seeded project, attributed to terraform
+        run: |
+          curl --fail --silent --show-error http://localhost:3000/api/v1/projects/birdwatch/flags/rare-bird-alerts/targeting/production \
+            | jq --exit-status '.on == true and .rules[0].values == ["CA", "US"]'
+          curl --fail --silent --show-error 'http://localhost:3000/api/v1/audit-entries?projectKey=birdwatch&limit=200' \
+            | jq --exit-status '(.entries | length > 0) and all(.entries[]; .actor == "terraform")'
+      - name: Applying again restores targeting edited in the admin app
+        run: |
+          url=http://localhost:3000/api/v1/projects/birdwatch/flags/new-sighting-form/targeting/production
+          version=$(curl --fail --silent --show-error "$url" | jq .version)
+          curl --fail --silent --show-error -X PATCH "$url" -H 'content-type: application/json' \
+            -d "{\"version\": $version, \"on\": false}" > /dev/null
+          docker compose --profile terraform run --rm terraform
+          curl --fail --silent --show-error "$url" | jq --exit-status '.on == true'
+      - if: failure()
+        run: docker compose --profile terraform logs
+      - if: always()
+        run: docker compose --profile terraform down --volumes

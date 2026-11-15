@@ -47,5 +47,24 @@ services:
     # No depends_on: the Evaluator polls until Core answers, and reports healthy (ready) only once it has loaded
     # its first snapshots. Once loaded, it keeps serving them while Core is stopped.
 
+  # Optional: `docker compose --profile terraform up` also builds the Terraform provider and applies the example
+  # configuration (apps/terraform-provider-ctff/examples/birdwatch) to Core, then exits. Its Terraform state is kept
+  # in a volume, so running it again only puts back what drifted.
+  terraform:
+    profiles: [terraform]
+    build:
+      context: .
+      dockerfile: apps/terraform-provider-ctff/Dockerfile
+    image: ctff-terraform:local
+    environment:
+      CTFF_BASE_URL: http://core:3000
+    volumes:
+      - terraform-state:/state
+    depends_on:
+      core:
+        condition: service_healthy
+    restart: 'no'
+
 volumes:
   postgres-data:
+  terraform-state:

@@ -6,7 +6,8 @@ import (
 	"testing"
 )
 
-// The provider repeats Core's validation rules so that plan catches invalid keys, names, descriptions and tags.
+// The provider repeats Core's validation rules so that plan catches invalid keys, names, descriptions, tags and
+// targeting.
 // This checks each copy against the OpenAPI document Core generates from its own rules, so they can't drift.
 func TestAccValidationRulesMatchCore(t *testing.T) {
 	if os.Getenv("TF_ACC") == "" {
@@ -17,6 +18,7 @@ func TestAccValidationRulesMatchCore(t *testing.T) {
 		MaxLength int       `json:"maxLength"`
 		MaxItems  int       `json:"maxItems"`
 		Items     *property `json:"items"`
+		Enum      []string  `json:"enum"`
 	}
 	var document struct {
 		Components struct {
@@ -55,4 +57,11 @@ func TestAccValidationRulesMatchCore(t *testing.T) {
 	}
 	check("CreateFlagDto.tags items maxLength", tags.Items.MaxLength, tagMaxLength)
 	check("CreateFlagDto.tags items pattern", tags.Items.Pattern, tagPatternSource)
+
+	check("UpdateTargetingDto.rules maxItems", get("UpdateTargetingDto", "rules").MaxItems, maxRules)
+	check("UpdateTargetingDto.individualTargets maxItems", get("UpdateTargetingDto", "individualTargets").MaxItems, maxIndividualTargets)
+	check("RuleDto.values maxItems", get("RuleDto", "values").MaxItems, maxListedValues)
+	check("IndividualTargetDto.userIds maxItems", get("IndividualTargetDto", "userIds").MaxItems, maxListedValues)
+	check("RuleDto.attribute enum", get("RuleDto", "attribute").Enum, ruleAttributes)
+	check("RuleDto.operator enum", get("RuleDto", "operator").Enum, ruleOperators)
 }

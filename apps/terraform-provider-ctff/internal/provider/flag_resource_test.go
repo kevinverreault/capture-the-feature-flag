@@ -23,6 +23,7 @@ type flagFixture struct {
 	name        string
 	description string // omitted from the configuration when empty
 	tags        []string
+	archived    bool // declared only when true
 }
 
 func flagConfig(projectKey string, flag flagFixture) string {
@@ -36,6 +37,9 @@ func flagConfig(projectKey string, flag flagFixture) string {
 			quoted[i] = fmt.Sprintf("%q", tag)
 		}
 		fmt.Fprintf(&attributes, "  tags        = [%s]\n", strings.Join(quoted, ", "))
+	}
+	if flag.archived {
+		attributes.WriteString("  archived    = true\n")
 	}
 	return projectConfig(projectKey, "Birdwatch") + fmt.Sprintf(`
 resource "ctff_flag" "test" {
@@ -93,6 +97,22 @@ func TestAccFlagResource(t *testing.T) {
 				Config: flagConfig(projectKey, edited),
 				ConfigPlanChecks: resource.ConfigPlanChecks{
 					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("ctff_flag.test", plancheck.ResourceActionUpdate)},
+				},
+				Check: checkFlag(api, projectKey, edited),
+			},
+			{
+				// So does archiving the flag in the admin app: applying restores it.
+				PreConfig: func() {
+					if err := archiveFlagByHand(t, projectKey, "rare-bird-alerts"); err != nil {
+						t.Fatal(err)
+					}
+				},
+				Config: flagConfig(projectKey, edited),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{
+						plancheck.ExpectResourceAction("ctff_flag.test", plancheck.ResourceActionUpdate),
+						plancheck.ExpectKnownValue("ctff_flag.test", tfjsonpath.New("archived"), knownvalue.Bool(false)),
+					},
 				},
 				Check: checkFlag(api, projectKey, edited),
 			},
@@ -182,6 +202,11 @@ func renameFlagByHand(t *testing.T, projectKey, key, name string) error {
 	return requestCore(t, "PATCH", path, map[string]any{"version": flag.Version, "name": name}, nil)
 }
 
+// archiveFlagByHand archives a flag the way the admin app does.
+func archiveFlagByHand(t *testing.T, projectKey, key string) error {
+	return requestCore(t, "POST", "/projects/"+projectKey+"/flags/"+key+"/archive", nil, nil)
+}
+
 // checkFlag checks Core holds the flag as configured, marked as managed by Terraform.
 func checkFlag(api *client.Client, projectKey string, want flagFixture) resource.TestCheckFunc {
 	return func(*terraform.State) error {
@@ -198,6 +223,8 @@ func checkFlag(api *client.Client, projectKey string, want flagFixture) resource
 			return fmt.Errorf("flag %s has description %q in Core, want %q", want.key, flag.Description, want.description)
 		case !slices.Equal(gotTags, wantTags):
 			return fmt.Errorf("flag %s has tags %v in Core, want %v", want.key, gotTags, wantTags)
+		case flag.Archived != want.archived:
+			return fmt.Errorf("flag %s is archived %v in Core, want %v", want.key, flag.Archived, want.archived)
 		case flag.ManagedBy == nil || *flag.ManagedBy != "terraform":
 			return fmt.Errorf("flag %s is managed by %v in Core, want terraform", want.key, flag.ManagedBy)
 		}
@@ -212,6 +239,45 @@ func checkFlagGone(api *client.Client, projectKey, key string) resource.TestChec
 		}
 		return nil
 	}
+}
+
+// A flag declared archived is archived, and declaring it not archived again restores it. Its details can change in
+// the same apply as either.
+func TestAccFlagResource_archived(t *testing.T) {
+	api := testAPI(t)
+	projectKey := randomKey("project")
+	active := flagFixture{key: "photo-id-beta", name: "Photo ID beta"}
+	archived := flagFixture{key: "photo-id-beta", name: "Photo ID (retired)", archived: true}
+	restored := flagFixture{key: "photo-id-beta", name: "Photo ID", tags: []string{"photos"}}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoV6ProviderFactories,
+		CheckDestroy:             checkProjectsGone(api, projectKey),
+		Steps: []resource.TestStep{
+			{Config: flagConfig(projectKey, active), Check: checkFlag(api, projectKey, active)},
+			{
+				Config: flagConfig(projectKey, archived),
+				ConfigStateChecks: []statecheck.StateCheck{
+					statecheck.ExpectKnownValue("ctff_flag.test", tfjsonpath.New("archived"), knownvalue.Bool(true)),
+				},
+				Check: checkFlag(api, projectKey, archived),
+			},
+			{
+				// Nothing changed: an archived flag declared archived reads without drift.
+				Config:   flagConfig(projectKey, archived),
+				PlanOnly: true,
+			},
+			{
+				Config: flagConfig(projectKey, restored),
+				Check:  checkFlag(api, projectKey, restored),
+			},
+			{
+				// Destroying an archived flag deletes it too.
+				Config: flagConfig(projectKey, archived),
+				Check:  checkFlag(api, projectKey, archived),
+			},
+		},
+	})
 }
 
 // When the flag changes in Core between plan and apply, Core rejects the edit as stale, and so does the apply.

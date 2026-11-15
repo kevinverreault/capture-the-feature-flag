@@ -6,6 +6,7 @@ import Input from '@ds/components/form/Input.astro';
 import Select from '@ds/components/form/Select.astro';
 import Badge from '@ds/components/ui/Badge.astro';
 import Button from '@ds/components/ui/Button.astro';
+import ManagedByBadge from '../../../../components/ManagedByBadge.astro';
 import NotFound from '../../../../components/NotFound.astro';
 import ProjectNav from '../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
@@ -117,6 +118,7 @@ const isOn = (flag: (typeof shown)[number], environmentKey: string) =>
                           <span class="flag-name">
                             <a href={routes.flag(project.key, flag.key)}>{flag.name}</a>
                             {flag.archived && <Badge variant="muted">Archived</Badge>}
+                            <ManagedByBadge managedBy={flag.managedBy} />
                           </span>
                           <code class="flag-key">{flag.key}</code>
                         </th>

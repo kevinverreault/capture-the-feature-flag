@@ -9,6 +9,8 @@ import AuditEntries from '../../../../../components/AuditEntries.astro';
 import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
 import ConfirmDelete from '../../../../../components/ConfirmDelete.astro';
 import FormAlert from '../../../../../components/FormAlert.astro';
+import ManagedByBadge from '../../../../../components/ManagedByBadge.astro';
+import ManagedByWarning from '../../../../../components/ManagedByWarning.astro';
 import NotFound from '../../../../../components/NotFound.astro';
 import ProjectNav from '../../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
@@ -126,8 +128,9 @@ const flagMessages =
 
       <section aria-labelledby="flag-heading" class="flag-summary">
         <div class="section-heading">
-          <h2 id="flag-heading" class="text-xl">
+          <h2 id="flag-heading" class="text-xl flag-title">
             {flag.name}
+            <ManagedByBadge managedBy={flag.managedBy} />
           </h2>
           {flag.archived ? (
             <Badge variant="muted">Archived</Badge>
@@ -181,6 +184,7 @@ const flagMessages =
             <h2 id="targeting-heading" class="text-xl">
               Targeting
             </h2>
+            <ManagedByWarning managedBy={flag.managedBy} what="this flag's targeting" />
             <FormAlert messages={unplacedMessages} />
             {tabs.length === 0 ? (
               <p>
@@ -308,6 +312,13 @@ const flagMessages =
   .flag-audit {
     display: grid;
     gap: var(--space-xs);
+  }
+
+  .flag-title {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
   }
 
   .flag-summary p {

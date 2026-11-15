@@ -1,0 +1,34 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import { type ManagedBy, managingTool } from '../lib/managed-by';
+
+interface Props {
+  managedBy: ManagedBy | undefined;
+  /** What the page edits, such as "this flag" or "this flag's targeting". */
+  what: string;
+}
+
+const { managedBy, what } = Astro.props;
+const tool = managingTool(managedBy);
+
+// Shown wherever a flag managed as code is edited. Nothing is locked: the edit is saved, then the tool's next plan
+// shows it as drift, and applying puts back what its configuration declares.
+---
+
+{
+  tool && (
+    <Alert variant="warning" icon="triangle-alert" title={`Managed by ${tool}`} data-managed-by-warning>
+      <p class="managed-by-warning">
+        {tool} manages {what} as code. You can still change it here, but the next {tool} plan shows your change as
+        drift, and applying the configuration puts back what it declares. To keep a change, make it in the {tool}
+        configuration.
+      </p>
+    </Alert>
+  )
+}
+
+<style>
+  .managed-by-warning {
+    margin: 0;
+  }
+</style>
