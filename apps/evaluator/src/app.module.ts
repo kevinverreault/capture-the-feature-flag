@@ -1,10 +1,9 @@
-import { type DynamicModule, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import { type DynamicModule, Module } from '@nestjs/common';
 import { LoggerModule } from 'nestjs-pino';
 import type { Logger } from 'pino';
 import type { EvaluatorConfig } from './config.js';
 import { EvaluationController } from './evaluation/evaluation.controller.js';
 import { HealthController } from './health/health.controller.js';
-import { EvaluationMetricsMiddleware } from './metrics/evaluation-metrics.middleware.js';
 import { EvaluatorMetrics } from './metrics/evaluator-metrics.js';
 import { MetricsController } from './metrics/metrics.controller.js';
 import { SnapshotPoller } from './snapshots/snapshot-poller.js';
@@ -13,7 +12,7 @@ import { SnapshotPoller } from './snapshots/snapshot-poller.js';
 const quietPaths = ['/health/', '/metrics'];
 
 @Module({})
-export class AppModule implements NestModule {
+export class AppModule {
   static forRoot(config: EvaluatorConfig, logger: Logger): DynamicModule {
     return {
       module: AppModule,
@@ -38,9 +37,5 @@ export class AppModule implements NestModule {
         },
       ],
     };
-  }
-
-  configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(EvaluationMetricsMiddleware).forRoutes(EvaluationController);
   }
 }

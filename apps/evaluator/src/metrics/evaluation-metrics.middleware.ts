@@ -1,34 +1,44 @@
-import { Injectable, type NestMiddleware } from '@nestjs/common';
-import type { NextFunction, Request, Response } from 'express';
-import { type EvaluationLabels, EvaluatorMetrics } from './evaluator-metrics.js';
-
-const labelsKey = 'ctffEvaluationLabels';
-
-/** Records the labels of an evaluation request, for the metrics middleware to count once the response is sent. */
-export function setEvaluationLabels(response: Response, labels: EvaluationLabels): void {
-  response.locals[labelsKey] = labels;
-}
+import { evaluatorErrors, sdkKeyHeader } from '@ctff/evaluation';
+import type { RequestHandler } from 'express';
+import type { SnapshotPoller } from '../snapshots/snapshot-poller.js';
+import type { EvaluationRequestResult, EvaluatorMetrics } from './evaluator-metrics.js';
 
 /**
- * Times every evaluation request, from the moment it arrives until its response is finished (so body parsing and
- * serialization count), and counts it with the labels the controller recorded. A request the controller never
- * saw, such as one with a body that isn't JSON, counts with its status code as the result.
+ * Times and counts every evaluation request. It is mounted ahead of the body parser, so the time runs from the
+ * moment a request arrives (body parsing included) until its response is finished or the client hangs up, and a
+ * request the body parser rejects still counts. The environment comes from the SDK key header, and the result from
+ * the answer itself (see `resultOf`), so the controller knows nothing about metrics.
  */
-@Injectable()
-export class EvaluationMetricsMiddleware implements NestMiddleware {
-  constructor(private readonly metrics: EvaluatorMetrics) {}
-
-  use(_request: Request, response: Response, next: NextFunction): void {
+export function evaluationMetricsMiddleware(metrics: EvaluatorMetrics, snapshots: SnapshotPoller): RequestHandler {
+  return (request, response, next) => {
     const start = process.hrtime.bigint();
-    response.once('finish', () => {
+    let answered: EvaluationRequestResult | undefined;
+    // Nest sends evaluations and error bodies alike through `json()`.
+    const json = response.json.bind(response);
+    response.json = (body: unknown) => {
+      answered = resultOf(body);
+      return json(body);
+    };
+    // `close` follows `finish` on an answered request, and comes alone when the client hangs up first.
+    response.once('close', () => {
       const durationSeconds = Number(process.hrtime.bigint() - start) / 1e9;
-      const labels = (response.locals[labelsKey] as EvaluationLabels | undefined) ?? {
-        project_key: '',
-        environment_key: '',
-        result: `HTTP_${response.statusCode}`,
-      };
-      this.metrics.observeEvaluation(labels, durationSeconds);
+      const sdkKey = request.get(sdkKeyHeader);
+      let result: EvaluationRequestResult;
+      if (!response.writableFinished) result = 'ABORTED';
+      else if (!sdkKey) result = 'MISSING_SDK_KEY';
+      else result = answered ?? `HTTP_${response.statusCode}`;
+      metrics.observeEvaluation(sdkKey ? snapshots.identify(sdkKey) : undefined, result, durationSeconds);
     });
     next();
+  };
+}
+
+/** The evaluation reason kind of a `FlagEvaluation`, or the Evaluator error of an `EvaluatorErrorBody`. */
+function resultOf(body: unknown): EvaluationRequestResult | undefined {
+  if (typeof body !== 'object' || body === null) return undefined;
+  if ('reason' in body && typeof body.reason === 'object' && body.reason !== null && 'kind' in body.reason) {
+    return body.reason.kind as EvaluationRequestResult;
   }
+  if ('error' in body) return evaluatorErrors.find((error) => error === body.error);
+  return undefined;
 }

@@ -3,9 +3,11 @@
 //
 // Environment:
 //   EVALUATOR_URL  The Evaluator (default http://localhost:3001).
-//   CORE_URL       Core (default http://localhost:3000). Unless SDK_KEY is set, setup() creates a project with an
-//                  environment and a flag through Core's API, switches its targeting on, and waits for the
-//                  Evaluator to serve it.
+//   CORE_URL       Core (default http://localhost:3000). Unless SDK_KEY is set, setup() makes sure Core has the
+//                  project PROJECT_KEY with a `production` environment and the flag FLAG_KEY, creating whatever is
+//                  missing, switches the flag's targeting on, and waits for the Evaluator to serve it. Every run
+//                  reuses them; delete the project in the admin app (or DELETE /api/v1/projects/load-test) to drop it.
+//   PROJECT_KEY    The project setup() uses (default load-test).
 //   SDK_KEY        Evaluate in an existing environment instead, with no setup.
 //   FLAG_KEY       The flag to evaluate (default load-test-flag).
 //   VUS            Concurrent virtual users, each sending one evaluation at a time (default 10).
@@ -16,6 +18,7 @@ import http from 'k6/http';
 
 const evaluatorUrl = (__ENV.EVALUATOR_URL || 'http://localhost:3001').replace(/\/+$/, '');
 const coreUrl = (__ENV.CORE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const projectKey = __ENV.PROJECT_KEY || 'load-test';
 const flagKey = __ENV.FLAG_KEY || 'load-test-flag';
 const countries = ['CA', 'US', 'FR', 'GB', 'MX', 'BR', 'JP', 'AU'];
 
@@ -35,11 +38,13 @@ export const options = {
   },
 };
 
-function core(method, path, body) {
+/** Calls Core's API and returns the JSON answer, or `null` for a `404` when `orNotFound` is set. */
+function core(method, path, body, { orNotFound = false } = {}) {
   const response = http.request(method, `${coreUrl}/api/v1${path}`, body === undefined ? null : JSON.stringify(body), {
     headers: { 'content-type': 'application/json' },
     tags: { name: 'setup' },
   });
+  if (orNotFound && response.status === 404) return null;
   if (response.status < 200 || response.status >= 300) {
     fail(`${method} ${path} answered ${response.status}: ${response.body}`);
   }
@@ -56,14 +61,20 @@ function evaluate(sdkKey, context, name) {
 export function setup() {
   if (__ENV.SDK_KEY) return { sdkKey: __ENV.SDK_KEY };
 
-  const projectKey = `load-test-${Date.now()}`;
-  core('POST', '/projects', { key: projectKey, name: 'Load test' });
-  const { sdkKey } = core('POST', `/projects/${projectKey}/environments`, { key: 'production', name: 'Production' });
-  core('POST', `/projects/${projectKey}/flags`, { key: flagKey, name: 'Load test flag' });
-  const targetingPath = `/projects/${projectKey}/flags/${flagKey}/targeting/production`;
-  core('PATCH', targetingPath, { version: core('GET', targetingPath).version, on: true });
+  const project = `/projects/${projectKey}`;
+  const existing = (path) => core('GET', path, undefined, { orNotFound: true });
+  if (!existing(project)) core('POST', '/projects', { key: projectKey, name: 'Load test' });
+  const { sdkKey } =
+    existing(`${project}/environments/production`) ??
+    core('POST', `${project}/environments`, { key: 'production', name: 'Production' });
+  if (!existing(`${project}/flags/${flagKey}`)) {
+    core('POST', `${project}/flags`, { key: flagKey, name: 'Load test flag' });
+  }
+  const targetingPath = `${project}/flags/${flagKey}/targeting/production`;
+  const targeting = core('GET', targetingPath);
+  if (!targeting.on) core('PATCH', targetingPath, { version: targeting.version, on: true });
 
-  // The Evaluator serves the new environment from its next poll on.
+  // The Evaluator serves a new environment, or changed targeting, from its next poll on.
   for (let attempt = 0; attempt < 120; attempt++) {
     const response = evaluate(sdkKey, { user_id: 'setup' }, 'setup');
     if (response.status === 200 && response.json('reason.kind') === 'DEFAULT') return { sdkKey };
@@ -74,7 +85,7 @@ export function setup() {
 
 export default function ({ sdkKey }) {
   const context = {
-    user_id: `birder-${Math.floor(Math.random() * 10_000)}`,
+    user_id: `birder-${Math.floor(Math.random() * 10000)}`,
     country: countries[Math.floor(Math.random() * countries.length)],
   };
   const response = evaluate(sdkKey, context, 'evaluate');

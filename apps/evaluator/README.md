@@ -42,13 +42,13 @@ The request and answer types (`EvaluationRequest`, `FlagEvaluation`, `EvaluatorE
 
 `GET /metrics` (outside `/api/v1`, kept out of the request logs like the health checks) serves Prometheus metrics in the text format. In compose that's <http://localhost:3001/metrics>.
 
-| Metric                                       | Type      | Labels                                     | Meaning                                                                                                                                                                                                                                                                                                   |
-| :------------------------------------------- | :-------- | :----------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ctff_evaluator_evaluation_requests_total`   | counter   | `project_key`, `environment_key`, `result` | Evaluation requests answered. `result` is the evaluation reason kind (`OFF`, `DEFAULT`, `FLAG_NOT_FOUND`, `ERROR`, …), or why there was no evaluation: `UNKNOWN_SDK_KEY`, `NOT_READY`, `MISSING_SDK_KEY`, or `HTTP_<status>` for a request that never reached evaluation, such as a body that isn't JSON. |
-| `ctff_evaluator_evaluation_duration_seconds` | histogram | `project_key`, `environment_key`           | Time from receiving an evaluation request until its response is finished, including body parsing and serialization. The buckets are fine-grained under 10 ms.                                                                                                                                             |
-| `ctff_evaluator_snapshot_age_seconds`        | gauge     | `project_key`, `environment_key`           | Time since Core last confirmed the environment's snapshot as current (a `200` or a `304`). It stays under about one poll interval while polling works, and grows while Core is unreachable or that snapshot keeps failing to load.                                                                        |
+| Metric                                       | Type      | Labels                                     | Meaning                                                                                                                                                                                                                                                                                                                                                                                  |
+| :------------------------------------------- | :-------- | :----------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ctff_evaluator_evaluation_requests_total`   | counter   | `project_key`, `environment_key`, `result` | Evaluation requests. `result` is the evaluation reason kind (`OFF`, `DEFAULT`, `FLAG_NOT_FOUND`, `ERROR`, …), or why there was no evaluation: `UNKNOWN_SDK_KEY` or `NOT_READY` (the Evaluator's error answers), `MISSING_SDK_KEY`, `ABORTED` when the client hung up before the answer was sent, or `HTTP_<status>` for any other answer, such as `HTTP_400` for a body that isn't JSON. |
+| `ctff_evaluator_evaluation_duration_seconds` | histogram | `project_key`, `environment_key`           | Time from the arrival of an evaluation request until its response is finished (or the client hangs up), including body parsing and serialization. The buckets are fine-grained under 10 ms.                                                                                                                                                                                              |
+| `ctff_evaluator_snapshot_age_seconds`        | gauge     | `project_key`, `environment_key`           | Time since Core last confirmed the environment's snapshot as current (a `200` or a `304`). It stays under about one poll interval while polling works, and grows while Core is unreachable or that snapshot keeps failing to load.                                                                                                                                                       |
 
-Plus prom-client's default `process_*` and `nodejs_*` metrics (CPU, memory, event loop lag, garbage collection). The SDK key is never a label: an unknown SDK key counts with empty `project_key` and `environment_key`.
+Plus prom-client's default `process_*` and `nodejs_*` metrics (CPU, memory, event loop lag, garbage collection). The environment labels come from the SDK key header, but the SDK key itself is never a label: a missing or unknown SDK key counts with empty `project_key` and `environment_key`.
 
 Some useful queries: the request rate `sum by (environment_key) (rate(ctff_evaluator_evaluation_requests_total[5m]))`, the p99 latency `histogram_quantile(0.99, sum by (le) (rate(ctff_evaluator_evaluation_duration_seconds_bucket[5m])))`, and an alert on `max(ctff_evaluator_snapshot_age_seconds) > 60`.
 
@@ -56,7 +56,7 @@ Some useful queries: the request rate `sum by (environment_key) (rate(ctff_evalu
 
 [load/evaluate.js](load/evaluate.js) is a [k6](https://grafana.com/docs/k6/latest/) script that measures the latency of single evaluations against a running Evaluator. The target is a **p99 under 10 ms** inside the cluster, and the script's threshold fails the run above that. It runs manually and is not part of CI.
 
-By default its `setup()` creates a `load-test-<timestamp>` project with a `production` environment and a `load-test-flag` flag through Core's API, switches targeting on, and waits for the Evaluator to serve it. Then 10 virtual users send one evaluation at a time each for 30 seconds, with a random `user_id` and `country`. The summary's `http_req_duration{name:evaluate}` line reports the p99 of the evaluations alone, without setup's calls to Core.
+By default its `setup()` makes sure Core has a `load-test` project with a `production` environment and a `load-test-flag` flag, creating whatever is missing through Core's API, switches the flag's targeting on, and waits for the Evaluator to serve it. Every run reuses them, so runs don't pile up projects in Core (or metric series in the Evaluator). Delete the `load-test` project in the admin app to drop it. Then 10 virtual users send one evaluation at a time each for 30 seconds, with a random `user_id` and `country`. The summary's `http_req_duration{name:evaluate}` line reports the p99 of the evaluations alone, without setup's calls to Core.
 
 With `docker compose up` running, from the repository root, inside the compose network (the cluster the target is for):
 
@@ -65,20 +65,27 @@ docker run --rm --network ctff_default -v "$PWD/apps/evaluator/load:/load:ro" \
   -e EVALUATOR_URL=http://evaluator:3000 -e CORE_URL=http://core:3000 grafana/k6 run /load/evaluate.js
 ```
 
-Or with k6 installed on the host, through the published ports: `k6 run apps/evaluator/load/evaluate.js`. The variables `VUS`, `DURATION`, `FLAG_KEY` and `SDK_KEY` (to use an existing environment and skip setup) adjust the run. See the comment at the top of the script.
+Or with k6 installed on the host, through the published ports: `k6 run apps/evaluator/load/evaluate.js`. The variables `VUS`, `DURATION`, `PROJECT_KEY`, `FLAG_KEY` and `SDK_KEY` (to use an existing environment and skip setup) adjust the run. See the comment at the top of the script.
 
 ### Recorded run
 
-On 2026-11-15, on a dev machine (AMD Ryzen 7 3700X, 8 cores and 16 threads, WSL2, Node 24.22), the environment used to build this ticket had no Docker and no way to download k6, so this run doesn't use the compose stack or k6. The built Evaluator (`node dist/main.js`, `LOG_LEVEL=info` as in compose, so every request is logged) polled the S3 fake Core every 2 s. The fake Core served one environment of 51 flags with individual targets and rules. [autocannon](https://github.com/mcollina/autocannon) ran on the same machine and sent `POST /api/v1/evaluate/load-test-flag` (targeting on) with a random context each time, matching the k6 script's load shape:
+Recorded on 2026-11-15 on a dev machine: AMD Ryzen 7 3700X (8 cores, 16 threads), WSL2, Node 24.22.
 
-| Load                                   | Requests |  Throughput |  p50 |  p90 |      p99 | p99.9 |   max |
-| :------------------------------------- | -------: | ----------: | ---: | ---: | -------: | ----: | ----: |
-| 10 connections, one request each, 30 s |  133,417 | 4,448 req/s | 1 ms | 3 ms | **7 ms** | 16 ms | 31 ms |
-| 1 connection, 20 s                     |   63,937 | 3,197 req/s | 0 ms | 0 ms | **0 ms** |  1 ms | 14 ms |
+- **Method.** This is not yet a k6 run over `docker compose up`. The built Evaluator (`node dist/main.js`, `LOG_LEVEL=info` and `POLL_INTERVAL_MS=2000` as in compose, so every request is logged) polled the S3 fake Core. The fake Core served one environment of 51 flags with individual targets and rules. [autocannon](https://github.com/mcollina/autocannon) ran on the same machine and sent `POST /api/v1/evaluate/load-test-flag` (targeting on) with a random `user_id` and `country` each time, the k6 script's load shape. Each run followed a 5 s warm-up.
+- **Results.** Neither run had errors or non-`200` answers. autocannon reports whole milliseconds.
 
-autocannon reports whole milliseconds. Neither run had errors or non-`200` answers. Over a 5 s warm-up and the 10-connection run, the server-side histogram (`ctff_evaluator_evaluation_duration_seconds`) had 99.8 % of the requests under 0.5 ms and 99.98 % under 10 ms. So the p99 of the single evaluations is under the 10 ms target. The client-side tail comes mostly from queueing in the Evaluator's single Node.js event loop (and the load generator sharing the CPU) at about 4,400 requests per second, not from evaluation itself.
+| Load                                   | Requests |  Throughput |  p50 |  p90 |      p99 | p99.9 |  max |
+| :------------------------------------- | -------: | ----------: | ---: | ---: | -------: | ----: | ---: |
+| 10 connections, one request each, 30 s |  148,681 | 4,956 req/s | 1 ms | 3 ms | **3 ms** |  5 ms | 8 ms |
+| 1 connection, 20 s                     |   77,226 | 3,862 req/s | 0 ms | 0 ms | **0 ms** |  0 ms | 8 ms |
 
-Two caveats: `evaluate()` doesn't apply individual targets and rules yet (#7), so the run measures the on/off path, and the k6 run against `docker compose up` is still to be recorded. Run the command above and add its `http_req_duration{name:evaluate}` line here.
+- **Server side.** Over the warm-up and the 10-connection run, `ctff_evaluator_evaluation_duration_seconds` had 99.96 % of the requests under 0.5 ms and all but one under 10 ms. The mean was 0.16 ms.
+- **Findings.**
+  - The p99 of single evaluations is well under the 10 ms target. The client-side tail comes from queueing in the Evaluator's single Node.js event loop at about 5,000 requests per second, not from evaluation itself.
+  - Under CPU contention the tail grows. While other builds were running on the same machine (load average around 7), the same 10-connection load got a p99 of 13–17 ms at 1,900–3,500 req/s. To keep the target under load, give each Evaluator replica a dedicated CPU and scale out by adding replicas.
+  - Timing and counting each request (the metrics middleware) made no measurable difference against a build without it. A per-request Nest interceptor did: it cost about 13 % of throughput and was dropped.
+
+Two caveats remain. `evaluate()` doesn't apply individual targets and rules yet (#7), so these runs measure the on/off path. The k6 run against `docker compose up` is still to be recorded: run the command above and add its `http_req_duration{name:evaluate}` line here.
 
 ## Tests (S3)
 

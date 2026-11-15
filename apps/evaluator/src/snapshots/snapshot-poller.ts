@@ -1,4 +1,9 @@
-import { type EnvironmentList, type EnvironmentSnapshot, sdkKeyHeader } from '@ctff/evaluation';
+import {
+  type EnvironmentList,
+  type EnvironmentListEntry,
+  type EnvironmentSnapshot,
+  sdkKeyHeader,
+} from '@ctff/evaluation';
 import type { OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import type { Logger } from 'pino';
 import type { EvaluatorConfig } from '../config.js';
@@ -10,15 +15,16 @@ interface Held<T> {
 
 interface HeldSnapshot extends Held<EnvironmentSnapshot> {
   /** When Core last confirmed this snapshot as current, with a `200` or a `304` (epoch milliseconds). */
-  checkedAt: number;
+  confirmedAt: number;
 }
 
-/** A snapshot the Evaluator holds, and when Core last confirmed it as current. */
-export interface HeldSnapshotInfo {
-  projectKey: string;
-  environmentKey: string;
+/** Which environment an SDK key names: its project's key and its own. */
+export type EnvironmentIdentity = Pick<EnvironmentListEntry, 'projectKey' | 'environmentKey'>;
+
+/** The environment of a snapshot the Evaluator holds, and when Core last confirmed that snapshot as current. */
+export interface SnapshotConfirmation extends EnvironmentIdentity {
   /** Epoch milliseconds. */
-  checkedAt: number;
+  confirmedAt: number;
 }
 
 type Fetched<T> = { kind: 'changed'; held: Held<T> } | { kind: 'unchanged' } | { kind: 'not-found' };
@@ -31,7 +37,7 @@ export type SnapshotPollerOptions = Pick<EvaluatorConfig, 'coreUrl' | 'pollInter
 export type HeldEnvironment =
   | { kind: 'loaded'; snapshot: EnvironmentSnapshot }
   /** Core lists the environment, but its snapshot hasn't loaded yet. */
-  | { kind: 'loading'; projectKey: string; environmentKey: string }
+  | { kind: 'loading' }
   /** Core doesn't list the environment. */
   | { kind: 'unknown' };
 
@@ -65,18 +71,22 @@ export class SnapshotPoller implements OnApplicationBootstrap, OnApplicationShut
   environment(sdkKey: string): HeldEnvironment {
     const held = this.snapshots.get(sdkKey);
     if (held) return { kind: 'loaded', snapshot: held.body };
-    const listed = this.list?.body.environments.find((entry) => entry.sdkKey === sdkKey);
-    return listed
-      ? { kind: 'loading', projectKey: listed.projectKey, environmentKey: listed.environmentKey }
-      : { kind: 'unknown' };
+    const listed = this.list?.body.environments.some((entry) => entry.sdkKey === sdkKey) ?? false;
+    return listed ? { kind: 'loading' } : { kind: 'unknown' };
+  }
+
+  /** The environment the SDK key names, if Core lists it or the Evaluator holds its snapshot. */
+  identify(sdkKey: string): EnvironmentIdentity | undefined {
+    const held = this.snapshots.get(sdkKey)?.body ?? this.list?.body.environments.find((e) => e.sdkKey === sdkKey);
+    return held && { projectKey: held.projectKey, environmentKey: held.environmentKey };
   }
 
   /** Every snapshot held, with when Core last confirmed it; one that keeps failing to load grows old. */
-  heldSnapshots(): HeldSnapshotInfo[] {
-    return [...this.snapshots.values()].map(({ body, checkedAt }) => ({
+  snapshotConfirmations(): SnapshotConfirmation[] {
+    return [...this.snapshots.values()].map(({ body, confirmedAt }) => ({
       projectKey: body.projectKey,
       environmentKey: body.environmentKey,
-      checkedAt,
+      confirmedAt,
     }));
   }
 
@@ -143,7 +153,7 @@ export class SnapshotPoller implements OnApplicationBootstrap, OnApplicationShut
     const held = this.snapshots.get(sdkKey);
     const fetched = await this.fetch<EnvironmentSnapshot>('/api/v1/evaluator/snapshot', held?.etag, sdkKey);
     if (fetched.kind === 'unchanged') {
-      if (held) held.checkedAt = Date.now();
+      if (held) held.confirmedAt = Date.now();
       return;
     }
     if (fetched.kind === 'not-found') {
@@ -152,7 +162,7 @@ export class SnapshotPoller implements OnApplicationBootstrap, OnApplicationShut
       return;
     }
     if (!Array.isArray(fetched.held.body.flags)) throw new Error('Core sent a malformed snapshot');
-    this.snapshots.set(sdkKey, { ...fetched.held, checkedAt: Date.now() });
+    this.snapshots.set(sdkKey, { ...fetched.held, confirmedAt: Date.now() });
   }
 
   /** GETs from Core, sending the ETag held as If-None-Match. Throws on errors other than `404`. */

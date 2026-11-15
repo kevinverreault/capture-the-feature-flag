@@ -1,6 +1,5 @@
 import {
   evaluate,
-  type EnvironmentListEntry,
   type EvaluationRequest,
   type EvaluatorErrorBody,
   type FlagEvaluation,
@@ -15,11 +14,8 @@ import {
   NotFoundException,
   Param,
   Post,
-  Res,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import type { Response } from 'express';
-import { setEvaluationLabels } from '../metrics/evaluation-metrics.middleware.js';
 import { SnapshotPoller } from '../snapshots/snapshot-poller.js';
 
 /** Evaluations for SDKs, answered from memory. The SDK key travels in a header, so it stays out of URLs and logs. */
@@ -37,23 +33,10 @@ export class EvaluationController {
     @Param('flagKey') flagKey: string,
     @Headers(sdkKeyHeader) sdkKey: string | undefined,
     @Body() body: unknown,
-    @Res({ passthrough: true }) response: Response,
   ): FlagEvaluation {
-    const recordLabels = (result: string, environment?: Pick<EnvironmentListEntry, 'projectKey' | 'environmentKey'>) =>
-      setEvaluationLabels(response, {
-        project_key: environment?.projectKey ?? '',
-        environment_key: environment?.environmentKey ?? '',
-        result,
-      });
-    if (!sdkKey) {
-      recordLabels('MISSING_SDK_KEY');
-      throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
-    }
+    if (!sdkKey) throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
     const held = this.snapshots.environment(sdkKey);
-    // The environment the SDK key names, if the Evaluator knows it.
-    const namedEnvironment = held.kind === 'loaded' ? held.snapshot : held.kind === 'loading' ? held : undefined;
     if (!this.snapshots.ready || held.kind === 'loading') {
-      recordLabels('NOT_READY', namedEnvironment);
       const notReady: EvaluatorErrorBody = {
         statusCode: 503,
         error: 'NOT_READY',
@@ -64,7 +47,6 @@ export class EvaluationController {
       throw new ServiceUnavailableException(notReady);
     }
     if (held.kind === 'unknown') {
-      recordLabels('UNKNOWN_SDK_KEY');
       const unknownSdkKey: EvaluatorErrorBody = {
         statusCode: 404,
         error: 'UNKNOWN_SDK_KEY',
@@ -75,8 +57,6 @@ export class EvaluationController {
     // Unchecked here: evaluate() validates the context at runtime and reports a malformed one.
     const request: Partial<EvaluationRequest> =
       typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {};
-    const evaluation = evaluate(held.snapshot, flagKey, request.context);
-    recordLabels(evaluation.reason.kind, namedEnvironment);
-    return { flagKey, ...evaluation };
+    return { flagKey, ...evaluate(held.snapshot, flagKey, request.context) };
   }
 }

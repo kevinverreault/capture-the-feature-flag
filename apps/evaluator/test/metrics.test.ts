@@ -1,4 +1,6 @@
+import { sdkKeyHeader } from '@ctff/evaluation';
 import { createClient } from '@ctff/sdk';
+import { request } from 'node:http';
 import { afterEach, describe, expect, it } from 'vitest';
 import { environment, flag, pollIntervalMs, startEvaluator, type RunningEvaluator } from './support/evaluator.js';
 import { startFakeCore, type FakeCore } from './support/fake-core.js';
@@ -43,6 +45,8 @@ describe('Prometheus metrics', () => {
     core = await startFakeCore();
     core.put('ctff-env-production', environment('production', [flag('rare-bird-alerts', { on: true })]));
     core.put('ctff-env-development', environment('development', [flag('rare-bird-alerts')]));
+    // Listed, but its snapshot fails to parse as one, so the Evaluator answers NOT_READY for it.
+    core.put('ctff-env-broken', { projectKey: 'birdwatch', environmentKey: 'broken' } as never);
     evaluator = await startEvaluator(core.url);
     await evaluator.waitUntilReady();
     return { core, evaluator };
@@ -64,6 +68,11 @@ describe('Prometheus metrics', () => {
     const production = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-production' });
     const development = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-development' });
     const unknown = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-nowhere' });
+    const broken = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-broken' });
+    expect((await broken.variationDetail('rare-bird-alerts', alice, false)).reason).toEqual({
+      kind: 'ERROR',
+      errorKind: 'NOT_READY',
+    });
     await production.variation('rare-bird-alerts', alice, false);
     await production.variation('rare-bird-alerts', alice, false);
     await production.variation('no-such-flag', alice, false);
@@ -79,7 +88,55 @@ describe('Prometheus metrics', () => {
     expect(requests({ project_key: 'birdwatch', environment_key: 'development', result: 'OFF' })).toBe(1);
     // An unknown SDK key names no environment, and the SDK key itself never becomes a label.
     expect(requests({ project_key: '', environment_key: '', result: 'UNKNOWN_SDK_KEY' })).toBe(1);
+    expect(requests({ project_key: 'birdwatch', environment_key: 'broken', result: 'NOT_READY' })).toBe(1);
     expect(JSON.stringify(samples)).not.toContain('ctff-env-');
+  });
+
+  it('counts and times requests that never reach evaluation: a body that is not JSON, or no SDK key', async () => {
+    const { evaluator } = await start();
+    const post = (headers: Record<string, string>, body: string) =>
+      fetch(`${evaluator.url}/api/v1/evaluate/rare-bird-alerts`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body,
+      });
+    expect((await post({ [sdkKeyHeader]: 'ctff-env-production' }, '{not json')).status).toBe(400);
+    expect((await post({}, JSON.stringify({ context: alice }))).status).toBe(400);
+
+    const { samples } = await scrape(evaluator.url);
+    const production = { project_key: 'birdwatch', environment_key: 'production' };
+    const noEnvironment = { project_key: '', environment_key: '' };
+    expect(value(samples, 'ctff_evaluator_evaluation_requests_total', { ...production, result: 'HTTP_400' })).toBe(1);
+    expect(
+      value(samples, 'ctff_evaluator_evaluation_requests_total', { ...noEnvironment, result: 'MISSING_SDK_KEY' }),
+    ).toBe(1);
+    expect(value(samples, 'ctff_evaluator_evaluation_duration_seconds_count', production)).toBe(1);
+  });
+
+  it('counts and times requests the client abandons before the answer, as ABORTED', async () => {
+    const { evaluator } = await start();
+    // Announces a body it never finishes sending, then hangs up.
+    await new Promise<void>((resolve) => {
+      const abandoned = request(`${evaluator.url}/api/v1/evaluate/rare-bird-alerts`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'content-length': '100', [sdkKeyHeader]: 'ctff-env-production' },
+      });
+      abandoned.on('error', () => resolve());
+      abandoned.write('{"context":', () => setTimeout(() => abandoned.destroy(), 100));
+      abandoned.on('close', () => resolve());
+    });
+
+    const production = { project_key: 'birdwatch', environment_key: 'production' };
+    await expect
+      .poll(async () =>
+        value((await scrape(evaluator.url)).samples, 'ctff_evaluator_evaluation_requests_total', {
+          ...production,
+          result: 'ABORTED',
+        }),
+      )
+      .toBe(1);
+    const { samples } = await scrape(evaluator.url);
+    expect(value(samples, 'ctff_evaluator_evaluation_duration_seconds_sum', production)).toBeGreaterThanOrEqual(0.1);
   });
 
   it('records the latency of evaluation requests in a histogram per environment, with buckets around 10 ms', async () => {
