@@ -40,19 +40,19 @@ Run a target for one project with `pnpm nx run <project>:<target>`, for every pr
 
 ## Module boundaries
 
-Each project's `package.json` declares exactly one `type:*` tag (`app`, `lib`, `tool`) and one `scope:*` tag (`core`, `admin`, `evaluator`, `birdwatch`, `showcase`, `shared`):
+Each project's `package.json` declares exactly one `type:*` tag and one `scope:*` tag. The allowed tags and the rules built on them live in [tools/workspace/src/module-boundaries.mjs](tools/workspace/src/module-boundaries.mjs):
 
 ```json
 "nx": { "tags": ["type:lib", "scope:shared"] }
 ```
 
-`@nx/enforce-module-boundaries` in [eslint.config.mjs](eslint.config.mjs) uses those tags, so `lint` fails when:
+`@nx/enforce-module-boundaries` (configured in [eslint.config.mjs](eslint.config.mjs)) uses those tags, so `lint` fails when:
 
 - a library depends on an app,
 - any project other than `core` depends on `core`: the admin app ([ADR 0003](docs/adr/0003-admin-app-mounted-inside-core.md)), Evaluators ([ADR 0001](docs/adr/0001-evaluator-polls-core-not-the-database.md)) and everything else call Core over HTTP,
 - any project other than `core` imports Prisma.
 
-The rules cover `.astro` files too (through `eslint-plugin-astro`).
+The rules cover `.astro` files too (through `eslint-plugin-astro`). The Prisma ban only applies to packages Nx knows from the lockfile, so it starts working once Prisma is installed (by `core`). Before that, a Prisma import passes `lint` and only `typecheck` catches it, so test the rule in a workspace where Prisma is installed.
 
 The `@ctff/workspace` tests fail if a project is missing either tag, because an untagged project would escape these rules.
 

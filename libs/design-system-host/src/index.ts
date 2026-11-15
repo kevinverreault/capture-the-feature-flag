@@ -13,7 +13,7 @@ const designSystemSrc = fileURLToPath(new URL('../../../vendor/design-system/src
 const hostDependencies = ['cva', 'node-html-parser'];
 
 /** Icons the design system's own components render (Alert, Toast, Dialog, Pagination, ThemeToggle...). */
-export const designSystemIcons = [
+const designSystemIcons = [
   'info',
   'circle-check',
   'triangle-alert',
