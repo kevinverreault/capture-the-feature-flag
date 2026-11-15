@@ -26,6 +26,18 @@ describe('formErrors', () => {
     expect(formErrors(error, { fields: ['name'] }).fields).toEqual({ name: 'name must not be blank' });
   });
 
+  it('puts a message about a nested property on it, when the form lists its parent as a prefix', () => {
+    const error = invalid({
+      'rules.120.values': ['values must contain at least 1 elements'],
+      rules: ['rules must contain no more than 100 elements'],
+      ruleset: ['property ruleset should not exist'],
+    });
+    expect(formErrors(error, { fields: [], fieldPrefixes: ['rules'] })).toEqual({
+      fields: { 'rules.120.values': 'values must contain at least 1 elements' },
+      form: ['rules must contain no more than 100 elements', 'property ruleset should not exist'],
+    });
+  });
+
   it('shows messages about fields the form does not have on the whole form', () => {
     const error = invalid({ color: ['property color should not exist'], name: ['name must not be blank'] });
     expect(formErrors(error, { fields: ['key', 'name'] })).toEqual({

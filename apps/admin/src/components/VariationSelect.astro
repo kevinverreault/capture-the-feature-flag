@@ -1,0 +1,23 @@
+---
+import Select from '@ds/components/form/Select.astro';
+
+interface Props {
+  name: string;
+  /** The flag's variations, as shown (`true`, `false`). */
+  variations: readonly string[];
+  /** The index of the variation selected. */
+  selected: number;
+}
+
+const { name, variations, selected } = Astro.props;
+
+// A select of a flag's variations, sending the index of the one picked (ADR 0002).
+---
+
+<Select name={name}>
+  {variations.map((variation, index) => (
+    <option value={String(index)} selected={selected === index}>
+      {variation}
+    </option>
+  ))}
+</Select>

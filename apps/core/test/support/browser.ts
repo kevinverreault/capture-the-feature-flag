@@ -6,8 +6,11 @@ export function browser(baseUrl: string) {
     /** Gets a page, sending the `cookie` header given, if any. */
     get: (path: string, cookie?: string) =>
       fetch(`${baseUrl}${path}`, { redirect: 'manual', headers: cookie ? { cookie } : {} }),
-    /** Submits a form the way a browser does: urlencoded, from a page of the same origin. */
-    post: (path: string, fields: Record<string, string>, cookie?: string) =>
+    /**
+     * Submits a form the way a browser does: urlencoded, from a page of the same origin. Fields given as pairs
+     * keep their order, and a name may repeat (as a multi-select sends it).
+     */
+    post: (path: string, fields: Record<string, string> | [string, string][], cookie?: string) =>
       fetch(`${baseUrl}${path}`, {
         method: 'POST',
         redirect: 'manual',
