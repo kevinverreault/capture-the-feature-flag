@@ -8,6 +8,7 @@ describe('routes', () => {
     expect(routes.environments('birdwatch')).toBe('/projects/birdwatch/environments');
     expect(routes.environment('birdwatch', 'production')).toBe('/projects/birdwatch/environments/production');
     expect(routes.settings('birdwatch')).toBe('/projects/birdwatch/settings');
+    expect(routes.telemetrySettings()).toBe('/settings');
     expect(routes.flags('birdwatch')).toBe('/projects/birdwatch/flags');
     // Outside /flags/, so that no flag key can take its address.
     expect(routes.newFlag('birdwatch')).toBe('/projects/birdwatch/new-flag');

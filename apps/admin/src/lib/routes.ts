@@ -30,4 +30,9 @@ export const routes = {
   /** The display-name setting, going back to `returnTo` once saved. */
   displayName: (returnTo?: string) =>
     returnTo === undefined ? '/display-name' : `/display-name?${new URLSearchParams({ returnTo }).toString()}`,
+  /**
+   * The Settings page, for every project: telemetry retention, the seen-context cap and the stale-flag threshold.
+   * Not to be confused with `settings`, a project's own settings (its name, and deleting it).
+   */
+  telemetrySettings: () => '/settings',
 };

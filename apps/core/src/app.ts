@@ -21,6 +21,8 @@ export async function createApp(config: CoreConfig, logger: Logger): Promise<INe
   app.set('etag', false);
   app.disable('x-powered-by');
   mountAdmin(app, config, logger);
+  // Telemetry batches from Evaluators can be well over Express's default limit of 100 kB.
+  app.useBodyParser('json', { limit: '10mb' });
   configureRoutes(app);
   app.useGlobalPipes(
     new ValidationPipe({

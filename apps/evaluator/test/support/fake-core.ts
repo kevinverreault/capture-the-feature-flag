@@ -3,6 +3,7 @@ import {
   type EnvironmentListEntry,
   type EnvironmentSnapshot,
   sdkKeyHeader,
+  type TelemetryBatch,
 } from '@ctff/evaluation';
 import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -19,11 +20,14 @@ export interface CoreRequest {
 /**
  * A stand-in for Core's evaluator endpoints (`/api/v1/evaluator/*`), built only from the shared types in
  * @ctff/evaluation, which Core's own tests (S2) check Core against. It serves the environment list and one
- * snapshot per SDK key, each with an ETag, and answers `304` to a matching If-None-Match like Core does.
+ * snapshot per SDK key, each with an ETag, and answers `304` to a matching If-None-Match like Core does. It
+ * accepts telemetry batches with `204` and keeps them, in the order they arrived.
  */
 export interface FakeCore {
   url: string;
   requests: CoreRequest[];
+  /** Every telemetry batch the Evaluator has sent. */
+  telemetry: TelemetryBatch[];
   /** Adds the environment, or replaces its snapshot. */
   put(sdkKey: string, snapshot: EnvironmentSnapshot): void;
   remove(sdkKey: string): void;
@@ -38,9 +42,10 @@ export interface FakeCore {
 export async function startFakeCore(): Promise<FakeCore> {
   const environments = new Map<string, EnvironmentSnapshot>();
   const requests: CoreRequest[] = [];
+  const telemetry: TelemetryBatch[] = [];
   let available = true;
 
-  function answer(request: IncomingMessage, response: ServerResponse): void {
+  async function answer(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const path = new URL(request.url ?? '/', 'http://fake-core').pathname;
     const sdkKey = header(request, sdkKeyHeader);
     const ifNoneMatch = header(request, 'if-none-match');
@@ -59,6 +64,14 @@ export async function startFakeCore(): Promise<FakeCore> {
     };
 
     if (!available) return send(503);
+    if (path === '/api/v1/evaluator/telemetry') {
+      if (request.method !== 'POST') return send(405);
+      if (header(request, 'content-type')?.startsWith('application/json') !== true) return send(415);
+      const chunks: Buffer[] = [];
+      for await (const chunk of request) chunks.push(chunk as Buffer);
+      telemetry.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as TelemetryBatch);
+      return send(204);
+    }
     if (request.method !== 'GET') return send(405);
     if (path === '/api/v1/evaluator/environments') {
       const list: EnvironmentList = {
@@ -80,13 +93,14 @@ export async function startFakeCore(): Promise<FakeCore> {
     return send(404);
   }
 
-  const server: Server = createServer(answer);
+  const server: Server = createServer((request, response) => void answer(request, response));
   await listen(server, 0);
   const { port } = server.address() as AddressInfo;
 
   return {
     url: `http://127.0.0.1:${port}`,
     requests,
+    telemetry,
     put: (sdkKey, snapshot) => void environments.set(sdkKey, structuredClone(snapshot)),
     remove: (sdkKey) => void environments.delete(sdkKey),
     setAvailable: (value) => (available = value),

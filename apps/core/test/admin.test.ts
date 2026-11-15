@@ -156,6 +156,38 @@ describe('admin app inside Core', () => {
     expect((await api.get(`/projects/${project}/environments/staging`)).status).toBe(404);
   });
 
+  it('shows and saves the install-wide settings, with validation errors from the API', async () => {
+    const page = await (await admin.get('/settings')).text();
+    expect(page).toContain('Seen contexts per environment');
+    expect(page).toMatch(/name="seenContextCap"[^>]*value="1000"/);
+
+    const fields = {
+      metricRetentionDays: '14',
+      seenContextRetentionDays: '30',
+      seenContextCap: '500',
+      staleFlagThresholdDays: '7',
+    };
+    try {
+      const saved = await admin.post('/settings', { _action: 'save', ...fields });
+      expect(saved.status).toBe(303);
+      expect(saved.headers.get('location')).toBe('/settings');
+      expect((await api.get('/settings')).body).toEqual({
+        metricRetentionDays: 14,
+        seenContextRetentionDays: 30,
+        seenContextCap: 500,
+        staleFlagThresholdDays: 7,
+      });
+      expect(await (await admin.get('/settings')).text()).toMatch(/name="seenContextCap"[^>]*value="500"/);
+
+      const rejected = await admin.post('/settings', { _action: 'save', ...fields, seenContextCap: '0' });
+      expect(rejected.status).toBe(400);
+      expect(await rejected.text()).toContain('seenContextCap must not be less than 1');
+      expect((await api.get('/settings')).body.seenContextCap).toBe(500);
+    } finally {
+      await api.patch('/settings', { metricRetentionDays: 30, seenContextCap: 1000 });
+    }
+  });
+
   it('answers a project that does not exist with 404', async () => {
     const response = await admin.get('/projects/no-such-project/environments');
     expect(response.status).toBe(404);

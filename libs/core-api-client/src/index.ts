@@ -8,6 +8,7 @@ export type Project = Schemas['ProjectDto'];
 export type Environment = Schemas['EnvironmentDto'];
 export type AuditEntry = Schemas['AuditEntryDto'];
 export type AuditEntryPage = Schemas['AuditEntryPageDto'];
+export type Settings = Schemas['SettingsDto'];
 
 /** A typed client for Core's API: `core.GET('/api/v1/projects')`, with paths, parameters and bodies checked. */
 export type CoreApiClient = Client<paths>;
