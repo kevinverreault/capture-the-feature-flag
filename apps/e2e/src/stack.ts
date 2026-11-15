@@ -1,6 +1,5 @@
-import { execFile } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 
 /**
  * Where the services of the compose stack answer, as a browser on the host reaches them: the ports compose.yaml
@@ -55,14 +54,15 @@ export async function stackIsReady(): Promise<boolean> {
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const composeFiles = ['-f', 'compose.yaml', '-f', 'apps/e2e/compose.e2e.yaml'];
-const run = promisify(execFile);
-
-async function compose(args: string[]): Promise<void> {
-  const { stdout, stderr } = await run('docker', ['compose', ...composeFiles, ...args], {
-    cwd: repositoryRoot,
-    maxBuffer: 64 * 1024 * 1024,
+/** Runs `docker compose` on the stack from the repository root, its output going to the suite's. */
+function compose(args: string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn('docker', ['compose', ...composeFiles, ...args], { cwd: repositoryRoot, stdio: 'inherit' });
+    child.on('error', reject);
+    child.on('exit', (code) =>
+      code === 0 ? resolve() : reject(new Error(`docker compose ${args[0]} exited with ${code}`)),
+    );
   });
-  process.stderr.write(stdout + stderr);
 }
 
 /** Builds and starts the stack, returning once every service reports healthy. */

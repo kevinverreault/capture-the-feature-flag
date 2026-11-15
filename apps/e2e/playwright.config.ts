@@ -11,7 +11,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env['CI'],
-  retries: process.env['CI'] ? 1 : 0,
+  // No retries: a scenario passing only on a second try is a scenario missing its poll interval.
+  retries: 0,
   timeout: 120_000,
   reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {

@@ -1,6 +1,6 @@
 import { adminUrl, expect, now, test } from '../src/fixtures.js';
 
-test('switching new-sighting-form off in the admin app hides the form in Birdwatch within the poll interval', async ({
+test('switching the targeting of new-sighting-form off in the admin app hides the form in Birdwatch within the poll interval', async ({
   page,
   birdwatch,
 }) => {
@@ -12,7 +12,7 @@ test('switching new-sighting-form off in the admin app hides the form in Birdwat
   await expect(page.getByText('Targeting switched off in Development')).toBeVisible();
   await expect(page.getByRole('switch', { name: 'Targeting off in Development' })).not.toBeChecked();
 
-  // Off, the flag serves its off variation, false, and the feed no longer offers the form.
+  // With its targeting off, the flag serves its off variation, false, and the feed no longer offers the form.
   await alice.expectFeedSoon(async (feed) => {
     await expect(feed.logSighting).toBeHidden(now);
     await feed.expectInspected('new-sighting-form', false, 'OFF');

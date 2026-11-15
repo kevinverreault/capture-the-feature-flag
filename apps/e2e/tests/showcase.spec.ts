@@ -19,7 +19,7 @@ test.describe('the showcase', () => {
         if (response.status() >= 400) errors.push(`${response.status()}: ${response.url()}`);
       });
 
-      const response = await page.goto(path, { waitUntil: 'networkidle' });
+      const response = await page.goto(path);
       expect(response?.status()).toBe(200);
       await expect(page).toHaveTitle(/Capture The Feature Flag/);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
@@ -29,10 +29,14 @@ test.describe('the showcase', () => {
       const hrefs = await page
         .locator('a[href]')
         .evaluateAll((links) => links.map((link) => (link as HTMLAnchorElement).href));
-      const internal = [
-        ...new Set(hrefs.map((href) => new URL(href)).filter((url) => url.origin === new URL(urls.showcase).origin)),
-      ];
-      for (const url of internal) expect(pages, `the link to ${url.href}`).toContain(url.pathname);
+      const showcaseOrigin = new URL(urls.showcase).origin;
+      const linked = new Set(
+        hrefs
+          .map((href) => new URL(href))
+          .filter((url) => url.origin === showcaseOrigin)
+          .map((url) => url.pathname),
+      );
+      for (const pathname of linked) expect(pages, `the link to ${pathname}`).toContain(pathname);
     });
   }
 

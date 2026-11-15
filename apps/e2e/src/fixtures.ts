@@ -1,4 +1,5 @@
 import { test as base, expect, type Browser, type Locator, type Page } from '@playwright/test';
+import type { EvaluationReason } from '@ctff/core-api-client';
 import { birders, resetDemo, type BirderId } from './demo.js';
 import { urls, withinPollInterval } from './stack.js';
 
@@ -42,7 +43,7 @@ export class BirdwatchSession {
   }
 
   /** Expects the flag inspector to show a flag serving `variation` for `reason`, such as `RULE_MATCH`. */
-  async expectInspected(flagKey: string, variation: boolean, reason: string): Promise<void> {
+  async expectInspected(flagKey: string, variation: boolean, reason: EvaluationReason['kind']): Promise<void> {
     const row = this.inspectedFlag(flagKey);
     await expect(row.getByTestId('flag-variation')).toHaveAttribute('data-variation', String(variation), now);
     await expect(row.getByTestId('flag-reason')).toHaveAttribute('data-reason', reason, now);

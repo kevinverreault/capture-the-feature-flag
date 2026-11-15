@@ -6,13 +6,17 @@ const dashboard = adminUrl('/projects/birdwatch?environment=development');
 
 /** The evaluations the dashboard counts in Development over the last 24 hours. */
 async function evaluationsShown(page: Page): Promise<number> {
-  return Number(await page.locator('.hero[data-total]').getAttribute('data-total', now));
+  const total = await page.locator('.hero[data-total]').getAttribute('data-total', now);
+  if (total === null) throw new Error('The dashboard shows no evaluation count');
+  return Number(total);
 }
 
 test('after some Birdwatch traffic, the dashboard shows evaluations and the Contexts explorer lists the birder', async ({
   page,
   birdwatch,
 }) => {
+  // Two waits on telemetry, which may each take a whole flush interval on a stack without compose.e2e.yaml.
+  test.setTimeout(2 * withinTelemetryFlush + 30_000);
   await page.goto(dashboard);
   const before = await evaluationsShown(page);
 
