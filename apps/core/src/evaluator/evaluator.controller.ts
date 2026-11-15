@@ -1,8 +1,9 @@
 import { sdkKeyHeader } from '@ctff/evaluation';
-import { BadRequestException, Controller, Get, Headers, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, HttpCode, Post, Res } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiHeader,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiResponse,
@@ -14,6 +15,8 @@ import { EnvironmentListService } from './environment-list.service.js';
 import { sendWithEtag } from './json-with-etag.js';
 import { EnvironmentSnapshotDto } from './snapshot.dto.js';
 import { SnapshotService } from './snapshot.service.js';
+import { TelemetryBatchDto } from '../telemetry/telemetry.dto.js';
+import { TelemetryService } from '../telemetry/telemetry.service.js';
 
 /** The endpoints Evaluators call (ADR 0001). */
 @ApiTags('evaluator')
@@ -22,6 +25,7 @@ export class EvaluatorController {
   constructor(
     private readonly environmentList: EnvironmentListService,
     private readonly snapshots: SnapshotService,
+    private readonly telemetry: TelemetryService,
   ) {}
 
   /** Evaluators poll this list to learn which environments to keep a snapshot of. */
@@ -59,5 +63,17 @@ export class EvaluatorController {
     const snapshot = await this.snapshots.forSdkKey(sdkKey);
     response.setHeader('Vary', sdkKeyHeader);
     sendWithEtag(response, snapshot, ifNoneMatch);
+  }
+
+  /**
+   * Evaluators send the evaluation counts and seen contexts they added up about every minute. Counts are added to
+   * the stored ones; telemetry for an SDK key, flag or variation that no longer exists is skipped.
+   */
+  @Post('telemetry')
+  @HttpCode(204)
+  @ApiNoContentResponse({ description: 'Stored.' })
+  @ApiBadRequestResponse({ description: 'A malformed batch; none of it is stored.' })
+  ingest(@Body() batch: TelemetryBatchDto): Promise<void> {
+    return this.telemetry.ingest(batch);
   }
 }

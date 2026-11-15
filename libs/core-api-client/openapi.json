@@ -771,6 +771,196 @@
           "evaluator"
         ]
       }
+    },
+    "/api/v1/evaluator/telemetry": {
+      "post": {
+        "operationId": "EvaluatorController_ingest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Stored."
+          },
+          "400": {
+            "description": "A malformed batch; none of it is stored."
+          }
+        },
+        "tags": [
+          "evaluator"
+        ]
+      }
+    },
+    "/api/v1/settings": {
+      "get": {
+        "operationId": "SettingsController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "settings"
+        ]
+      },
+      "patch": {
+        "operationId": "SettingsController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/evaluation-counts": {
+      "get": {
+        "operationId": "TelemetryController_counts",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "required": false,
+            "in": "query",
+            "description": "Only this environment.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "From this moment, inclusive. Defaults to 24 hours before `to`; at most 7 days before it.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Until this moment, exclusive. Defaults to now.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EvaluationCountBucketDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "telemetry"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts": {
+      "get": {
+        "operationId": "TelemetryController_seenContexts",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environmentKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many of the most recently seen to list.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StoredSeenContextDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "telemetry"
+        ]
+      }
     }
   },
   "info": {
@@ -1425,6 +1615,224 @@
           "projectKey",
           "environmentKey",
           "flags"
+        ]
+      },
+      "EvaluationCountDto": {
+        "type": "object",
+        "properties": {
+          "flagKey": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "variationIndex": {
+            "type": "integer",
+            "description": "Index into the flag variations.",
+            "minimum": 0
+          },
+          "minute": {
+            "type": "string",
+            "description": "The start of the minute; seconds are ignored.",
+            "example": "2026-11-15T12:34:00.000Z"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          }
+        },
+        "required": [
+          "flagKey",
+          "variationIndex",
+          "minute",
+          "count"
+        ]
+      },
+      "ContextDto": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "Any non-empty string.",
+            "example": "alice"
+          },
+          "country": {
+            "type": "string",
+            "description": "An ISO 3166-1 alpha-2 code, in any case.",
+            "example": "CA"
+          }
+        }
+      },
+      "SeenContextDto": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "$ref": "#/components/schemas/ContextDto"
+          },
+          "lastSeen": {
+            "type": "string",
+            "example": "2026-11-15T12:34:56.789Z"
+          }
+        },
+        "required": [
+          "context",
+          "lastSeen"
+        ]
+      },
+      "EnvironmentTelemetryDto": {
+        "type": "object",
+        "properties": {
+          "sdkKey": {
+            "type": "string",
+            "description": "The SDK key of the environment. Telemetry for an unknown one is skipped."
+          },
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationCountDto"
+            }
+          },
+          "seenContexts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SeenContextDto"
+            }
+          }
+        },
+        "required": [
+          "sdkKey",
+          "counts",
+          "seenContexts"
+        ]
+      },
+      "TelemetryBatchDto": {
+        "type": "object",
+        "properties": {
+          "environments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentTelemetryDto"
+            }
+          }
+        },
+        "required": [
+          "environments"
+        ]
+      },
+      "SettingsDto": {
+        "type": "object",
+        "properties": {
+          "metricRetentionDays": {
+            "type": "integer",
+            "description": "How many days evaluation count buckets are kept.",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "seenContextRetentionDays": {
+            "type": "integer",
+            "description": "How many days a seen context is kept after it was last seen.",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "seenContextCap": {
+            "type": "integer",
+            "description": "How many seen contexts are kept per environment: the most recently seen.",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "staleFlagThresholdDays": {
+            "type": "integer",
+            "description": "After how many days without evaluations in any environment a flag counts as stale.",
+            "minimum": 1,
+            "maximum": 3650
+          }
+        },
+        "required": [
+          "metricRetentionDays",
+          "seenContextRetentionDays",
+          "seenContextCap",
+          "staleFlagThresholdDays"
+        ]
+      },
+      "UpdateSettingsDto": {
+        "type": "object",
+        "properties": {
+          "metricRetentionDays": {
+            "type": "integer",
+            "description": "How many days evaluation count buckets are kept.",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "seenContextRetentionDays": {
+            "type": "integer",
+            "description": "How many days a seen context is kept after it was last seen.",
+            "minimum": 1,
+            "maximum": 3650
+          },
+          "seenContextCap": {
+            "type": "integer",
+            "description": "How many seen contexts are kept per environment: the most recently seen.",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "staleFlagThresholdDays": {
+            "type": "integer",
+            "description": "After how many days without evaluations in any environment a flag counts as stale.",
+            "minimum": 1,
+            "maximum": 3650
+          }
+        }
+      },
+      "EvaluationCountBucketDto": {
+        "type": "object",
+        "properties": {
+          "flagKey": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "environmentKey": {
+            "type": "string",
+            "example": "production"
+          },
+          "variationIndex": {
+            "type": "number",
+            "description": "Index into the flag variations."
+          },
+          "minute": {
+            "format": "date-time",
+            "type": "string",
+            "description": "The start of the minute."
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "flagKey",
+          "environmentKey",
+          "variationIndex",
+          "minute",
+          "count"
+        ]
+      },
+      "StoredSeenContextDto": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "description": "Its context attributes; `country` in uppercase.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ContextDto"
+              }
+            ]
+          },
+          "lastSeen": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "context",
+          "lastSeen"
         ]
       }
     }

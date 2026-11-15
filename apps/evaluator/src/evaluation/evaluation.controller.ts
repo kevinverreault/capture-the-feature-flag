@@ -3,6 +3,7 @@ import {
   type EvaluationRequest,
   type EvaluatorErrorBody,
   type FlagEvaluation,
+  normalizeContext,
   sdkKeyHeader,
 } from '@ctff/evaluation';
 import {
@@ -17,11 +18,15 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { SnapshotPoller } from '../snapshots/snapshot-poller.js';
+import { TelemetryRecorder } from '../telemetry/telemetry-recorder.js';
 
 /** Evaluations for SDKs, answered from memory. The SDK key travels in a header, so it stays out of URLs and logs. */
 @Controller('evaluate')
 export class EvaluationController {
-  constructor(private readonly snapshots: SnapshotPoller) {}
+  constructor(
+    private readonly snapshots: SnapshotPoller,
+    private readonly telemetry: TelemetryRecorder,
+  ) {}
 
   /**
    * Evaluates one flag for the context in the body (`{ "context": { "user_id": …, "country": … } }`). An unknown
@@ -57,6 +62,8 @@ export class EvaluationController {
     // Unchecked here: evaluate() validates the context at runtime and reports a malformed one.
     const request: Partial<EvaluationRequest> =
       typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {};
-    return { flagKey, ...evaluate(held.snapshot, flagKey, request.context) };
+    const result = evaluate(held.snapshot, flagKey, request.context);
+    this.telemetry.record(sdkKey, flagKey, result.variationIndex, normalizeContext(request.context));
+    return { flagKey, ...result };
   }
 }

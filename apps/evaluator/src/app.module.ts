@@ -7,6 +7,7 @@ import { HealthController } from './health/health.controller.js';
 import { EvaluatorMetrics } from './metrics/evaluator-metrics.js';
 import { MetricsController } from './metrics/metrics.controller.js';
 import { SnapshotPoller } from './snapshots/snapshot-poller.js';
+import { TelemetryRecorder } from './telemetry/telemetry-recorder.js';
 
 /** Probes and scrapes, which come every few seconds and would drown the request logs. */
 const quietPaths = ['/health/', '/metrics'];
@@ -29,6 +30,10 @@ export class AppModule {
         {
           provide: SnapshotPoller,
           useValue: new SnapshotPoller({ ...config, logger: logger.child({ component: 'snapshot-poller' }) }),
+        },
+        {
+          provide: TelemetryRecorder,
+          useValue: new TelemetryRecorder({ ...config, logger: logger.child({ component: 'telemetry' }) }),
         },
         {
           provide: EvaluatorMetrics,

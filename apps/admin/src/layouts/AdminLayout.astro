@@ -38,6 +38,7 @@ const switcherItems = [
     <header class="app-header">
       <a href={routes.projects()} class="brand ff-serif text-xl">Capture The Feature Flag</a>
       <div class="header-actions">
+        <a href={routes.telemetrySettings()} class="header-link">Settings</a>
         <DropdownMenu label="Switch project" items={switcherItems}>
           <Button slot="trigger" variant="muted" size="small">
             {project ? `Project: ${project.name}` : 'Choose a project'}
@@ -81,6 +82,10 @@ const switcherItems = [
   .brand {
     color: inherit;
     text-decoration: none;
+  }
+
+  .header-link {
+    color: inherit;
   }
 
   .header-actions {

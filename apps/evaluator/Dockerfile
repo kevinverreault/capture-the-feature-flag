@@ -1,7 +1,8 @@
 # The Evaluator. Build from the repository root:
 #   docker build -f apps/evaluator/Dockerfile -t ctff-evaluator .
 # All configuration comes from environment variables: CORE_URL (required), PORT, HOST, LOG_LEVEL,
-# POLL_INTERVAL_MS, CORE_TIMEOUT_MS. Prometheus metrics are at /metrics.
+# POLL_INTERVAL_MS, CORE_TIMEOUT_MS, TELEMETRY_FLUSH_INTERVAL_MS, TELEMETRY_MAX_SEEN_CONTEXTS,
+# TELEMETRY_TIMEOUT_MS, TELEMETRY_MAX_BATCH_BYTES. Prometheus metrics are at /metrics.
 
 FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
