@@ -42,6 +42,14 @@ describe('evaluating every flag at once through the SDK', () => {
     });
   });
 
+  it('has no entry for a flag the environment does not have, even one named like an object property', async () => {
+    const client = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-development' });
+    const flags = await client.allFlags(alice);
+    expect(flags.values['constructor'] ?? false).toBe(false);
+    expect(flags.details['constructor']).toBeUndefined();
+    expect('toString' in flags.values).toBe(false);
+  });
+
   it('returns no flags for an environment without flags', async () => {
     const client = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-empty' });
     expect(await client.allFlags(alice)).toEqual({ values: {}, details: {}, error: null });
@@ -88,6 +96,21 @@ describe('evaluating every flag at once through the SDK', () => {
     [
       'an inconsistent flag',
       { flags: [{ flagKey: 'rare-bird-alerts', value: true, variationIndex: 0, reason: { kind: 'ERROR' } }] },
+    ],
+    [
+      'a flag listed twice',
+      {
+        flags: [
+          { flagKey: 'rare-bird-alerts', value: true, variationIndex: 0, reason: { kind: 'DEFAULT' } },
+          { flagKey: 'rare-bird-alerts', value: false, variationIndex: 1, reason: { kind: 'OFF' } },
+        ],
+      },
+    ],
+    [
+      'a flag that was not found',
+      {
+        flags: [{ flagKey: 'rare-bird-alerts', value: null, variationIndex: null, reason: { kind: 'FLAG_NOT_FOUND' } }],
+      },
     ],
   ])('returns no flags, with an EVALUATOR_ERROR, for an answer that is %s', async (_case, answer) => {
     await withEvaluatorStandIn(

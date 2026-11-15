@@ -12,6 +12,12 @@ import { RequestFlags } from './request-flags.js';
 
 const requiredFlagsKey = 'ctff:required-flags';
 
+/**
+ * The requests the guard has let through. `@RequireFlag` on a controller and on one of its routes registers the
+ * guard at both levels, and each run checks the flags of both, so the second run has nothing left to check.
+ */
+const checked = new WeakSet<object>();
+
 /** Answers `404` unless every flag `@RequireFlag` names on the handler and its controller serves `true`. */
 @Injectable()
 export class RequireFlagGuard implements CanActivate {
@@ -25,9 +31,11 @@ export class RequireFlagGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-    if (required.length === 0) return true;
-    const flags = await this.flags.of(context.switchToHttp().getRequest());
+    const request = context.switchToHttp().getRequest<object>();
+    if (required.length === 0 || checked.has(request)) return true;
+    const flags = await this.flags.forRequest(request);
     for (const flagKey of required) if (flags.values[flagKey] !== true) throw new NotFoundException();
+    checked.add(request);
     return true;
   }
 }

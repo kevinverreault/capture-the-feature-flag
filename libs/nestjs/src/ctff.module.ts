@@ -1,4 +1,4 @@
-import type { ClientOptions } from '@ctff/sdk';
+import { type ClientOptions, createClient } from '@ctff/sdk';
 import {
   type DynamicModule,
   type FactoryProvider,
@@ -7,8 +7,10 @@ import {
   type Provider,
   type Type,
 } from '@nestjs/common';
+import { APP_INTERCEPTOR } from '@nestjs/core';
 import { CTFF_CONTEXT_RESOLVER, type CtffContextResolver } from './context-resolver.js';
 import { CtffClient } from './ctff-client.js';
+import { FlagsLoader } from './flags.decorator.js';
 import { RequestFlags } from './request-flags.js';
 
 const CTFF_CLIENT_OPTIONS = Symbol('CTFF_CLIENT_OPTIONS');
@@ -57,13 +59,10 @@ export class CtffModule {
       imports,
       providers: [
         clientOptions,
-        {
-          provide: CtffClient,
-          useFactory: (options: ClientOptions) => new CtffClient(options),
-          inject: [CTFF_CLIENT_OPTIONS],
-        },
+        { provide: CtffClient, useFactory: createClient, inject: [CTFF_CLIENT_OPTIONS] },
         { provide: CTFF_CONTEXT_RESOLVER, useClass: contextResolver },
         RequestFlags,
+        { provide: APP_INTERCEPTOR, useClass: FlagsLoader },
       ],
       exports: [CtffClient, CTFF_CONTEXT_RESOLVER, RequestFlags],
     };

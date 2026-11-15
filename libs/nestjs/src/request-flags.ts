@@ -16,7 +16,7 @@ export class RequestFlags {
     @Inject(CTFF_CONTEXT_RESOLVER) private readonly resolver: CtffContextResolver,
   ) {}
 
-  of(request: object): Promise<AllFlags> {
+  forRequest(request: object): Promise<AllFlags> {
     let flags = this.loaded.get(request);
     if (!flags) {
       flags = this.load(request);

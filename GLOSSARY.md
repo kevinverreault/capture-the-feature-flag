@@ -84,6 +84,10 @@ A context that has recently been evaluated in an environment. It is recorded so 
 Working out which variation one flag serves to one context in one environment.
 _Avoid_: Resolution, check, lookup
 
+**Bulk evaluation**:
+The evaluation of every non-archived flag of an environment for one context, in one request to the Evaluator. The SDK's `allFlags` makes one.
+_Avoid_: Batch evaluation, all-flags state
+
 **Evaluation reason**:
 Why an evaluation produced its variation: targeting off, individual target, rule match, default variation, flag not found, or error.
 

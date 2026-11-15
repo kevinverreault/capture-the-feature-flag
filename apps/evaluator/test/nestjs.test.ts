@@ -9,6 +9,7 @@ import {
   RequireFlag,
 } from '@ctff/nestjs';
 import {
+  type ArgumentMetadata,
   type CanActivate,
   Controller,
   type ExecutionContext,
@@ -17,6 +18,7 @@ import {
   type INestApplication,
   Injectable,
   Module,
+  type PipeTransform,
   UseGuards,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -123,13 +125,24 @@ class FeatureController {
 @Module({ controllers: [FeatureController] })
 class FeatureModule {}
 
-async function startApp(ctff: ReturnType<typeof CtffModule.forRoot>): Promise<{ app: INestApplication; url: string }> {
+/** An app-wide pipe that hands every custom parameter on as a copy, the way a transforming global pipe can. */
+class CopyingPipe implements PipeTransform {
+  transform(value: unknown, metadata: ArgumentMetadata): unknown {
+    return metadata.type === 'custom' && typeof value === 'object' && value !== null ? { ...value } : value;
+  }
+}
+
+async function startApp(
+  ctff: ReturnType<typeof CtffModule.forRoot>,
+  globalPipes: PipeTransform[] = [],
+): Promise<{ app: INestApplication; url: string }> {
   const moduleRef = await Test.createTestingModule({
     imports: [ctff, FeatureModule],
     controllers: [SightingController],
     providers: [SightingService],
   }).compile();
   const app = moduleRef.createNestApplication({ logger: false });
+  app.useGlobalPipes(...globalPipes);
   await app.listen(0, '127.0.0.1');
   return { app, url: await app.getUrl() };
 }
@@ -333,6 +346,44 @@ describe('the NestJS module, with a resolver that depends on the app’s authent
     expect(await response.json()).toMatchObject({ values: { 'photo-id-beta': true }, error: null });
     expect(proxy.requests).toEqual([
       { method: 'POST', path: '/api/v1/evaluate', body: { context: { user_id: 'carol', country: 'BR' } } },
+    ]);
+  });
+});
+
+describe('the NestJS module, in an app with a global pipe', () => {
+  let core: FakeCore;
+  let evaluator: RunningEvaluator;
+  let proxy: CountingProxy;
+  let app: INestApplication;
+  let url: string;
+  beforeAll(async () => {
+    core = await startFakeCore();
+    core.put('ctff-env-production', environment('production', [flag('rare-bird-alerts', { on: true })]));
+    evaluator = await startEvaluator(core.url);
+    await evaluator.waitUntilReady();
+    proxy = await startCountingProxy(evaluator.url);
+    ({ app, url } = await startApp(
+      CtffModule.forRoot({
+        evaluatorUrl: proxy.url,
+        sdkKey: 'ctff-env-production',
+        contextResolver: HeaderContextResolver,
+      }),
+      [new CopyingPipe()],
+    ));
+  });
+  afterAll(async () => {
+    await app?.close();
+    await proxy?.stop();
+    await evaluator?.stop();
+    await core?.stop();
+  });
+
+  it('@Flags() hands the pipe the loaded flags, and still resolves the context from the request itself', async () => {
+    const response = await fetch(`${url}/sightings`, { headers: { 'x-birder': 'alice', 'x-country': 'CA' } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ flags: { values: { 'rare-bird-alerts': true }, error: null } });
+    expect(proxy.requests).toEqual([
+      { method: 'POST', path: '/api/v1/evaluate', body: { context: { user_id: 'alice', country: 'CA' } } },
     ]);
   });
 });

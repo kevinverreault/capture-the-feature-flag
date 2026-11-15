@@ -44,8 +44,13 @@ export interface EvaluationDetail {
   reason: EvaluationReason;
 }
 
-/** The evaluation of one flag in `allFlags`: a served variation, or none (`null`) with the `ERROR` reason. */
-export type FlagDetail = EvaluationDetail | { value: null; variationIndex: null; reason: EvaluationReason };
+/**
+ * The evaluation of one flag in `allFlags`: the served variation with its index, or no variation (`null`, with the
+ * `ERROR` reason) when the flag couldn't be evaluated. There is no fallback value in it.
+ */
+export type FlagDetail =
+  | { value: boolean; variationIndex: number; reason: EvaluationReason }
+  | { value: null; variationIndex: null; reason: EvaluationReason };
 
 /**
  * Every flag of the environment, evaluated for one context. When the Evaluator can't be asked or answers with an
@@ -53,7 +58,10 @@ export type FlagDetail = EvaluationDetail | { value: null; variationIndex: null;
  * `flags.values['rare-bird-alerts'] ?? false`.
  */
 export interface AllFlags {
-  /** The served variation of every flag that served one, by flag key. */
+  /**
+   * The served variation of every flag that served one, by flag key. Like `details`, it has no prototype, so a key
+   * that isn't a flag of the environment (even `constructor`) is missing.
+   */
   values: Record<string, boolean>;
   /** The evaluation of every flag, by flag key, including flags that served no variation because of an error. */
   details: Record<string, FlagDetail>;
@@ -63,7 +71,8 @@ export interface AllFlags {
 
 /**
  * Evaluates flags through an Evaluator. There is no local cache: every call is one request to the Evaluator.
- * No method ever throws or rejects; when an evaluation can't happen, the caller's fallback value is returned.
+ * No method ever throws or rejects. When an evaluation can't happen, `variation` and `variationDetail` return the
+ * caller's fallback value, and `allFlags` returns no flags with the `error` that stopped it.
  */
 export interface Client {
   /** The variation the flag serves to the context, or `fallbackValue` when it can't be evaluated. */
@@ -108,36 +117,40 @@ export function createClient(options: ClientOptions): Client {
       variationIndex: null,
       reason,
     });
-    const answered = await post(`evaluate/${encodeURIComponent(flagKey)}`, context);
-    if ('error' in answered) return fallback({ kind: 'ERROR', errorKind: answered.error });
-    const evaluation = asFlagEvaluation(answered.answer);
+    const outcome = await post(`evaluate/${encodeURIComponent(flagKey)}`, context);
+    if ('error' in outcome) return fallback({ kind: 'ERROR', errorKind: outcome.error });
+    const evaluation = asFlagEvaluation(outcome.answer);
     if (!evaluation) return fallback({ kind: 'ERROR', errorKind: 'EVALUATOR_ERROR' });
     if (evaluation.value === null) return fallback(evaluation.reason);
     return { value: evaluation.value, variationIndex: evaluation.variationIndex, reason: evaluation.reason };
   }
 
   async function allFlags(context: Context): Promise<AllFlags> {
-    const none = (error: ErrorKind): AllFlags => ({ values: {}, details: {}, error });
-    const answered = await post('evaluate', context);
-    if ('error' in answered) return none(answered.error);
-    const { answer } = answered;
+    const noFlags = (error: ErrorKind): AllFlags => ({ values: byFlagKey(), details: byFlagKey(), error });
+    const outcome = await post('evaluate', context);
+    if ('error' in outcome) return noFlags(outcome.error);
+    const { answer } = outcome;
     const entries = isObject(answer) && Array.isArray(answer['flags']) ? answer['flags'] : null;
-    if (!entries) return none('EVALUATOR_ERROR');
-    const result: AllFlags = { values: {}, details: {}, error: null };
+    if (!entries) return noFlags('EVALUATOR_ERROR');
+    const flags: AllFlags = { values: byFlagKey(), details: byFlagKey(), error: null };
     for (const entry of entries) {
       const evaluation = asFlagEvaluation(entry);
       const flagKey = isObject(entry) ? entry['flagKey'] : undefined;
-      if (!evaluation || typeof flagKey !== 'string') return none('EVALUATOR_ERROR');
-      // An Evaluator leaves out flags it can't find; should one list such a flag anyway, it has no evaluation.
-      if (evaluation.reason.kind === 'FLAG_NOT_FOUND') continue;
+      // An Evaluator lists each flag once, and leaves out the flags it can't find (archived ones).
+      const consistent =
+        evaluation &&
+        typeof flagKey === 'string' &&
+        !(flagKey in flags.details) &&
+        evaluation.reason.kind !== 'FLAG_NOT_FOUND';
+      if (!consistent) return noFlags('EVALUATOR_ERROR');
       const { reason } = evaluation;
-      if (evaluation.value === null) result.details[flagKey] = { value: null, variationIndex: null, reason };
+      if (evaluation.value === null) flags.details[flagKey] = { value: null, variationIndex: null, reason };
       else {
-        result.details[flagKey] = { value: evaluation.value, variationIndex: evaluation.variationIndex, reason };
-        result.values[flagKey] = evaluation.value;
+        flags.details[flagKey] = { value: evaluation.value, variationIndex: evaluation.variationIndex, reason };
+        flags.values[flagKey] = evaluation.value;
       }
     }
-    return result;
+    return flags;
   }
 
   return {
@@ -146,6 +159,11 @@ export function createClient(options: ClientOptions): Client {
       (await variationDetail(flagKey, context, fallbackValue)).value,
     allFlags,
   };
+}
+
+/** An empty record without a prototype, so only flag keys are ever in it. */
+function byFlagKey<T>(): Record<string, T> {
+  return Object.create(null) as Record<string, T>;
 }
 
 /** The error kind an Evaluator error answer names (`UNKNOWN_SDK_KEY`, `NOT_READY`), or `EVALUATOR_ERROR`. */

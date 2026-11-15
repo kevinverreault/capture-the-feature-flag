@@ -50,9 +50,13 @@ export class EvaluationController {
     const snapshot = this.snapshot(sdkKey);
     const context = contextOf(body);
     const flags = snapshot.flags
-      .map((flag): FlagEvaluation => ({ flagKey: flag.key, ...evaluate(snapshot, flag.key, context) }))
+      // Each flag against a snapshot of it alone, so evaluate() finds it at once: linear in the number of flags.
+      .map((flag): FlagEvaluation => ({
+        flagKey: flag.key,
+        ...evaluate({ ...snapshot, flags: [flag] }, flag.key, context),
+      }))
       .filter((evaluation) => evaluation.reason.kind !== 'FLAG_NOT_FOUND')
-      .sort((a, b) => (a.flagKey < b.flagKey ? -1 : a.flagKey > b.flagKey ? 1 : 0));
+      .sort(byFlagKey);
     return { flags };
   }
 
@@ -80,6 +84,12 @@ export class EvaluationController {
     }
     return held.snapshot;
   }
+}
+
+/** Orders by flag key, the way Core orders a snapshot's flags (plain code-unit order, independent of locale). */
+function byFlagKey(a: FlagEvaluation, b: FlagEvaluation): number {
+  if (a.flagKey === b.flagKey) return 0;
+  return a.flagKey < b.flagKey ? -1 : 1;
 }
 
 /** The context of a request body, unchecked: evaluate() validates it at runtime and reports a malformed one. */
