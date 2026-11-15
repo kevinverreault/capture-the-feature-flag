@@ -1,0 +1,42 @@
+{
+  "name": "@ctff/birdwatch-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Birdwatch's API, the demo backend: mock birders, species and sightings, a fake JWT login, and the flags each birder gets through @ctff/nestjs.",
+  "exports": "./dist/main.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.app.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "start": "node dist/main.js",
+    "docker-build": "docker build -f Dockerfile -t ctff-birdwatch-api:local ../.."
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:birdwatch"
+    ]
+  },
+  "dependencies": {
+    "@ctff/core-api-client": "workspace:*",
+    "@ctff/nestjs": "workspace:*",
+    "@nestjs/common": "^11.2.10",
+    "@nestjs/core": "^11.2.10",
+    "@nestjs/platform-express": "^11.2.10",
+    "jose": "^6.2.17",
+    "nestjs-pino": "^5.3.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "typescript": "~6.0.3"
+  }
+}

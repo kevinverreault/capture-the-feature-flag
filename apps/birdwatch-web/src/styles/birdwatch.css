@@ -1,0 +1,45 @@
+/* Page-level layout shared by the Birdwatch pages; components come from the design system. */
+
+h1,
+h2,
+h3 {
+  margin: 0 0 var(--space-xs);
+}
+
+p {
+  margin: 0;
+}
+
+/* A form laid out as one column of fields, its submit button at its natural width. */
+.stack {
+  display: grid;
+  gap: var(--space-sm);
+  max-width: 30rem;
+}
+
+.stack > button {
+  justify-self: start;
+}
+
+/* A grid of cards. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A page's heading with the page's main action at its end. */
+.page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.muted {
+  opacity: 0.75;
+}

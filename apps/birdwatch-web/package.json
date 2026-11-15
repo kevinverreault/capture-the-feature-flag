@@ -1,0 +1,42 @@
+{
+  "name": "@ctff/birdwatch-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Birdwatch's website, the demo frontend: server-rendered Astro on Node that calls birdwatch-api and shows what each birder's flags serve.",
+  "exports": "./server.js",
+  "files": [
+    "dist",
+    "server.js"
+  ],
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "typecheck": "astro check",
+    "lint": "eslint .",
+    "start": "node server.js",
+    "docker-build": "docker build -f Dockerfile -t ctff-birdwatch-web:local ../.."
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:birdwatch"
+    ]
+  },
+  "dependencies": {
+    "@astrojs/node": "^11.1.13",
+    "astro": "^7.4.12",
+    "cva": "npm:class-variance-authority@^0.7.1",
+    "node-html-parser": "^6.1.13",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "serve-static": "^2.2.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@ctff/design-system-host": "workspace:*",
+    "@ctff/sdk": "workspace:*",
+    "@types/serve-static": "^2.2.0",
+    "typescript": "~6.0.3"
+  }
+}
