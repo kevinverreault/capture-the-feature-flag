@@ -1,0 +1,95 @@
+---
+import { type Settings, unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Button from '@ds/components/ui/Button.astro';
+import FormAlert from '../components/FormAlert.astro';
+import AdminLayout from '../layouts/AdminLayout.astro';
+import { coreApi } from '../lib/core';
+import { handlePost, textField } from '../lib/forms';
+import { routes } from '../lib/routes';
+
+/** The settings, in the order the form shows them, with the bounds Core enforces (see its OpenAPI document). */
+const settings: { name: keyof Settings; label: string; hint: string; min: number; max: number }[] = [
+  {
+    name: 'metricRetentionDays',
+    label: 'Evaluation metric retention (days)',
+    hint: 'How long the per-minute evaluation counts behind the dashboard charts are kept.',
+    min: 1,
+    max: 3650,
+  },
+  {
+    name: 'seenContextRetentionDays',
+    label: 'Seen-context retention (days)',
+    hint: 'How long a seen context is kept after it was last evaluated.',
+    min: 1,
+    max: 3650,
+  },
+  {
+    name: 'seenContextCap',
+    label: 'Seen contexts per environment',
+    hint: 'How many seen contexts each environment keeps: the most recently seen.',
+    min: 1,
+    max: 100000,
+  },
+  {
+    name: 'staleFlagThresholdDays',
+    label: 'Stale-flag threshold (days)',
+    hint: 'A flag with no evaluations in any environment for this many days is listed as stale.',
+    min: 1,
+    max: 3650,
+  },
+];
+
+const core = coreApi(Astro.locals);
+const post = await handlePost(Astro, {
+  save: {
+    fields: settings.map((setting) => setting.name),
+    send: async (form) => {
+      // Sent as numbers; Core rejects anything that isn't a whole number in range, with a message per field.
+      const body = Object.fromEntries(
+        settings.map(({ name }) => [name, Number(textField(form, name) || Number.NaN)]),
+      ) as Settings;
+      await unwrap(core.PATCH('/api/v1/settings', { body }));
+      return { location: routes.telemetrySettings(), flash: 'Settings saved. They apply right away.' };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
+
+const [projects, current] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  unwrap(core.GET('/api/v1/settings')),
+]);
+---
+
+<AdminLayout title="Settings" projects={projects}>
+  <h1 class="ff-serif text-2xl">Settings</h1>
+  <p>
+    These apply to every project. Evaluators report evaluation counts and seen contexts about once a minute; Core
+    keeps them as set here, deletes older ones regularly (hourly by default), and applies a change as soon as you save.
+  </p>
+
+  <form method="post" class="stack">
+    <input type="hidden" name="_action" value="save" />
+    <FormAlert messages={errors.form} />
+    {
+      settings.map((setting) => (
+        <FormField label={setting.label} hint={setting.hint} error={errors.fields[setting.name]}>
+          <Input
+            name={setting.name}
+            type="number"
+            inputmode="numeric"
+            min={setting.min}
+            max={setting.max}
+            step="1"
+            value={post.value(setting.name) ?? String(current[setting.name])}
+            required
+          />
+        </FormField>
+      ))
+    }
+    <Button type="submit" variant="primary">Save settings</Button>
+  </form>
+</AdminLayout>

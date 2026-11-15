@@ -78,7 +78,8 @@ type Environment struct {
 	SDKKey     string `json:"sdkKey"`
 }
 
-// Flag is a flag as Core returns it.
+// Flag is a flag as Core returns it. Archived is set while the flag is archived: it is not served, and Core rejects
+// changes to it until it is restored.
 type Flag struct {
 	ProjectKey  string   `json:"projectKey"`
 	Key         string   `json:"key"`
@@ -87,7 +88,6 @@ type Flag struct {
 	Tags        []string `json:"tags"`
 	Version     int64    `json:"version"`
 	ManagedBy   *string  `json:"managedBy"`
-	// Archived is set while the flag is archived: not served, and not changeable until it is restored.
 	Archived    bool     `json:"archived"`
 }
 

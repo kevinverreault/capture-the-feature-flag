@@ -95,8 +95,21 @@ Why an evaluation produced its variation: targeting off, individual target, rule
 The value the calling code supplies to the SDK, returned when an evaluation can't happen (flag unknown or archived, Evaluator unreachable).
 _Avoid_: Default value (confusable with default variation)
 
+**Evaluation count**:
+How many evaluations of one flag served one variation in one environment within one minute (a 1-minute bucket). Evaluators add them up and send them to Core.
+_Avoid_: Hit, impression
+
 **Stale flag**:
-A flag that has had no evaluations in any environment for a set number of days.
+A flag that has had no evaluations in any environment for a set number of days. That number is the **stale-flag threshold**.
+
+**Retention**:
+How long Core keeps evaluation counts (metric retention) and seen contexts after they were last seen (seen-context retention), before deleting them.
+
+**Seen-context cap**:
+How many seen contexts Core keeps per environment: the most recently seen.
+
+**Settings**:
+The install-wide values an admin sets for telemetry: the retention, the seen-context cap and the stale-flag threshold. Not to be confused with a project's own settings (its name).
 
 ### Change history
 

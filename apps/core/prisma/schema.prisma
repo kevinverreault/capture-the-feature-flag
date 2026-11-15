@@ -23,38 +23,41 @@ model Project {
 }
 
 model Environment {
-  id        String      @id @default(uuid()) @db.Uuid
-  projectId String      @map("project_id") @db.Uuid
-  key       String
-  name      String
-  sdkKey    String      @unique @map("sdk_key")
-  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
-  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  targeting Targeting[]
+  id               String            @id @default(uuid()) @db.Uuid
+  projectId        String            @map("project_id") @db.Uuid
+  key              String
+  name             String
+  sdkKey           String            @unique @map("sdk_key")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  targeting        Targeting[]
+  evaluationCounts EvaluationCount[]
+  seenContexts     SeenContext[]
 
   @@unique([projectId, key])
   @@map("environments")
 }
 
 model Flag {
-  id          String      @id @default(uuid()) @db.Uuid
-  projectId   String      @map("project_id") @db.Uuid
-  key         String
-  name        String
-  description String      @default("")
-  tags        String[]    @default([])
+  id               String            @id @default(uuid()) @db.Uuid
+  projectId        String            @map("project_id") @db.Uuid
+  key              String
+  name             String
+  description      String            @default("")
+  tags             String[]          @default([])
   /// The ordered list of variations; boolean flags always have [true, false] (ADR 0002).
-  variations  Json
-  version     Int         @default(1)
+  variations       Json
+  version          Int               @default(1)
   /// The tool managing the flag as code, or null when it is managed by hand.
-  managedBy   ManagedBy?  @map("managed_by")
+  managedBy        ManagedBy?        @map("managed_by")
   /// When the flag was archived, or null while it is not. An archived flag is left out of snapshots.
-  archivedAt  DateTime?   @map("archived_at") @db.Timestamptz(3)
-  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
-  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  targeting   Targeting[]
+  archivedAt       DateTime?         @map("archived_at") @db.Timestamptz(3)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  targeting        Targeting[]
+  evaluationCounts EvaluationCount[]
 
   @@unique([projectId, key])
   @@map("flags")
@@ -84,4 +87,52 @@ model Targeting {
   @@unique([flagId, environmentId])
   @@index([environmentId])
   @@map("targeting")
+}
+
+/// How many evaluations of one flag served one variation in one environment within one minute, as Evaluators
+/// report them. Purged after the metric retention.
+model EvaluationCount {
+  environmentId  String      @map("environment_id") @db.Uuid
+  flagId         String      @map("flag_id") @db.Uuid
+  variationIndex Int         @map("variation_index")
+  /// The start of the minute.
+  minute         DateTime    @db.Timestamptz(3)
+  count          Int
+  environment    Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+  flag           Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@id([environmentId, flagId, variationIndex, minute])
+  @@index([minute])
+  @@map("evaluation_counts")
+}
+
+/// A context recently evaluated in an environment. Only the newest (by last-seen) up to the seen-context cap are
+/// kept per environment, and they are purged after the seen-context retention.
+model SeenContext {
+  id            String      @id @default(uuid()) @db.Uuid
+  environmentId String      @map("environment_id") @db.Uuid
+  /// Identifies the context within its environment (its attributes, canonically), so each is kept once.
+  contextKey    String      @map("context_key")
+  userId        String?     @map("user_id")
+  /// ISO 3166-1 alpha-2, in uppercase.
+  country       String?
+  lastSeen      DateTime    @map("last_seen") @db.Timestamptz(3)
+  environment   Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@unique([environmentId, contextKey])
+  @@index([environmentId, lastSeen])
+  @@index([lastSeen])
+  @@map("seen_contexts")
+}
+
+/// The install-wide telemetry settings: a single row, with id 1.
+model Settings {
+  id                       Int      @id @default(1)
+  metricRetentionDays      Int      @default(30) @map("metric_retention_days")
+  seenContextRetentionDays Int      @default(30) @map("seen_context_retention_days")
+  seenContextCap           Int      @default(1000) @map("seen_context_cap")
+  staleFlagThresholdDays   Int      @default(7) @map("stale_flag_threshold_days")
+  updatedAt                DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("settings")
 }

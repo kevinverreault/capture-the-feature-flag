@@ -19,4 +19,9 @@ export const routes = {
       ? flagPath(project, flagKey)
       : `${flagPath(project, flagKey)}?${new URLSearchParams({ environment }).toString()}`,
   editFlag: (project: string, flagKey: string) => `${flagPath(project, flagKey)}/edit`,
+  /**
+   * The Settings page, for every project: telemetry retention, the seen-context cap and the stale-flag threshold.
+   * Not to be confused with `settings`, a project's own settings (its name, and deleting it).
+   */
+  telemetrySettings: () => '/settings',
 };
