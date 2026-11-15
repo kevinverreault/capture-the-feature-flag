@@ -218,3 +218,24 @@ export function lastEvaluated(lastEvaluatedAt: string | null, now: Date): string
   const days = Math.floor((now.getTime() - Date.parse(lastEvaluatedAt)) / dayMs);
   return `Last evaluated ${days} ${days === 1 ? 'day' : 'days'} ago`;
 }
+
+/** Counts per variation in words, for a chart mark's accessible name: "30 true, 12 false". */
+export function describeCounts(variations: readonly string[], counts: readonly number[]): string {
+  return variations.map((variation, slot) => `${fullCount(counts[slot] ?? 0)} ${variation}`).join(', ');
+}
+
+/** The columns of a chart's table view for its variations, then their total. */
+export function variationColumns(variations: readonly string[]): { key: string; label: string; align: 'end' }[] {
+  return [
+    ...variations.map((variation, slot) => ({ key: `v${slot}`, label: variation, align: 'end' as const })),
+    { key: 'total', label: 'Total', align: 'end' },
+  ];
+}
+
+/** The cells of a row of a chart's table view for {@link variationColumns}. */
+export function variationCells(counts: readonly number[], total: number): Record<string, string> {
+  return {
+    ...Object.fromEntries(counts.map((count, slot) => [`v${slot}`, fullCount(count)])),
+    total: fullCount(total),
+  };
+}

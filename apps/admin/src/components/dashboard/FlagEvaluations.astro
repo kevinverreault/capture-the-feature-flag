@@ -1,9 +1,10 @@
 ---
 import Badge from '@ds/components/ui/Badge.astro';
 import Table from '@ds/components/ui/Table.astro';
-import { compactCount, type EvaluationChart, fullCount } from '../../lib/dashboard';
+import { compactCount, describeCounts, type EvaluationChart, variationCells, variationColumns } from '../../lib/dashboard';
 import { routes } from '../../lib/routes';
 import ChartLegend from './ChartLegend.astro';
+import ChartTooltip from './ChartTooltip.astro';
 import { seriesColor } from './series';
 
 interface Props {
@@ -19,8 +20,6 @@ const shownFlags = 10;
 const { chart, projectKey, label } = Astro.props;
 const shown = chart.flags.slice(0, shownFlags);
 const max = Math.max(1, ...shown.map((flag) => flag.total));
-const describe = (counts: readonly number[]) =>
-  chart.variations.map((variation, slot) => `${fullCount(counts[slot] ?? 0)} ${variation}`).join(', ');
 ---
 
 <figure class="flag-evaluations" aria-label={label}>
@@ -34,7 +33,7 @@ const describe = (counts: readonly number[]) =>
             {flag.archived && <Badge variant="muted">Archived</Badge>}
             {!flag.known && <Badge variant="muted">Deleted</Badge>}
           </span>
-          <span class="track" tabindex="0" aria-label={`${flag.name}: ${describe(flag.counts)}`}>
+          <span class="track" tabindex="0" aria-label={`${flag.name}: ${describeCounts(chart.variations, flag.counts)}`}>
             <span class="bar" style={`width: ${((flag.total / max) * 100).toFixed(3)}%`}>
               {flag.counts.map((count, slot) =>
                 count > 0 ? <span style={`flex-grow: ${count}; background-color: ${seriesColor(slot)}`} /> : null,
@@ -43,15 +42,7 @@ const describe = (counts: readonly number[]) =>
             <span class="value" aria-hidden="true">
               {compactCount(flag.total)}
             </span>
-            <span class="tip" aria-hidden="true">
-              {chart.variations.map((variation, slot) => (
-                <span class="tip-row">
-                  <span class="tip-key" style={`background-color: ${seriesColor(slot)}`} />
-                  <strong>{fullCount(flag.counts[slot] ?? 0)}</strong>
-                  <code>{variation}</code>
-                </span>
-              ))}
-            </span>
+            <ChartTooltip variations={chart.variations} counts={flag.counts} />
           </span>
         </li>
       ))
@@ -72,14 +63,12 @@ const describe = (counts: readonly number[]) =>
       columns={[
         { key: 'flag', label: 'Flag' },
         { key: 'environment', label: 'Environment' },
-        ...chart.variations.map((variation, slot) => ({ key: `v${slot}`, label: variation, align: 'end' as const })),
-        { key: 'total', label: 'Total', align: 'end' },
+        ...variationColumns(chart.variations),
       ]}
       rows={chart.rows.map((row) => ({
         flag: row.flagName,
         environment: row.environmentKey,
-        ...Object.fromEntries(chart.variations.map((_, slot) => [`v${slot}`, fullCount(row.counts[slot] ?? 0)])),
-        total: fullCount(row.total),
+        ...variationCells(row.counts, row.total),
       }))}
     />
   </details>
@@ -162,36 +151,9 @@ const describe = (counts: readonly number[]) =>
     color: hsl(var(--color-on-background) / 0.75);
   }
 
-  .tip {
-    position: absolute;
-    bottom: calc(100% + 0.25em);
-    left: 0;
-    z-index: 1;
-    display: none;
-    gap: 0.2em;
-    min-width: max-content;
-    padding: 0.5em 0.75em;
-    border: 1px solid hsl(var(--color-on-background) / 0.15);
-    border-radius: var(--border);
-    background-color: hsl(var(--color-background));
-    box-shadow: 0 0.25rem 1rem hsl(var(--color-on-background) / 0.12);
-    font-size: var(--fs-sm);
-  }
-
-  .track:hover .tip,
-  .track:focus-visible .tip {
+  .track:hover :global(.chart-tip),
+  .track:focus-visible :global(.chart-tip) {
     display: grid;
-  }
-
-  .tip-row {
-    display: flex;
-    gap: 0.5em;
-    align-items: center;
-  }
-
-  .tip-key {
-    width: 0.75em;
-    height: 2px;
   }
 
   figcaption {
@@ -204,8 +166,7 @@ const describe = (counts: readonly number[]) =>
   }
 
   @media (forced-colors: active) {
-    .bar span,
-    .tip-key {
+    .bar span {
       forced-color-adjust: none;
     }
   }

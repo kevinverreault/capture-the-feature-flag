@@ -3,9 +3,12 @@ import {
   axisLabel,
   compactCount,
   dashboardRange,
+  describeCounts,
   evaluationChart,
   lastEvaluated,
   niceTicks,
+  variationCells,
+  variationColumns,
 } from '../src/lib/dashboard.js';
 
 const flags = [
@@ -181,5 +184,13 @@ describe('lastEvaluated', () => {
 
   it('says when no evaluation was kept', () => {
     expect(lastEvaluated(null, now)).toBe('No evaluations in the kept telemetry');
+  });
+});
+
+describe('chart table views and labels', () => {
+  it('describes counts per variation, and lays them out as table columns and cells', () => {
+    expect(describeCounts(['true', 'false'], [1_200, 3])).toBe('1,200 true, 3 false');
+    expect(variationColumns(['true', 'false']).map((column) => column.label)).toEqual(['true', 'false', 'Total']);
+    expect(variationCells([1_200, 3], 1_203)).toEqual({ v0: '1,200', v1: '3', total: '1,203' });
   });
 });

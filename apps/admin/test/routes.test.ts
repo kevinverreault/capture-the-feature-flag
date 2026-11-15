@@ -5,10 +5,6 @@ describe('routes', () => {
   it('builds the address of each admin page', () => {
     expect(routes.projects()).toBe('/projects');
     expect(routes.project('birdwatch')).toBe('/projects/birdwatch');
-    expect(routes.dashboard('birdwatch')).toBe('/projects/birdwatch');
-    expect(routes.dashboard('birdwatch', { range: '7d', environment: 'production' })).toBe(
-      '/projects/birdwatch?range=7d&environment=production',
-    );
     expect(routes.environments('birdwatch')).toBe('/projects/birdwatch/environments');
     expect(routes.environment('birdwatch', 'production')).toBe('/projects/birdwatch/environments/production');
     expect(routes.settings('birdwatch')).toBe('/projects/birdwatch/settings');

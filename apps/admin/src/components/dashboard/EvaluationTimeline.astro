@@ -5,12 +5,15 @@ import {
   axisLabel,
   bucketTime,
   compactCount,
+  describeCounts,
   type EvaluationChart,
-  fullCount,
   hasAxisLabel,
   niceTicks,
+  variationCells,
+  variationColumns,
 } from '../../lib/dashboard';
 import ChartLegend from './ChartLegend.astro';
+import ChartTooltip from './ChartTooltip.astro';
 import { seriesColor } from './series';
 
 interface Props {
@@ -26,8 +29,6 @@ const top = ticks.at(-1) ?? 1;
 const percent = (value: number) => `${((value / top) * 100).toFixed(3)}%`;
 // Tooltips near either end open inwards, so they stay inside the chart.
 const edge = Math.ceil(chart.buckets.length / 6);
-const describe = (counts: readonly number[]) =>
-  chart.variations.map((variation, slot) => `${fullCount(counts[slot] ?? 0)} ${variation}`).join(', ');
 ---
 
 <figure class="timeline" aria-label={label}>
@@ -46,7 +47,7 @@ const describe = (counts: readonly number[]) =>
             <li
               tabindex="0"
               class:list={[index < edge && 'start', index >= chart.buckets.length - edge && 'end']}
-              aria-label={`${bucketTime(bucket.start)} UTC: ${describe(bucket.counts)}`}
+              aria-label={`${bucketTime(bucket.start)} UTC: ${describeCounts(chart.variations, bucket.counts)}`}
             >
               <span class="stack" style={`height: ${percent(bucket.total)}`}>
                 {bucket.counts.map((count, slot) =>
@@ -58,16 +59,7 @@ const describe = (counts: readonly number[]) =>
                   {axisLabel(bucket.start, range)}
                 </span>
               )}
-              <span class="tip" aria-hidden="true">
-                <span class="tip-time">{bucketTime(bucket.start)} UTC</span>
-                {chart.variations.map((variation, slot) => (
-                  <span class="tip-row">
-                    <span class="tip-key" style={`background-color: ${seriesColor(slot)}`} />
-                    <strong>{fullCount(bucket.counts[slot] ?? 0)}</strong>
-                    <code>{variation}</code>
-                  </span>
-                ))}
-              </span>
+              <ChartTooltip variations={chart.variations} counts={bucket.counts} heading={`${bucketTime(bucket.start)} UTC`} />
             </li>
           ))
         }
@@ -80,15 +72,10 @@ const describe = (counts: readonly number[]) =>
     <Table
       caption={label}
       rowHeader="time"
-      columns={[
-        { key: 'time', label: 'Time (UTC)' },
-        ...chart.variations.map((variation, slot) => ({ key: `v${slot}`, label: variation, align: 'end' as const })),
-        { key: 'total', label: 'Total', align: 'end' },
-      ]}
+      columns={[{ key: 'time', label: 'Time (UTC)' }, ...variationColumns(chart.variations)]}
       rows={chart.buckets.map((bucket) => ({
         time: bucketTime(bucket.start),
-        ...Object.fromEntries(chart.variations.map((_, slot) => [`v${slot}`, fullCount(bucket.counts[slot] ?? 0)])),
-        total: fullCount(bucket.total),
+        ...variationCells(bucket.counts, bucket.total),
       }))}
     />
   </details>
@@ -198,53 +185,25 @@ const describe = (counts: readonly number[]) =>
     color: hsl(var(--color-on-background) / 0.7);
   }
 
-  .tip {
-    position: absolute;
-    bottom: calc(100% + 0.25em);
+  .columns :global(.chart-tip) {
     left: 50%;
-    z-index: 1;
-    display: none;
-    gap: 0.2em;
-    min-width: max-content;
-    padding: 0.5em 0.75em;
     transform: translateX(-50%);
-    border: 1px solid hsl(var(--color-on-background) / 0.15);
-    border-radius: var(--border);
-    background-color: hsl(var(--color-background));
-    box-shadow: 0 0.25rem 1rem hsl(var(--color-on-background) / 0.12);
-    font-size: var(--fs-sm);
   }
 
-  .start .tip {
+  .start :global(.chart-tip) {
     left: 0;
     transform: none;
   }
 
-  .end .tip {
+  .end :global(.chart-tip) {
     right: 0;
     left: auto;
     transform: none;
   }
 
-  li:hover .tip,
-  li:focus-visible .tip {
+  li:hover :global(.chart-tip),
+  li:focus-visible :global(.chart-tip) {
     display: grid;
-  }
-
-  .tip-time {
-    color: hsl(var(--color-on-background) / 0.75);
-  }
-
-  .tip-row {
-    display: flex;
-    gap: 0.5em;
-    align-items: center;
-  }
-
-  /* A short line keys each row, rather than a box. */
-  .tip-key {
-    width: 0.75em;
-    height: 2px;
   }
 
   figcaption {
@@ -257,8 +216,7 @@ const describe = (counts: readonly number[]) =>
   }
 
   @media (forced-colors: active) {
-    .stack span,
-    .tip-key {
+    .stack span {
       forced-color-adjust: none;
     }
   }

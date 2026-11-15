@@ -4,6 +4,7 @@ import { archived, notArchived } from '../flags/archived.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
+import { dayMs } from '../telemetry/time.js';
 import {
   type DashboardSummaryDto,
   type EvaluationRange,
@@ -21,15 +22,7 @@ interface SeriesRow {
   count: bigint;
 }
 
-interface StaleRow {
-  key: string;
-  name: string;
-  createdAt: Date;
-  lastEvaluatedAt: Date | null;
-}
-
 const minuteMs = 60_000;
-const dayMs = 24 * 60 * minuteMs;
 
 /** What the admin app's dashboard shows of a project. */
 @Injectable()
@@ -44,7 +37,7 @@ export class DashboardService {
   /** The project's flag counts, and how many of its flags are on and off in each environment. */
   async summary(projectKey: string): Promise<DashboardSummaryDto> {
     const project = await this.projects.find(projectKey);
-    const [flagCount, archivedFlagCount, environments, onCounts] = await Promise.all([
+    const [flagCount, archivedFlagCount, environments, states] = await Promise.all([
       this.prisma.flag.count({ where: { projectId: project.id, ...notArchived } }),
       this.prisma.flag.count({ where: { projectId: project.id, ...archived } }),
       this.prisma.environment.findMany({
@@ -53,21 +46,21 @@ export class DashboardService {
         select: { id: true, key: true, name: true },
       }),
       this.prisma.targeting.groupBy({
-        by: ['environmentId'],
-        where: { on: true, flag: { projectId: project.id, ...notArchived } },
+        by: ['environmentId', 'on'],
+        where: { flag: { projectId: project.id, ...notArchived } },
         _count: { _all: true },
       }),
     ]);
-    const on = new Map(onCounts.map((row) => [row.environmentId, row._count._all]));
+    const count = (environmentId: string, on: boolean) =>
+      states.find((row) => row.environmentId === environmentId && row.on === on)?._count._all ?? 0;
     return {
       flagCount,
       archivedFlagCount,
-      // Every flag has targeting in every environment, so those not on are off.
       environments: environments.map((environment) => ({
         environmentKey: environment.key,
         name: environment.name,
-        on: on.get(environment.id) ?? 0,
-        off: flagCount - (on.get(environment.id) ?? 0),
+        on: count(environment.id, true),
+        off: count(environment.id, false),
       })),
     };
   }
@@ -123,14 +116,25 @@ export class DashboardService {
     const project = await this.projects.find(projectKey);
     const { staleFlagThresholdDays } = await this.settings.get();
     const since = new Date(Date.now() - staleFlagThresholdDays * dayMs);
-    const flags = await this.prisma.$queryRaw<StaleRow[]>`
-      SELECT f.key, f.name, f.created_at AS "createdAt", MAX(c.minute) AS "lastEvaluatedAt"
-        FROM flags f
-        LEFT JOIN evaluation_counts c ON c.flag_id = f.id
-       WHERE f.project_id = ${project.id}::uuid AND f.archived_at IS NULL AND f.created_at <= ${since}
-       GROUP BY f.id
-      HAVING MAX(c.minute) IS NULL OR MAX(c.minute) < ${since}
-       ORDER BY "lastEvaluatedAt" ASC NULLS FIRST, f.key`;
-    return { thresholdDays: staleFlagThresholdDays, flags };
+    const flags = await this.prisma.flag.findMany({
+      where: { projectId: project.id, ...notArchived, createdAt: { lte: since } },
+      select: { id: true, key: true, name: true, createdAt: true },
+    });
+    const lastEvaluations = await this.prisma.evaluationCount.groupBy({
+      by: ['flagId'],
+      where: { flagId: { in: flags.map((flag) => flag.id) } },
+      _max: { minute: true },
+    });
+    const lastEvaluated = new Map(lastEvaluations.map((row) => [row.flagId, row._max.minute]));
+    const stale = flags
+      .map(({ id, ...flag }) => ({ ...flag, lastEvaluatedAt: lastEvaluated.get(id) ?? null }))
+      .filter((flag) => flag.lastEvaluatedAt === null || flag.lastEvaluatedAt < since)
+      // Never evaluated first, then the longest without evaluations.
+      .sort(
+        (a, b) =>
+          (a.lastEvaluatedAt?.getTime() ?? -Infinity) - (b.lastEvaluatedAt?.getTime() ?? -Infinity) ||
+          (a.key < b.key ? -1 : a.key > b.key ? 1 : 0),
+      );
+    return { thresholdDays: staleFlagThresholdDays, flags: stale };
   }
 }
