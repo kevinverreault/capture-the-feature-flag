@@ -1,25 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { apiClient, uniqueKey } from './support/api.js';
+import { browser, type Browser } from './support/browser.js';
 import { startCore, type RunningCore } from './support/core.js';
-
-/** The admin app, as a browser sees it on Core's origin (ADR 0003). */
-function browser(baseUrl: string) {
-  return {
-    get: (path: string) => fetch(`${baseUrl}${path}`, { redirect: 'manual' }),
-    /** Submits a form the way a browser does: urlencoded, from a page of the same origin. */
-    post: (path: string, fields: Record<string, string>) =>
-      fetch(`${baseUrl}${path}`, {
-        method: 'POST',
-        redirect: 'manual',
-        headers: { 'content-type': 'application/x-www-form-urlencoded', origin: baseUrl },
-        body: new URLSearchParams(fields).toString(),
-      }),
-  };
-}
 
 describe('admin app inside Core', () => {
   let core: RunningCore;
-  let admin: ReturnType<typeof browser>;
+  let admin: Browser;
   let api: ReturnType<typeof apiClient>;
   beforeAll(async () => {
     core = await startCore();

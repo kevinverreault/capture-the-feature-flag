@@ -92,6 +92,32 @@ describe('targeting', () => {
     expect(off.body).toMatchObject({ on: false, version: 3 });
   });
 
+  it('lists each flag with its targeting on or off in every environment, in environment order', async () => {
+    const projectKey = await project('development', 'production');
+    await api.post(`/projects/${projectKey}/flags`, { key: 'shown-off', name: 'Shown off' });
+    await api.post(`/projects/${projectKey}/flags`, { key: 'shown-on', name: 'Shown on' });
+    await api.patch(`/projects/${projectKey}/flags/shown-on/targeting/production`, { version: 1, on: true });
+
+    const list = await api.get(`/projects/${projectKey}/flags`);
+    expect(list.status).toBe(200);
+    expect(list.body).toEqual([
+      expect.objectContaining({
+        key: 'shown-off',
+        targeting: [
+          { environmentKey: 'development', on: false },
+          { environmentKey: 'production', on: false },
+        ],
+      }),
+      expect.objectContaining({
+        key: 'shown-on',
+        targeting: [
+          { environmentKey: 'development', on: false },
+          { environmentKey: 'production', on: true },
+        ],
+      }),
+    ]);
+  });
+
   it('rejects a targeting change based on an outdated version with 409', async () => {
     const projectKey = await project('production');
     await api.post(`/projects/${projectKey}/flags`, { key: 'contended', name: 'Contended' });

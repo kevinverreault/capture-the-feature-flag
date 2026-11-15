@@ -1,0 +1,231 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import Switch from '@ds/components/form/Switch.astro';
+import TabPanel from '@ds/components/navigation/TabPanel.astro';
+import Tabs from '@ds/components/navigation/Tabs.astro';
+import Badge from '@ds/components/ui/Badge.astro';
+import Button from '@ds/components/ui/Button.astro';
+import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
+import FormAlert from '../../../../../components/FormAlert.astro';
+import NotFound from '../../../../../components/NotFound.astro';
+import ProjectNav from '../../../../../components/ProjectNav.astro';
+import AdminLayout from '../../../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../../../lib/core';
+import { noFormErrors } from '../../../../../lib/form-errors';
+import { handlePost, orNotFound, textField } from '../../../../../lib/forms';
+import { routes } from '../../../../../lib/routes';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const flagKey = Astro.params.flag ?? '';
+const params = { path: { projectKey, flagKey } };
+const post = await handlePost(Astro, {
+  targeting: {
+    fields: ['on'],
+    versioned: true,
+    send: async (form) => {
+      const environmentKey = textField(form, 'environment');
+      const body = { version: Number(textField(form, 'version')), on: form.has('on') };
+      const targeting = await unwrap(
+        core.PATCH('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting/{environmentKey}', {
+          params: { path: { projectKey, flagKey, environmentKey } },
+          body,
+        }),
+      );
+      return {
+        location: routes.flag(projectKey, flagKey, targeting.environmentKey),
+        flash: `Targeting switched ${targeting.on ? 'on' : 'off'} in ${environmentKey}`,
+      };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+
+const [projects, project, environments, flag, targeting] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey } } }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params: { path: { projectKey } } }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting', { params }))),
+]);
+if (!project || !environments || !flag || !targeting) Astro.response.status = 404;
+
+/** The environment whose targeting form was just submitted and rejected, if any. */
+const postedEnvironment = post.action === 'targeting' ? post.value('environment') : undefined;
+const tabs = environments?.flatMap((environment) => {
+  const current = targeting?.find((row) => row.environmentKey === environment.key);
+  if (!current) return [];
+  const posted = environment.key === postedEnvironment;
+  return [
+    {
+      environment,
+      // A rejected change keeps what was submitted, and the version it was based on (see ChangedElsewhere).
+      on: posted ? post.value('on') !== undefined : current.on,
+      version: posted ? (post.value('version') ?? String(current.version)) : String(current.version),
+      errors: posted ? post.errors : noFormErrors,
+    },
+  ];
+});
+---
+
+{
+  project && environments && flag && tabs ? (
+    <AdminLayout title={`${flag.name} · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="flags" />
+
+      <section aria-labelledby="flag-heading" class="flag-summary">
+        <div class="section-heading">
+          <h2 id="flag-heading" class="text-xl">
+            {flag.name}
+          </h2>
+          <Button href={routes.editFlag(project.key, flag.key)} variant="secondary" size="small">
+            Edit details
+          </Button>
+        </div>
+        <p>
+          Key <code>{flag.key}</code>
+        </p>
+        {flag.description && <p class="description">{flag.description}</p>}
+        {flag.tags.length > 0 && (
+          <p class="tags" aria-label="Tags">
+            {flag.tags.map((tag) => (
+              <Badge variant="outline">{tag}</Badge>
+            ))}
+          </p>
+        )}
+      </section>
+
+      <section aria-labelledby="targeting-heading" class="targeting">
+        <h2 id="targeting-heading" class="text-xl">
+          Targeting
+        </h2>
+        {tabs.length === 0 ? (
+          <p>
+            This project has no environments yet: <a href={routes.environments(project.key)}>create one</a> to
+            switch this flag on in it.
+          </p>
+        ) : (
+          <flag-tabs data-selected={Astro.url.searchParams.get('environment') ?? postedEnvironment ?? ''}>
+            <Tabs label="Environments">
+              {tabs.map(({ environment, on, version, errors }) => (
+                <TabPanel label={environment.name} data-environment={environment.key}>
+                  {errors.changedElsewhere && (
+                    <ChangedElsewhere
+                      what={`the targeting in ${environment.name}`}
+                      reloadHref={routes.flag(project.key, flag.key, environment.key)}
+                    />
+                  )}
+                  <FormAlert messages={errors.form} />
+                  <form method="post" class="targeting-switch">
+                    <input type="hidden" name="_action" value="targeting" />
+                    <input type="hidden" name="environment" value={environment.key} />
+                    <input type="hidden" name="version" value={version} />
+                    <label class="switch-label">
+                      <Switch name="on" checked={on} aria-describedby={`served-${environment.key}`} />
+                      Targeting {on ? 'on' : 'off'} in {environment.name}
+                    </label>
+                    <p id={`served-${environment.key}`} class="served">
+                      {on
+                        ? 'Contexts get the default variation, true.'
+                        : 'Every context gets the off variation, false.'}
+                    </p>
+                    <noscript>
+                      <Button type="submit" variant="primary" size="small">
+                        Save
+                      </Button>
+                    </noscript>
+                  </form>
+                </TabPanel>
+              ))}
+            </Tabs>
+          </flag-tabs>
+        )}
+      </section>
+
+      <Button href={routes.flags(project.key)} variant="muted" decoration="ghost">
+        Back to flags
+      </Button>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Flag not found" projects={projects} project={project}>
+      <NotFound>
+        There is no flag {flagKey} in project {project?.name ?? projectKey}.
+      </NotFound>
+    </AdminLayout>
+  )
+}
+
+<script>
+  /**
+   * Opens the tab of the environment named in the address (after a save, the one just changed), keeps the
+   * address in step as tabs are picked, and saves a targeting switch as soon as it is flipped.
+   */
+  class FlagTabs extends HTMLElement {
+    async connectedCallback() {
+      for (const input of this.querySelectorAll<HTMLInputElement>('.targeting-switch input[role="switch"]')) {
+        input.addEventListener('change', () => input.form?.requestSubmit());
+      }
+
+      await customElements.whenDefined('tab-group');
+      const group = this.querySelector<HTMLElement & { select(index: number): void }>('tab-group');
+      if (!group) return;
+      const panels = [...group.querySelectorAll<HTMLElement>(':scope > .tab-panel')];
+      const selected = panels.findIndex((panel) => panel.dataset['environment'] === this.dataset['selected']);
+      if (selected > 0) group.select(selected);
+
+      group.querySelector('[role="tablist"]')?.addEventListener('click', () => {
+        const shown = panels.find((panel) => !panel.hidden)?.dataset['environment'];
+        if (!shown) return;
+        const url = new URL(window.location.href);
+        url.searchParams.set('environment', shown);
+        history.replaceState(history.state, '', url);
+      });
+    }
+  }
+  customElements.define('flag-tabs', FlagTabs);
+</script>
+
+<style>
+  .flag-summary,
+  .targeting {
+    display: grid;
+    gap: var(--space-xs);
+  }
+
+  .flag-summary p {
+    margin: 0;
+  }
+
+  .description {
+    white-space: pre-line;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25em;
+  }
+
+  .targeting-switch {
+    display: grid;
+    gap: var(--space-xs);
+    justify-items: start;
+  }
+
+  .switch-label {
+    display: inline-flex;
+    gap: var(--space-xs);
+    align-items: center;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .served {
+    margin: 0;
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  flag-tabs {
+    display: block;
+  }
+</style>

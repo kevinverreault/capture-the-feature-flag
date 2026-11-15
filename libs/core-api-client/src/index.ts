@@ -6,6 +6,10 @@ export type { components, paths } from './generated/schema.js';
 type Schemas = components['schemas'];
 export type Project = Schemas['ProjectDto'];
 export type Environment = Schemas['EnvironmentDto'];
+export type Flag = Schemas['FlagDto'];
+/** A flag in the project's flag list, with its targeting on or off in each environment. */
+export type FlagListItem = Schemas['FlagListItemDto'];
+export type Targeting = Schemas['TargetingDto'];
 
 /** A typed client for Core's API: `core.GET('/api/v1/projects')`, with paths, parameters and bodies checked. */
 export type CoreApiClient = Client<paths>;

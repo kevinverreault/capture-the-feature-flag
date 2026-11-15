@@ -1,0 +1,94 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Textarea from '@ds/components/form/Textarea.astro';
+import Button from '@ds/components/ui/Button.astro';
+import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
+import FormAlert from '../../../../../components/FormAlert.astro';
+import NotFound from '../../../../../components/NotFound.astro';
+import ProjectNav from '../../../../../components/ProjectNav.astro';
+import AdminLayout from '../../../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../../../lib/core';
+import { handlePost, orNotFound, textField } from '../../../../../lib/forms';
+import { routes } from '../../../../../lib/routes';
+import { formatTags, parseTags } from '../../../../../lib/tags';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const flagKey = Astro.params.flag ?? '';
+const params = { path: { projectKey, flagKey } };
+const post = await handlePost(Astro, {
+  edit: {
+    fields: ['name', 'description', 'tags'],
+    versioned: true,
+    send: async (form) => {
+      // The key is immutable, so the form doesn't send it.
+      const body = {
+        version: Number(textField(form, 'version')),
+        name: textField(form, 'name'),
+        description: textField(form, 'description'),
+        tags: parseTags(textField(form, 'tags')),
+      };
+      const flag = await unwrap(core.PATCH('/api/v1/projects/{projectKey}/flags/{flagKey}', { params, body }));
+      return { location: routes.flag(projectKey, flag.key), flash: `Flag ${flag.name} saved` };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
+
+const [projects, project, flag] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey } } }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }))),
+]);
+if (!project || !flag) Astro.response.status = 404;
+---
+
+{
+  project && flag ? (
+    <AdminLayout title={`Edit ${flag.name} · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="flags" />
+
+      <section aria-labelledby="edit-flag">
+        <h2 id="edit-flag" class="text-xl">
+          Edit {flag.name}
+        </h2>
+        <form method="post" class="stack">
+          {errors.changedElsewhere && (
+            <ChangedElsewhere what="this flag" reloadHref={routes.editFlag(project.key, flag.key)} />
+          )}
+          <FormAlert messages={errors.form} />
+          {/* A rejected save keeps the version it was based on, so saving again can't overwrite a newer one. */}
+          <input type="hidden" name="version" value={post.value('version') ?? String(flag.version)} />
+          <FormField label="Key" hint="Your code refers to the flag by its key, so it cannot be changed.">
+            <Input value={flag.key} readonly />
+          </FormField>
+          <FormField label="Name" error={errors.fields['name']}>
+            <Input name="name" value={post.value('name') ?? flag.name} required />
+          </FormField>
+          <FormField label="Description (optional)" hint="What the flag controls." error={errors.fields['description']}>
+            <Textarea name="description" value={post.value('description') ?? flag.description} />
+          </FormField>
+          <FormField label="Tags (optional)" hint="Separated by commas, such as alerts, beta." error={errors.fields['tags']}>
+            <Input name="tags" value={post.value('tags') ?? formatTags(flag.tags)} />
+          </FormField>
+          <Button type="submit" variant="primary">
+            Save
+          </Button>
+        </form>
+      </section>
+
+      <Button href={routes.flag(project.key, flag.key)} variant="muted" decoration="ghost">
+        Back to {flag.name}
+      </Button>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Flag not found" projects={projects} project={project}>
+      <NotFound>
+        There is no flag {flagKey} in project {project?.name ?? projectKey}.
+      </NotFound>
+    </AdminLayout>
+  )
+}

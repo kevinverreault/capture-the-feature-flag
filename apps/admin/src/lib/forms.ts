@@ -16,6 +16,8 @@ export interface FormAction extends FormSpec {
 }
 
 export interface PostResult {
+  /** The action the submission asked for, so a page with several forms shows the errors on the right one. */
+  action?: string;
   /** The 303 to return when the submission succeeded (Post/Redirect/Get). */
   redirect?: Response;
   /** What to show on the form when Core rejected the submission. */
@@ -40,17 +42,17 @@ export async function handlePost(astro: AstroGlobal, actions: Record<string, For
   const action = name === undefined ? undefined : actions[name];
   if (!action) {
     astro.response.status = 400;
-    return { errors: { fields: {}, form: [`This form can't do "${name ?? ''}"`] }, value };
+    return { action: name, errors: { fields: {}, form: [`This form can't do "${name ?? ''}"`] }, value };
   }
 
   try {
     const { location, flash } = await action.send(form);
     setFlash(astro.cookies, flash);
-    return { redirect: astro.redirect(location, 303), errors: noFormErrors, value };
+    return { action: name, redirect: astro.redirect(location, 303), errors: noFormErrors, value };
   } catch (error) {
     if (!(error instanceof CoreApiError)) throw error;
     astro.response.status = error.status;
-    return { errors: formErrors(error, action), value };
+    return { action: name, errors: formErrors(error, action), value };
   }
 }
 

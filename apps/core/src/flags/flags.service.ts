@@ -7,6 +7,7 @@ import { PrismaService } from '../database/prisma.service.js';
 import type { Flag, Project } from '../generated/prisma/client.js';
 import { projectNotFound, ProjectsService } from '../projects/projects.service.js';
 import { offStateTargeting } from '../targeting/off-state.js';
+import type { FlagListItemDto } from './flag-list.dto.js';
 import type { CreateFlagDto, FlagDto, UpdateFlagDto } from './flags.dto.js';
 import { booleanVariations } from './variations.js';
 
@@ -17,10 +18,23 @@ export class FlagsService {
     private readonly projects: ProjectsService,
   ) {}
 
-  async list(projectKey: string): Promise<FlagDto[]> {
+  /** The project's flags by key, each with its targeting on or off in every environment. */
+  async list(projectKey: string): Promise<FlagListItemDto[]> {
     const project = await this.projects.find(projectKey);
-    const flags = await this.prisma.flag.findMany({ where: { projectId: project.id }, orderBy: { key: 'asc' } });
-    return flags.map((flag) => toFlagDto(project, flag));
+    const flags = await this.prisma.flag.findMany({
+      where: { projectId: project.id },
+      orderBy: { key: 'asc' },
+      include: {
+        targeting: {
+          select: { on: true, environment: { select: { key: true } } },
+          orderBy: { environment: { createdAt: 'asc' } },
+        },
+      },
+    });
+    return flags.map(({ targeting, ...flag }) => ({
+      ...toFlagDto(project, flag),
+      targeting: targeting.map((row) => ({ environmentKey: row.environment.key, on: row.on })),
+    }));
   }
 
   async get(projectKey: string, key: string): Promise<FlagDto> {
