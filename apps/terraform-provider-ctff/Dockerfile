@@ -2,7 +2,8 @@
 # then applies the example configuration (examples/birdwatch) to Core and exits. Build from the repository root:
 #   docker build -f apps/terraform-provider-ctff/Dockerfile -t ctff-terraform .
 # Configuration comes from environment variables: CTFF_BASE_URL (Core's base URL, default http://core:3000).
-# Terraform's state is kept in /state, a volume in compose, so applying again only changes what drifted.
+# Terraform's state is kept in /state, a volume in compose, so applying again only changes what drifted. A run
+# without state first imports what Core already has of the example (Core's demo seed creates the Birdwatch project).
 
 FROM golang:1.26-alpine AS build
 WORKDIR /src
@@ -26,6 +27,7 @@ ENV TF_CLI_CONFIG_FILE=/opt/ctff/terraformrc \
 COPY --from=build /out/plugins /opt/ctff/plugins
 COPY apps/terraform-provider-ctff/docker/terraformrc /opt/ctff/terraformrc
 COPY apps/terraform-provider-ctff/docker/apply.sh /opt/ctff/apply.sh
+COPY apps/terraform-provider-ctff/docker/adopt.txt /opt/ctff/adopt.txt
 COPY apps/terraform-provider-ctff/examples/birdwatch /opt/ctff/example
 RUN mkdir /state && chown 1000:1000 /state
 USER 1000:1000

@@ -58,13 +58,15 @@ jobs:
       - uses: ./.github/actions/setup
       # The end-to-end script below evaluates through the built SDK.
       - run: pnpm nx run @ctff/sdk:build
-      # --wait returns once every service with a health check reports healthy (Core: migrated and ready;
-      # Evaluator: first snapshots loaded).
+      # --wait returns once every service with a health check reports healthy (Core: migrated, seeded and ready;
+      # Evaluator: first snapshots loaded; birdwatch-api: SDK key found; birdwatch-web: birdwatch-api ready).
       - run: docker compose up --build --detach --wait --wait-timeout 300
       - name: Services run as non-root
         run: |
           test "$(docker compose exec -T core id -u)" != "0"
           test "$(docker compose exec -T evaluator id -u)" != "0"
+          test "$(docker compose exec -T birdwatch-api id -u)" != "0"
+          test "$(docker compose exec -T birdwatch-web id -u)" != "0"
       - name: Core serves its API on the migrated database
         run: |
           curl --fail --silent --show-error http://localhost:3000/health/ready
@@ -75,6 +77,8 @@ jobs:
         run: curl --fail --silent --show-error http://localhost:3000/projects | grep --quiet 'Smoke test'
       - name: The SDK sees targeting switched on through Core within one poll interval
         run: echo "SDK_KEY=$(node apps/evaluator/scripts/compose-smoke.ts switch-on)" >> "$GITHUB_ENV"
+      - name: Birdwatch logs sightings while new-sighting-form is on, and hides the form within one poll interval
+        run: node apps/birdwatch-api/scripts/compose-smoke.ts
       - name: The Evaluator keeps serving its last snapshot while Core is stopped
         run: |
           docker compose stop core
@@ -103,12 +107,16 @@ jobs:
           # Exited, not still running (an ExitCode of 0 alone would also match a running container).
           test "$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$container")" = 'exited 0'
       - run: docker compose up --detach --wait --wait-timeout 300
-      - name: Core holds the seeded project, attributed to terraform
+      # Core's demo seed creates the project first (actor seed); Terraform adopts it and applies the example over it.
+      - name: Core holds the example configuration, managed by and attributed to terraform
         run: |
           curl --fail --silent --show-error http://localhost:3000/api/v1/projects/birdwatch/flags/rare-bird-alerts/targeting/production \
             | jq --exit-status '.on == true and .rules[0].values == ["CA", "US"]'
+          curl --fail --silent --show-error http://localhost:3000/api/v1/projects/birdwatch/flags \
+            | jq --exit-status 'length == 3 and all(.[]; .managedBy == "terraform")'
           curl --fail --silent --show-error 'http://localhost:3000/api/v1/audit-entries?projectKey=birdwatch&limit=200' \
-            | jq --exit-status '(.entries | length > 0) and all(.entries[]; .actor == "terraform")'
+            | jq --exit-status 'all(.entries[]; .actor == "seed" or .actor == "terraform")
+                and any(.entries[]; .actor == "terraform" and .targetType == "targeting")'
       - name: Applying again restores targeting edited in the admin app
         run: |
           url=http://localhost:3000/api/v1/projects/birdwatch/flags/new-sighting-form/targeting/production

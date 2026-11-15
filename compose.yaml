@@ -26,6 +26,8 @@ services:
       DATABASE_URL: postgres://ctff:ctff@postgres:5432/ctff
       PORT: '3000'
       LOG_LEVEL: info
+      # Seeds the Birdwatch demo project on an empty database; set SEED_DEMO=false to start without it.
+      SEED_DEMO: ${SEED_DEMO:-true}
     ports:
       - '3000:3000'
     depends_on:
@@ -47,9 +49,42 @@ services:
     # No depends_on: the Evaluator polls until Core answers, and reports healthy (ready) only once it has loaded
     # its first snapshots. Once loaded, it keeps serving them while Core is stopped.
 
+  # Birdwatch, the demo: its API evaluates flags through the Evaluator with @ctff/nestjs.
+  birdwatch-api:
+    build:
+      context: .
+      dockerfile: apps/birdwatch-api/Dockerfile
+    image: ctff-birdwatch-api:local
+    environment:
+      EVALUATOR_URL: http://evaluator:3000
+      # The SDK key of birdwatch/development is generated, so the API looks it up in Core (or set CTFF_SDK_KEY).
+      CORE_URL: http://core:3000
+      CTFF_PROJECT: birdwatch
+      CTFF_ENVIRONMENT: development
+      PORT: '3000'
+      LOG_LEVEL: info
+    ports:
+      - '4001:3000'
+    # No depends_on: the API waits until Core has the environment, then starts listening.
+
+  # Birdwatch's website: http://localhost:4000
+  birdwatch-web:
+    build:
+      context: .
+      dockerfile: apps/birdwatch-web/Dockerfile
+    image: ctff-birdwatch-web:local
+    environment:
+      BIRDWATCH_API_URL: http://birdwatch-api:3000
+      PORT: '3000'
+      LOG_LEVEL: info
+    ports:
+      - '4000:3000'
+    # Reports healthy (ready) while birdwatch-api is.
+
   # Optional: `docker compose --profile terraform up` also builds the Terraform provider and applies the example
-  # configuration (apps/terraform-provider-ctff/examples/birdwatch) to Core, then exits. Its Terraform state is kept
-  # in a volume, so running it again only puts back what drifted.
+  # configuration (apps/terraform-provider-ctff/examples/birdwatch) to Core, then exits. The first run imports the
+  # demo project Core seeded and applies the configuration over it (with SEED_DEMO=false, it creates the project).
+  # Its Terraform state is kept in a volume, so running it again only puts back what drifted.
   terraform:
     profiles: [terraform]
     build:

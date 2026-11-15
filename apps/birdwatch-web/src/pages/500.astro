@@ -1,0 +1,15 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import Button from '@ds/components/ui/Button.astro';
+import BirdwatchLayout from '../layouts/BirdwatchLayout.astro';
+
+// Rendered for a page that failed, usually because birdwatch-api is unreachable; it calls nothing itself.
+Astro.response.status = 500;
+---
+
+<BirdwatchLayout title="Something went wrong">
+  <Alert variant="danger" icon="circle-alert" title="Birdwatch can’t load this page">
+    birdwatch-api didn’t answer as expected. Try again in a moment.
+  </Alert>
+  <Button href="/" variant="primary">Try again</Button>
+</BirdwatchLayout>
