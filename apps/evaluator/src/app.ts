@@ -16,7 +16,7 @@ export async function createApp(config: EvaluatorConfig, logger: Logger): Promis
   app.useLogger(app.get(NestPinoLogger));
   app.set('etag', false);
   app.disable('x-powered-by');
-  app.setGlobalPrefix(apiPrefix, { exclude: ['health/live', 'health/ready'] });
+  app.setGlobalPrefix(apiPrefix, { exclude: ['health/live', 'health/ready', 'metrics'] });
   app.enableShutdownHooks();
   return app;
 }
