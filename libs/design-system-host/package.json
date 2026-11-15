@@ -1,0 +1,36 @@
+{
+  "name": "@ctff/design-system-host",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Astro integration and tsconfig preset that let an Astro app consume the design system submodule from source.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tsconfig.json": "./tsconfig.astro.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "nx": {
+    "tags": [
+      "type:lib",
+      "scope:shared"
+    ]
+  },
+  "devDependencies": {
+    "astro": "^7.4.12",
+    "cva": "npm:class-variance-authority@^0.7.1",
+    "node-html-parser": "^6.1.13"
+  },
+  "peerDependencies": {
+    "astro": "^7.4.12",
+    "cva": "npm:class-variance-authority@^0.7.1",
+    "node-html-parser": "^6.1.13"
+  }
+}

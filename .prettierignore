@@ -1,0 +1,4 @@
+vendor/
+pnpm-lock.yaml
+dist/
+.nx/

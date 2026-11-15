@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "paths": {
+      "@ds/*": ["../../vendor/design-system/src/*"],
+      "@styles/*": ["../../vendor/design-system/src/styles/*"],
+      "astro": ["${configDir}/node_modules/astro"],
+      "astro/types": ["${configDir}/node_modules/astro/types.d.ts"],
+      "cva": ["${configDir}/node_modules/cva"],
+      "node-html-parser": ["${configDir}/node_modules/node-html-parser"]
+    }
+  }
+}
