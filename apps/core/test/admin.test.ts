@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { apiClient, uniqueKey } from './support/api.js';
+import { apiClient, uniqueKey, type ApiClient } from './support/api.js';
 import { browser, type Browser } from './support/browser.js';
 import { startCore, type RunningCore } from './support/core.js';
 
 describe('admin app inside Core', () => {
   let core: RunningCore;
   let admin: Browser;
-  let api: ReturnType<typeof apiClient>;
+  let api: ApiClient;
   beforeAll(async () => {
     core = await startCore();
     admin = browser(core.baseUrl);

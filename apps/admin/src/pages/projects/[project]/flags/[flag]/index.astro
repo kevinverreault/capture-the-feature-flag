@@ -61,6 +61,7 @@ const tabs = environments?.flatMap((environment) => {
       environment,
       // A rejected change keeps what was submitted, and the version it was based on (see ChangedElsewhere).
       on: posted ? post.value('on') !== undefined : current.on,
+      offVariation: String(flag?.variations[current.offVariation]),
       version: posted ? (post.value('version') ?? String(current.version)) : String(current.version),
       errors: posted ? post.errors : noFormErrors,
     },
@@ -87,7 +88,7 @@ const tabs = environments?.flatMap((environment) => {
         </p>
         {flag.description && <p class="description">{flag.description}</p>}
         {flag.tags.length > 0 && (
-          <p class="tags" aria-label="Tags">
+          <p class="tag-list" aria-label="Tags">
             {flag.tags.map((tag) => (
               <Badge variant="outline">{tag}</Badge>
             ))}
@@ -102,12 +103,12 @@ const tabs = environments?.flatMap((environment) => {
         {tabs.length === 0 ? (
           <p>
             This project has no environments yet: <a href={routes.environments(project.key)}>create one</a> to
-            switch this flag on in it.
+            switch this flag's targeting on in it.
           </p>
         ) : (
           <flag-tabs data-selected={Astro.url.searchParams.get('environment') ?? postedEnvironment ?? ''}>
             <Tabs label="Environments">
-              {tabs.map(({ environment, on, version, errors }) => (
+              {tabs.map(({ environment, on, offVariation, version, errors }) => (
                 <TabPanel label={environment.name} data-environment={environment.key}>
                   {errors.changedElsewhere && (
                     <ChangedElsewhere
@@ -123,11 +124,12 @@ const tabs = environments?.flatMap((environment) => {
                     <label class="switch-label">
                       <Switch name="on" checked={on} aria-describedby={`served-${environment.key}`} />
                       Targeting {on ? 'on' : 'off'} in {environment.name}
+                      {errors.changedElsewhere && ' (not saved)'}
                     </label>
                     <p id={`served-${environment.key}`} class="served">
                       {on
-                        ? 'Contexts get the default variation, true.'
-                        : 'Every context gets the off variation, false.'}
+                        ? 'Individual targets and rules decide what each context gets, then the default variation.'
+                        : `Every context gets the off variation, ${offVariation}.`}
                     </p>
                     <noscript>
                       <Button type="submit" variant="primary" size="small">
@@ -198,12 +200,6 @@ const tabs = environments?.flatMap((environment) => {
 
   .description {
     white-space: pre-line;
-  }
-
-  .tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25em;
   }
 
   .targeting-switch {

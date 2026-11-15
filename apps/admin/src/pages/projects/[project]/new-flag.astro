@@ -2,8 +2,8 @@
 import { unwrap } from '@ctff/core-api-client';
 import FormField from '@ds/components/form/FormField.astro';
 import Input from '@ds/components/form/Input.astro';
-import Textarea from '@ds/components/form/Textarea.astro';
 import Button from '@ds/components/ui/Button.astro';
+import FlagFields from '../../../components/FlagFields.astro';
 import FormAlert from '../../../components/FormAlert.astro';
 import NotFound from '../../../components/NotFound.astro';
 import ProjectNav from '../../../components/ProjectNav.astro';
@@ -51,12 +51,9 @@ if (!project) Astro.response.status = 404;
         <h2 id="create-flag" class="text-xl">
           Create a flag
         </h2>
-        <p>It starts with targeting off in every environment, serving false, until you switch it on.</p>
+        <p>It starts with targeting off in every environment, until you switch its targeting on.</p>
         <form method="post" class="stack">
           <FormAlert messages={errors.form} />
-          <FormField label="Name" error={errors.fields['name']}>
-            <Input name="name" value={post.value('name') ?? ''} required />
-          </FormField>
           <FormField
             label="Key"
             hint="Lowercase kebab-case, such as rare-bird-alerts. Your code refers to the flag by it, so it cannot be changed later."
@@ -64,12 +61,14 @@ if (!project) Astro.response.status = 404;
           >
             <Input name="key" value={post.value('key') ?? ''} required />
           </FormField>
-          <FormField label="Description (optional)" hint="What the flag controls." error={errors.fields['description']}>
-            <Textarea name="description" value={post.value('description') ?? ''} />
-          </FormField>
-          <FormField label="Tags (optional)" hint="Separated by commas, such as alerts, beta." error={errors.fields['tags']}>
-            <Input name="tags" value={post.value('tags') ?? ''} />
-          </FormField>
+          <FlagFields
+            values={{
+              name: post.value('name') ?? '',
+              description: post.value('description') ?? '',
+              tags: post.value('tags') ?? '',
+            }}
+            errors={errors}
+          />
           <Button type="submit" variant="primary">
             Create flag
           </Button>

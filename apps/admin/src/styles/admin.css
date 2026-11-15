@@ -52,3 +52,10 @@ h2 {
 .section-heading > h2 {
   margin: 0;
 }
+
+/* A flag's tags, as badges. */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+}

@@ -5,7 +5,7 @@ export function browser(baseUrl: string) {
   return {
     get: (path: string) => fetch(`${baseUrl}${path}`, { redirect: 'manual' }),
     /** Submits a form the way a browser does: urlencoded, from a page of the same origin. */
-    post: (path: string, fields: Record<string, string> | [string, string][]) =>
+    post: (path: string, fields: Record<string, string>) =>
       fetch(`${baseUrl}${path}`, {
         method: 'POST',
         redirect: 'manual',

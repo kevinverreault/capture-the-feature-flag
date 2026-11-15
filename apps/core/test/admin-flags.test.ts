@@ -283,6 +283,7 @@ describe('admin app: flags', () => {
     expect(development?.textContent).not.toContain('Changed elsewhere');
     // The switch shows what was submitted, still based on the version loaded.
     expect(productionTab?.querySelector('input[name="on"]')?.hasAttribute('checked')).toBe(true);
+    expect(productionTab?.querySelector('label')?.textContent).toContain('(not saved)');
     expect(productionTab?.querySelector('input[name="version"]')?.getAttribute('value')).toBe('1');
     expect(detail.querySelector('flag-tabs')?.getAttribute('data-selected')).toBe('production');
     expect((await api.get(production)).body).toMatchObject({ on: false, version: 3 });
