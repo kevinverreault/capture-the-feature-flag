@@ -212,12 +212,19 @@ func TestAccFlagEnvironmentResource_importAdoptsTargeting(t *testing.T) {
 				ImportState:        true,
 				ImportStateId:      ref.ID(),
 				ImportStatePersist: true,
+				// The states of every resource in the configuration; the imported one has the targeting's ID.
 				ImportStateCheck: func(states []*terraform.InstanceState) error {
-					attributes := states[0].Attributes
-					if attributes["on"] != "true" || attributes["individual_targets.#"] != "1" || attributes["rules.#"] != "0" {
-						return fmt.Errorf("imported targeting %v, want it on with one individual target and no rules", attributes)
+					for _, state := range states {
+						if state.ID != ref.ID() {
+							continue
+						}
+						attributes := state.Attributes
+						if attributes["on"] != "true" || attributes["individual_targets.#"] != "1" || attributes["rules.#"] != "0" {
+							return fmt.Errorf("imported targeting %v, want it on with one individual target and no rules", attributes)
+						}
+						return nil
 					}
-					return nil
+					return fmt.Errorf("no imported state with ID %s among %d", ref.ID(), len(states))
 				},
 			},
 			{
