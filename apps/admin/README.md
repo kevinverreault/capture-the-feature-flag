@@ -51,4 +51,4 @@ The dashboard's charts are plain HTML and CSS, server-rendered from the evaluati
 
 - `build`: `astro build` into `dist/` (Core's build depends on it).
 - `typecheck`: `astro check`.
-- `test`: the unit tests of the pure helpers in `src/lib`. The pages are covered by Core's S2 tests (`apps/core/test/admin*.test.ts`) and, with #23, by the Playwright end-to-end suite over compose.
+- `test`: the unit tests of the pure helpers in `src/lib`. The pages are covered by Core's S2 tests (`apps/core/test/admin*.test.ts`) and by the Playwright [end-to-end suite](../e2e/README.md) over compose.

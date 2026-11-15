@@ -98,6 +98,35 @@ jobs:
       - if: always()
         run: docker compose down --volumes
 
+  e2e:
+    name: End-to-end suite (S5) over compose
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: true
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter @ctff/e2e exec playwright install --with-deps chromium
+      # The suite's global setup starts the stack (compose.yaml with apps/e2e/compose.e2e.yaml) and waits until every
+      # service is healthy, then runs the scenarios headless. The stack is kept for the logs, and stopped below.
+      - name: Playwright drives the admin app, Birdwatch and the showcase over the compose stack
+        run: pnpm nx run @ctff/e2e:e2e
+        env:
+          E2E_STACK: compose
+          E2E_KEEP_STACK: '1'
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/e2e/playwright-report
+            apps/e2e/test-results
+      - if: failure()
+        run: docker compose -f compose.yaml -f apps/e2e/compose.e2e.yaml logs
+      - if: always()
+        run: docker compose -f compose.yaml -f apps/e2e/compose.e2e.yaml down --volumes
+
   compose-terraform:
     name: Compose Terraform profile
     runs-on: ubuntu-latest

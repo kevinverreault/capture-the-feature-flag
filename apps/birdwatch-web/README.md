@@ -40,4 +40,4 @@ A form post must come from the site's own pages: Astro checks its `Origin`. When
 
 Outside Docker: `pnpm nx run @ctff/birdwatch-web:build`, then `BIRDWATCH_API_URL=… pnpm --filter @ctff/birdwatch-web start`, or `pnpm --filter @ctff/birdwatch-web dev` for Astro's dev server.
 
-Beyond unit tests of its pure helpers (the flag inspector's rows and links, the Photo ID mock: `pnpm nx run @ctff/birdwatch-web:test`), the website has no tests of its own: the end-to-end suite (S5) and the compose smoke test ([birdwatch-api's](../birdwatch-api/README.md#tests)) cover it.
+Beyond unit tests of its pure helpers (the flag inspector's rows and links, the Photo ID mock: `pnpm nx run @ctff/birdwatch-web:test`), the website has no tests of its own: the [end-to-end suite](../e2e/README.md) (S5) and the compose smoke test ([birdwatch-api's](../birdwatch-api/README.md#tests)) cover it.

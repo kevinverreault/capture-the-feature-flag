@@ -1,0 +1,10 @@
+# Layered over the root compose.yaml by the end-to-end suite when it starts the stack itself:
+#
+#   docker compose -f compose.yaml -f apps/e2e/compose.e2e.yaml up --build --wait
+#
+# Evaluators send their telemetry about every 60 s; every 2 s here, so the dashboard and the Contexts explorer
+# scenario sees Birdwatch's traffic within seconds. Everything else is the stack as `docker compose up` runs it.
+services:
+  evaluator:
+    environment:
+      TELEMETRY_FLUSH_INTERVAL_MS: '2000'
