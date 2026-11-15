@@ -1,0 +1,68 @@
+---
+import { fullCount } from '../../lib/dashboard';
+import { seriesColor } from './series';
+
+interface Props {
+  variations: readonly string[];
+  /** The counts per variation, in the chart's order. */
+  counts: readonly number[];
+  /** What the counts are of, above them (a bucket's time), if anything. */
+  heading?: string | undefined;
+}
+
+const { variations, counts, heading } = Astro.props;
+---
+
+<!-- Shown while its mark is hovered or focused (the chart's CSS says when); the mark's label already says the same. -->
+<span class="chart-tip" aria-hidden="true">
+  {heading && <span class="tip-heading">{heading}</span>}
+  {
+    variations.map((variation, slot) => (
+      <span class="tip-row">
+        <span class="tip-key" style={`background-color: ${seriesColor(slot)}`} />
+        <strong>{fullCount(counts[slot] ?? 0)}</strong>
+        <code>{variation}</code>
+      </span>
+    ))
+  }
+</span>
+
+<style>
+  .chart-tip {
+    position: absolute;
+    bottom: calc(100% + 0.25em);
+    left: 0;
+    z-index: 1;
+    display: none;
+    gap: 0.2em;
+    min-width: max-content;
+    padding: 0.5em 0.75em;
+    border: 1px solid hsl(var(--color-on-background) / 0.15);
+    border-radius: var(--border);
+    background-color: hsl(var(--color-background));
+    box-shadow: 0 0.25rem 1rem hsl(var(--color-on-background) / 0.12);
+    font-size: var(--fs-sm);
+  }
+
+  .tip-heading {
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .tip-row {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+  }
+
+  /* A short line keys each row, rather than a box. */
+  .tip-key {
+    width: 0.75em;
+    height: 2px;
+  }
+
+  @media (forced-colors: active) {
+    .tip-key {
+      forced-color-adjust: none;
+    }
+  }
+</style>

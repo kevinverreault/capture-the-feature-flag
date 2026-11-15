@@ -59,3 +59,56 @@ h2 {
   flex-wrap: wrap;
   gap: 0.25em;
 }
+
+/*
+ * The evaluation charts' series colors: the design system's sage (true) and terracotta (false), each stepped for
+ * its theme so that the pair stays apart for color-blind readers and on the dark background (checked with a
+ * palette validator: lightness band, CVD and normal-vision separation, contrast). Light terracotta is below 3:1
+ * on white, so every chart also has a table view. Any other variation is gray.
+ */
+:root {
+  --chart-series-1: 95 45% 30%;
+  --chart-series-2: 13 60% 62%;
+  --chart-series-other: 0 0% 55%;
+  --chart-grid: var(--color-on-background) / 0.1;
+  --chart-axis: var(--color-on-background) / 0.3;
+}
+
+:root.theme-dark {
+  --chart-series-1: 95 35% 47%;
+  --chart-series-2: 13 80% 42%;
+}
+
+/*
+ * A chart: its caption and table-view toggle. A mark's target (a column, a bar's row) is wider than the mark: a
+ * ghost wash shows the one hovered or focused, and it shows its tooltip (.chart-tip) meanwhile.
+ */
+.chart figcaption {
+  font-size: var(--fs-sm);
+  color: hsl(var(--color-on-background) / 0.75);
+}
+
+.chart summary {
+  cursor: pointer;
+}
+
+.chart-target {
+  position: relative;
+  border-radius: 2px;
+  outline: none;
+}
+
+.chart-target:hover,
+.chart-target:focus-visible {
+  background-color: hsl(var(--color-on-background) / 0.06);
+}
+
+.chart-target:focus-visible {
+  outline: 2px solid hsl(var(--color-accent));
+  outline-offset: -2px;
+}
+
+.chart-target:hover .chart-tip,
+.chart-target:focus-visible .chart-tip {
+  display: grid;
+}

@@ -3,6 +3,7 @@ import { LoggerModule } from 'nestjs-pino';
 import type { Logger } from 'pino';
 import { AuditModule } from './audit/audit.module.js';
 import { CORE_CONFIG, type CoreConfig } from './config.js';
+import { DashboardModule } from './dashboard/dashboard.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EnvironmentsModule } from './environments/environments.module.js';
 import { EvaluatorModule } from './evaluator/evaluator.module.js';
@@ -45,6 +46,7 @@ export class AppModule {
         SettingsModule,
         TelemetryModule,
         AuditModule,
+        DashboardModule,
       ],
       controllers: [HealthController],
     };

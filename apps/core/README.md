@@ -29,6 +29,12 @@ Evaluators send what they added up to `POST /api/v1/evaluator/telemetry` about o
 - `GET /api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts` lists the seen contexts, most recently seen first: the newest 100, or `limit` (up to 1,000).
 - `GET /api/v1/settings` and `PATCH /api/v1/settings` read and change the install-wide settings: `metricRetentionDays` (default 30), `seenContextRetentionDays` (30), `seenContextCap` (1,000 per environment) and `staleFlagThresholdDays` (7). The admin app's Settings page edits them.
 
+The admin app's dashboard reads the telemetry through endpoints of its own, which do the summing in the database:
+
+- `GET /api/v1/projects/{projectKey}/dashboard/evaluations` sums the count buckets of the last 24 hours (`range=24h`, the default) into hourly buckets, or of the last 7 days (`range=7d`) into 6-hour buckets, per flag, environment and variation, optionally for one `environment`. Buckets are aligned on UTC (whole hours; 00:00, 06:00, 12:00 and 18:00). The last one is the current one, still filling, so there is one bucket more than the range holds (25 hourly buckets, or 29 of 6 hours) and the whole range is covered. Only buckets with evaluations are listed. It also returns the range's `from`, `to` and `bucketMinutes`, so a chart can lay out the empty ones.
+- `GET /api/v1/projects/{projectKey}/dashboard/stale-flags` lists the stale flags: those without evaluations in any environment for the stale-flag threshold of the settings, never evaluated first, then the longest without, with when each was last evaluated (`lastEvaluatedAt`, null when the count buckets kept have none). Archived flags, and flags younger than the threshold, are not stale. A metric retention shorter than the threshold makes flags evaluated before it look never evaluated.
+- `GET /api/v1/projects/{projectKey}/dashboard/summary` counts the project's flags (and archived flags), and how many are on and off in each environment, archived flags left out.
+
 The retention job deletes count buckets older than the metric retention and seen contexts last seen before the seen-context retention, and trims each environment to the cap. It runs in the background when Core starts, every `RETENTION_INTERVAL_MS`, and whenever the settings change, so a change applies at once, without a redeploy (the `PATCH` answers once it has run).
 
 Several Evaluators and Core replicas can write telemetry at once. Each batch is stored in one transaction, which holds the environments and flags it names so none is deleted under it; one being deleted at that moment is skipped with its telemetry. Writes to an environment's seen contexts, by ingestion and by retention alike, take a per-environment lock in a fixed order, so they wait for each other instead of deadlocking.
@@ -65,6 +71,9 @@ Projects, environments and flags are addressed by their keys, which are lowercas
 | `/api/v1/evaluator/telemetry`                                         | `POST` (for Evaluators)   |
 | `/api/v1/projects/{project}/evaluation-counts`                        | `GET`                     |
 | `/api/v1/projects/{project}/environments/{environment}/seen-contexts` | `GET`                     |
+| `/api/v1/projects/{project}/dashboard/summary`                        | `GET`                     |
+| `/api/v1/projects/{project}/dashboard/evaluations`                    | `GET`                     |
+| `/api/v1/projects/{project}/dashboard/stale-flags`                    | `GET`                     |
 | `/api/v1/settings`                                                    | `GET`, `PATCH`            |
 
 - Each environment gets a generated SDK key (`ctff-env-…`).

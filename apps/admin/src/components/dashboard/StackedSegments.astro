@@ -1,0 +1,61 @@
+---
+import { seriesColor } from './series';
+
+interface Props {
+  /** The counts per variation, in the chart's order; each gets a segment the size of its share. */
+  counts: readonly number[];
+  /** Which way the segments stack: up from the baseline (a column) or right from it (a bar). */
+  direction: 'up' | 'right';
+  /** The size of the whole stack along `direction` (`height: 40%`, `width: 40%`) and anything else it needs. */
+  style: string;
+  class?: string | undefined;
+}
+
+const { counts, direction, style, class: className } = Astro.props;
+---
+
+<span class:list={['stacked-segments', direction, className]} style={style}>
+  {
+    counts.map((count, slot) =>
+      count > 0 ? <span style={`flex-grow: ${count}; background-color: ${seriesColor(slot)}`} /> : null,
+    )
+  }
+</span>
+
+<style>
+  /* A 2px gap separates the segments, and the end away from the baseline is rounded. */
+  .stacked-segments {
+    display: flex;
+    gap: 2px;
+    overflow: hidden;
+  }
+
+  .stacked-segments > span {
+    flex-basis: 0;
+  }
+
+  .up {
+    flex-direction: column-reverse;
+    border-radius: 4px 4px 0 0;
+  }
+
+  .up > span {
+    min-height: 1px;
+  }
+
+  .right {
+    flex-direction: row;
+    min-width: 2px;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .right > span {
+    min-width: 1px;
+  }
+
+  @media (forced-colors: active) {
+    .stacked-segments > span {
+      forced-color-adjust: none;
+    }
+  }
+</style>

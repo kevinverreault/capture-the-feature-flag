@@ -5,6 +5,7 @@ const flagPath = (project: string, flagKey: string) => `/projects/${segment(proj
 
 export const routes = {
   projects: () => '/projects',
+  /** A project's dashboard, its landing page. */
   project: (project: string) => `/projects/${segment(project)}`,
   environments: (project: string) => `/projects/${segment(project)}/environments`,
   environment: (project: string, environment: string) =>

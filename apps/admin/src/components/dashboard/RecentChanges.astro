@@ -1,0 +1,76 @@
+---
+import type { AuditEntry } from '@ctff/core-api-client';
+import Badge from '@ds/components/ui/Badge.astro';
+import { auditSummary } from '../../lib/audit';
+import { routes } from '../../lib/routes';
+
+interface Props {
+  entries: readonly AuditEntry[];
+  /** The keys of the project's flags (archived ones included): changes to them link to their page. */
+  flagKeys: ReadonlySet<string>;
+}
+
+const { entries, flagKeys } = Astro.props;
+const when = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' });
+---
+
+{
+  entries.length === 0 ? (
+    <p>No changes yet.</p>
+  ) : (
+    <ol class="recent-changes">
+      {entries.map((entry) => {
+        const summary = auditSummary(entry);
+        const flagHref =
+          entry.flagKey !== null && flagKeys.has(entry.flagKey)
+            ? routes.flag(entry.projectKey, entry.flagKey, entry.environmentKey ?? undefined)
+            : undefined;
+        return (
+          <li data-audit-entry={entry.id}>
+            <Badge variant={entry.action === 'delete' ? 'danger' : 'outline'}>{entry.action}</Badge>
+            <span class="change">
+              {flagHref ? <a href={flagHref}>{summary}</a> : summary}
+              <span class="meta">
+                by <strong>{entry.actor}</strong> · <time datetime={entry.createdAt}>{when.format(new Date(entry.createdAt))} UTC</time>
+              </span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  )
+}
+
+<style>
+  .recent-changes {
+    display: grid;
+    gap: var(--space-xs);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: baseline;
+    padding-bottom: var(--space-xs);
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.1);
+  }
+
+  .change {
+    display: grid;
+    gap: 0.1em;
+    overflow-wrap: anywhere;
+  }
+
+  .change > a {
+    color: inherit;
+    font-weight: 700;
+  }
+
+  .meta {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+</style>

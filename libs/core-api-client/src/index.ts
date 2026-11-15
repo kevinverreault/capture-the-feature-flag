@@ -9,6 +9,10 @@ export type Environment = Schemas['EnvironmentDto'];
 export type AuditEntry = Schemas['AuditEntryDto'];
 export type AuditEntryPage = Schemas['AuditEntryPageDto'];
 export type Settings = Schemas['SettingsDto'];
+export type DashboardSummary = Schemas['DashboardSummaryDto'];
+export type EvaluationRange = Schemas['EvaluationRange'];
+export type EvaluationSeries = Schemas['EvaluationSeriesDto'];
+export type StaleFlags = Schemas['StaleFlagsDto'];
 
 /** A typed client for Core's API: `core.GET('/api/v1/projects')`, with paths, parameters and bodies checked. */
 export type CoreApiClient = Client<paths>;
