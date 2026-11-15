@@ -1,3 +1,4 @@
+import { sdkKeyHeader } from '@ctff/evaluation';
 import { BadRequestException, Controller, Get, Headers, Res } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -8,16 +9,32 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { EnvironmentListDto } from './environment-list.dto.js';
+import { EnvironmentListService } from './environment-list.service.js';
+import { sendWithEtag } from './json-with-etag.js';
 import { EnvironmentSnapshotDto } from './snapshot.dto.js';
-import { matchesIfNoneMatch, SnapshotService } from './snapshot.service.js';
-
-export const sdkKeyHeader = 'x-ctff-sdk-key';
+import { SnapshotService } from './snapshot.service.js';
 
 /** The endpoints Evaluators call (ADR 0001). */
 @ApiTags('evaluator')
 @Controller('evaluator')
 export class EvaluatorController {
-  constructor(private readonly snapshots: SnapshotService) {}
+  constructor(
+    private readonly environmentList: EnvironmentListService,
+    private readonly snapshots: SnapshotService,
+  ) {}
+
+  /** Evaluators poll this list to learn which environments to keep a snapshot of. */
+  @Get('environments')
+  @ApiHeader({ name: 'If-None-Match', required: false, description: 'The ETag of the list already held.' })
+  @ApiOkResponse({ type: EnvironmentListDto, description: 'Every environment of every project, with an ETag.' })
+  @ApiResponse({ status: 304, description: 'The list has not changed since the ETag in If-None-Match.' })
+  async environments(
+    @Headers('if-none-match') ifNoneMatch: string | undefined,
+    @Res() response: Response,
+  ): Promise<void> {
+    sendWithEtag(response, await this.environmentList.list(), ifNoneMatch);
+  }
 
   /**
    * The SDK key travels in a header rather than the path, so it stays out of access logs and URLs; it becomes a
@@ -39,14 +56,8 @@ export class EvaluatorController {
     @Res() response: Response,
   ): Promise<void> {
     if (!sdkKey) throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
-    const { json, etag } = await this.snapshots.forSdkKey(sdkKey);
-    response.setHeader('ETag', etag);
-    response.setHeader('Cache-Control', 'no-cache');
+    const snapshot = await this.snapshots.forSdkKey(sdkKey);
     response.setHeader('Vary', sdkKeyHeader);
-    if (matchesIfNoneMatch(ifNoneMatch, etag)) {
-      response.status(304).end();
-      return;
-    }
-    response.status(200).type('application/json').send(json);
+    sendWithEtag(response, snapshot, ifNoneMatch);
   }
 }

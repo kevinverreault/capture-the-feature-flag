@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Targeting semantics in one place: the shared types for targeting, environment snapshots and telemetry, and (later) the pure evaluation function.",
+  "description": "Targeting semantics in one place: the pure evaluation function, and the shared types for targeting, environment snapshots, evaluations and telemetry.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -16,7 +16,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.lib.json",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run"
   },
   "nx": {
     "tags": [

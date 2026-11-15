@@ -689,6 +689,40 @@
         ]
       }
     },
+    "/api/v1/evaluator/environments": {
+      "get": {
+        "operationId": "EvaluatorController_environments",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "The ETag of the list already held.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every environment of every project, with an ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentListDto"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The list has not changed since the ETag in If-None-Match."
+          }
+        },
+        "tags": [
+          "evaluator"
+        ]
+      }
+    },
     "/api/v1/evaluator/snapshot": {
       "get": {
         "operationId": "EvaluatorController_snapshot",
@@ -1145,6 +1179,43 @@
         },
         "required": [
           "version"
+        ]
+      },
+      "EnvironmentListEntryDto": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "example": "birdwatch"
+          },
+          "environmentKey": {
+            "type": "string",
+            "example": "production"
+          },
+          "sdkKey": {
+            "type": "string",
+            "example": "ctff-env-…"
+          }
+        },
+        "required": [
+          "projectKey",
+          "environmentKey",
+          "sdkKey"
+        ]
+      },
+      "EnvironmentListDto": {
+        "type": "object",
+        "properties": {
+          "environments": {
+            "description": "Every environment of every project, by SDK key.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentListEntryDto"
+            }
+          }
+        },
+        "required": [
+          "environments"
         ]
       },
       "TargetingSnapshotDto": {

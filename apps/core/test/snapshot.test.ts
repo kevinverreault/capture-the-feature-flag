@@ -1,4 +1,4 @@
-import type { EnvironmentSnapshot } from '@ctff/evaluation';
+import type { EnvironmentList, EnvironmentSnapshot } from '@ctff/evaluation';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { apiClient, uniqueKey, type ApiClient } from './support/api.js';
 import { startCore, type RunningCore } from './support/core.js';
@@ -116,5 +116,65 @@ describe('evaluator snapshot', () => {
 
     await expect.poll(snapshotRequests).toBe(before + 1);
     expect(JSON.stringify(core.logs)).not.toContain(production);
+  });
+});
+
+describe('evaluator environment list', () => {
+  let core: RunningCore;
+  let api: ApiClient;
+  beforeAll(async () => {
+    core = await startCore();
+    api = apiClient(core.baseUrl);
+  });
+  afterAll(() => core?.stop());
+
+  const environments = (headers: Record<string, string> = {}) =>
+    api.get<EnvironmentList>('/evaluator/environments', headers);
+
+  it('lists every environment of every project with its SDK key, so Evaluators know which snapshots to poll', async () => {
+    const first = uniqueKey('project');
+    const second = uniqueKey('project');
+    await api.post('/projects', { key: first, name: 'First' });
+    await api.post('/projects', { key: second, name: 'Second' });
+    const created = [
+      await api.post(`/projects/${first}/environments`, { key: 'development', name: 'Dev' }),
+      await api.post(`/projects/${first}/environments`, { key: 'production', name: 'Prod' }),
+      await api.post(`/projects/${second}/environments`, { key: 'production', name: 'Prod' }),
+    ].map(({ body }) => ({ projectKey: body.projectKey, environmentKey: body.key, sdkKey: body.sdkKey }));
+
+    const response = await environments();
+    expect(response.status).toBe(200);
+    const expected: EnvironmentList = {
+      environments: [...created].sort((a, b) => (a.sdkKey < b.sdkKey ? -1 : 1)),
+    };
+    expect(response.body).toEqual(expected);
+  });
+
+  it('sends an ETag, answers 304 while nothing changed and a new list once an environment is added or deleted', async () => {
+    const projectKey = uniqueKey('project');
+    await api.post('/projects', { key: projectKey, name: 'Project' });
+    await api.post(`/projects/${projectKey}/environments`, { key: 'development', name: 'Dev' });
+
+    const first = await environments();
+    const etag = first.headers.get('etag') ?? '';
+    expect(etag).toMatch(/^"[^"]+"$/);
+    expect((await environments({ 'if-none-match': etag })).status).toBe(304);
+
+    // Flag changes show in snapshots, not in the environment list.
+    await api.post(`/projects/${projectKey}/flags`, { key: 'unrelated', name: 'Unrelated' });
+    expect((await environments({ 'if-none-match': etag })).status).toBe(304);
+
+    await api.post(`/projects/${projectKey}/environments`, { key: 'production', name: 'Prod' });
+    const added = await environments({ 'if-none-match': etag });
+    expect(added.status).toBe(200);
+    const addedEtag = added.headers.get('etag') ?? '';
+    expect(addedEtag).not.toBe(etag);
+
+    await api.delete(`/projects/${projectKey}/environments/production`);
+    const deleted = await environments({ 'if-none-match': addedEtag });
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.environments.filter((entry) => entry.projectKey === projectKey)).toEqual([
+      expect.objectContaining({ environmentKey: 'development' }),
+    ]);
   });
 });

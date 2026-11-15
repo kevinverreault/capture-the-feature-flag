@@ -44,6 +44,7 @@ Projects, environments and flags are addressed by their keys, which are lowercas
 | `/api/v1/projects/{project}/flags/{flag}`                 | `GET`, `PATCH`, `DELETE`  |
 | `/api/v1/projects/{project}/flags/{flag}/targeting`       | `GET` (every environment) |
 | `/api/v1/projects/{project}/flags/{flag}/targeting/{env}` | `GET`, `PATCH`            |
+| `/api/v1/evaluator/environments`                          | `GET` (for Evaluators)    |
 | `/api/v1/evaluator/snapshot` (header `X-CTFF-SDK-Key`)    | `GET` (for Evaluators)    |
 
 - Each environment gets a generated SDK key (`ctff-env-…`).
@@ -51,6 +52,7 @@ Projects, environments and flags are addressed by their keys, which are lowercas
 - Every flag is stored with the variations `[true, false]` ([ADR 0002](../../docs/adr/0002-boolean-flags-stored-as-variations.md)), and targeting refers to them by index. Creating a flag gives it off-state targeting in every environment: targeting off, off variation `false` (index 1), default variation `true` (index 0). Creating an environment gives every existing flag the same off-state targeting there.
 - Flags and targeting carry a `version`. A `PATCH` must send the version it is based on, and an outdated one is rejected with `409 Conflict`. A duplicate key also gets `409`.
 - A `400` for an invalid body lists every message in `message`, and groups the same messages by property in `fields` (e.g. `{ "name": ["name must not be blank"] }`), so a form can show each next to its input.
+- The environment list (`EnvironmentList` from `@ctff/evaluation`) names every environment of every project with its SDK key, ordered by SDK key, so Evaluators know which snapshots to poll. It has a strong `ETag` and answers `304 Not Modified` to a matching `If-None-Match`. It only changes when an environment is added or deleted.
 - The snapshot endpoint returns the targeting of every flag in the environment named by the `X-CTFF-SDK-Key` header (kept out of URLs and redacted from logs), typed by `EnvironmentSnapshot` from `@ctff/evaluation`. It sends a strong `ETag` derived from the snapshot's content, and answers `304 Not Modified` to a matching `If-None-Match` ([ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md)).
 
 ## Schema and migrations

@@ -1,0 +1,30 @@
+{
+  "name": "@ctff/sdk",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The TypeScript SDK: evaluates flags remotely through an Evaluator, and returns the caller's fallback value instead of throwing.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "tags": [
+      "type:lib",
+      "scope:shared"
+    ]
+  },
+  "dependencies": {
+    "@ctff/evaluation": "workspace:*"
+  }
+}

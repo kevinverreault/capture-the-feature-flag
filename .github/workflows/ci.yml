@@ -43,11 +43,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           submodules: true
-      # --wait returns once every service with a health check reports healthy (Core: migrated and ready).
+      - uses: ./.github/actions/setup
+      # The end-to-end script below evaluates through the built SDK.
+      - run: pnpm nx run @ctff/sdk:build
+      # --wait returns once every service with a health check reports healthy (Core: migrated and ready;
+      # Evaluator: first snapshots loaded).
       - run: docker compose up --build --detach --wait --wait-timeout 300
-      - name: Core runs as non-root
-        run: test "$(docker compose exec -T core id -u)" != "0"
+      - name: Services run as non-root
+        run: |
+          test "$(docker compose exec -T core id -u)" != "0"
+          test "$(docker compose exec -T evaluator id -u)" != "0"
       - name: Core serves its API on the migrated database
         run: |
           curl --fail --silent --show-error http://localhost:3000/health/ready
@@ -56,6 +63,14 @@ jobs:
             -H 'content-type: application/json' -d '{"key":"smoke-test","name":"Smoke test"}'
       - name: Core serves the admin app, which reads the API
         run: curl --fail --silent --show-error http://localhost:3000/projects | grep --quiet 'Smoke test'
+      - name: The SDK sees targeting switched on through Core within one poll interval
+        run: echo "SDK_KEY=$(node apps/evaluator/scripts/compose-smoke.ts switch-on)" >> "$GITHUB_ENV"
+      - name: The Evaluator keeps serving its last snapshot while Core is stopped
+        run: |
+          docker compose stop core
+          sleep 5
+          curl --fail --silent --show-error http://localhost:3001/health/ready
+          node apps/evaluator/scripts/compose-smoke.ts expect "$SDK_KEY" smoke-test-flag true
       - if: failure()
         run: docker compose logs
       - if: always()
