@@ -1,21 +1,14 @@
 import type { EnvironmentSnapshot, Variation } from '@ctff/evaluation';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { createHash } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service.js';
 import { toTargetingSnapshot } from '../targeting/targeting-snapshot.js';
-
-export interface SerializedSnapshot {
-  /** The snapshot as JSON, exactly as it is sent. */
-  json: string;
-  /** A strong ETag derived from the JSON, so it changes exactly when the snapshot does. */
-  etag: string;
-}
+import { type JsonWithEtag, toJsonWithEtag } from './json-with-etag.js';
 
 @Injectable()
 export class SnapshotService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async forSdkKey(sdkKey: string): Promise<SerializedSnapshot> {
+  async forSdkKey(sdkKey: string): Promise<JsonWithEtag> {
     const environment = await this.prisma.environment.findUnique({ where: { sdkKey }, include: { project: true } });
     if (!environment) throw new NotFoundException('Unknown SDK key');
 
@@ -36,14 +29,6 @@ export class SnapshotService {
       })),
     };
 
-    const json = JSON.stringify(snapshot);
-    return { json, etag: `"${createHash('sha256').update(json).digest('base64url')}"` };
+    return toJsonWithEtag(snapshot);
   }
-}
-
-/** Whether an If-None-Match header matches the ETag (weak comparison, as RFC 9110 requires for this header). */
-export function matchesIfNoneMatch(ifNoneMatch: string | undefined, etag: string): boolean {
-  if (!ifNoneMatch) return false;
-  const opaque = (tag: string) => tag.trim().replace(/^W\//, '');
-  return ifNoneMatch.split(',').some((candidate) => candidate.trim() === '*' || opaque(candidate) === opaque(etag));
 }

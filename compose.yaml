@@ -32,5 +32,20 @@ services:
       postgres:
         condition: service_healthy
 
+  evaluator:
+    build:
+      context: .
+      dockerfile: apps/evaluator/Dockerfile
+    image: ctff-evaluator:local
+    environment:
+      CORE_URL: http://core:3000
+      PORT: '3000'
+      LOG_LEVEL: info
+      POLL_INTERVAL_MS: '2000'
+    ports:
+      - '3001:3000'
+    # No depends_on: the Evaluator polls until Core answers, and reports healthy (ready) only once it has loaded
+    # its first snapshots. Once loaded, it keeps serving them while Core is stopped.
+
 volumes:
   postgres-data:

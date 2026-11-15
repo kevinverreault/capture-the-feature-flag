@@ -689,6 +689,40 @@
         ]
       }
     },
+    "/api/v1/evaluator/environments": {
+      "get": {
+        "operationId": "EvaluatorController_environments",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "The ETag of the list already held.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every environment of every project, with an ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentListDto"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The list has not changed since the ETag in If-None-Match."
+          }
+        },
+        "tags": [
+          "evaluator"
+        ]
+      }
+    },
     "/api/v1/evaluator/snapshot": {
       "get": {
         "operationId": "EvaluatorController_snapshot",
@@ -944,6 +978,14 @@
             "type": "number",
             "description": "Incremented on every edit; send it back with the next edit."
           },
+          "managedBy": {
+            "type": "string",
+            "enum": [
+              "terraform"
+            ],
+            "nullable": true,
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -968,6 +1010,7 @@
           "tags",
           "variations",
           "version",
+          "managedBy",
           "createdAt",
           "updatedAt",
           "targeting"
@@ -994,14 +1037,24 @@
             "description": "What the flag controls."
           },
           "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
             "example": [
               "alerts"
             ],
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "maxItems": 50
+          },
+          "managedBy": {
+            "type": "string",
+            "nullable": false,
+            "enum": [
+              "terraform"
+            ],
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
           }
         },
         "required": [
@@ -1048,6 +1101,14 @@
             "type": "number",
             "description": "Incremented on every edit; send it back with the next edit."
           },
+          "managedBy": {
+            "type": "string",
+            "enum": [
+              "terraform"
+            ],
+            "nullable": true,
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -1065,6 +1126,7 @@
           "tags",
           "variations",
           "version",
+          "managedBy",
           "createdAt",
           "updatedAt"
         ]
@@ -1091,14 +1153,24 @@
             "description": "What the flag controls."
           },
           "tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64,
+              "pattern": "^\\S(?:.*\\S)?$"
+            },
             "example": [
               "alerts"
             ],
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "maxItems": 50
+          },
+          "managedBy": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "terraform"
+            ],
+            "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag. Send null to clear it."
           }
         },
         "required": [
@@ -1230,6 +1302,43 @@
         },
         "required": [
           "version"
+        ]
+      },
+      "EnvironmentListEntryDto": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "example": "birdwatch"
+          },
+          "environmentKey": {
+            "type": "string",
+            "example": "production"
+          },
+          "sdkKey": {
+            "type": "string",
+            "example": "ctff-env-…"
+          }
+        },
+        "required": [
+          "projectKey",
+          "environmentKey",
+          "sdkKey"
+        ]
+      },
+      "EnvironmentListDto": {
+        "type": "object",
+        "properties": {
+          "environments": {
+            "description": "Every environment of every project, by SDK key.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentListEntryDto"
+            }
+          }
+        },
+        "required": [
+          "environments"
         ]
       },
       "TargetingSnapshotDto": {

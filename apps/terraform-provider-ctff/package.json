@@ -1,0 +1,56 @@
+{
+  "name": "@ctff/terraform-provider",
+  "version": "0.0.0",
+  "private": true,
+  "description": "terraform-provider-ctff: manages projects, environments and flags as code through Core's API (Go, Terraform Plugin Framework; ADR 0004).",
+  "scripts": {
+    "build": "go build -o dist/terraform-provider-ctff .",
+    "typecheck": "go vet ./...",
+    "lint": "unformatted=$(gofmt -l .) && test -z \"$unformatted\" || { echo \"gofmt needed: $unformatted\"; exit 1; }",
+    "test": "TF_ACC=1 go test -count=1 ./..."
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:terraform"
+    ],
+    "implicitDependencies": [
+      "@ctff/core"
+    ],
+    "targets": {
+      "lint": {
+        "dependsOn": [],
+        "inputs": [
+          "default",
+          {
+            "runtime": "go version"
+          }
+        ]
+      },
+      "typecheck": {
+        "dependsOn": [],
+        "inputs": [
+          "default",
+          {
+            "runtime": "go version"
+          }
+        ]
+      },
+      "build": {
+        "dependsOn": [],
+        "inputs": [
+          "production",
+          {
+            "runtime": "go version"
+          }
+        ]
+      },
+      "test": {
+        "dependsOn": [
+          "^build"
+        ],
+        "cache": false
+      }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "name": "@ctff/evaluator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Evaluator: answers evaluation requests from in-memory snapshots of targeting that it polls from Core. No database access (ADR 0001).",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.app.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "start": "node dist/main.js",
+    "docker-build": "docker build -f Dockerfile -t ctff-evaluator:local ../.."
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:evaluator"
+    ],
+    "targets": {
+      "test": {
+        "dependsOn": [
+          "build",
+          "^build"
+        ]
+      }
+    }
+  },
+  "dependencies": {
+    "@ctff/evaluation": "workspace:*",
+    "@nestjs/common": "^11.2.10",
+    "@nestjs/core": "^11.2.10",
+    "@nestjs/platform-express": "^11.2.10",
+    "nestjs-pino": "^5.3.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@ctff/sdk": "workspace:*",
+    "@types/express": "^5.0.6",
+    "typescript": "~6.0.3"
+  }
+}
