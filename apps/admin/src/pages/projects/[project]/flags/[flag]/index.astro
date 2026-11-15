@@ -21,7 +21,7 @@ import { routes } from '../../../../../lib/routes';
 import {
   readTargetingDraft,
   targetingChange,
-  targetingChangeFields,
+  targetingChangeForm,
   targetingDraft,
   targetingDraftErrors,
   type TargetingChange,
@@ -39,11 +39,13 @@ const flagAction = (call: () => Promise<unknown>, location: string, flash: strin
     return { location, flash };
   },
 });
-/** Saves a targeting change to one environment, then goes back to its tab, saying what was done there. */
+/**
+ * Saves a targeting change to one environment; resolves to the targeting saved, the page to go back to (its tab)
+ * and the environment's name, for the confirmation.
+ */
 async function saveTargeting(
   environmentKey: string,
   body: { version: number; on?: boolean } & Partial<TargetingChange>,
-  done: (on: boolean) => string,
 ) {
   const targeting = await unwrap(
     core.PATCH('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting/{environmentKey}', {
@@ -56,34 +58,31 @@ async function saveTargeting(
       params: { path: { projectKey, environmentKey } },
     }),
   );
-  return {
-    location: routes.flag(projectKey, flagKey, targeting.environmentKey),
-    flash: `${done(targeting.on)} in ${environment.name}`,
-  };
+  return { targeting, location: routes.flag(projectKey, flagKey, targeting.environmentKey), name: environment.name };
 }
 const post = await handlePost(Astro, {
   'edit-targeting': {
-    fields: targetingChangeFields,
+    ...targetingChangeForm,
     versioned: true,
     send: async (form) => {
-      const { variations } = await unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }));
-      const change = targetingChange(readTargetingDraft(form, variations.length));
-      return saveTargeting(
-        textField(form, 'environment'),
-        { version: Number(textField(form, 'version')), ...change },
-        () => 'Targeting saved',
-      );
+      const change = targetingChange(readTargetingDraft(form));
+      const { location, name } = await saveTargeting(textField(form, 'environment'), {
+        version: Number(textField(form, 'version')),
+        ...change,
+      });
+      return { location, flash: `Targeting saved in ${name}` };
     },
   },
   targeting: {
     fields: ['on'],
     versioned: true,
-    send: (form) =>
-      saveTargeting(
-        textField(form, 'environment'),
-        { version: Number(textField(form, 'version')), on: form.has('on') },
-        (on) => `Targeting switched ${on ? 'on' : 'off'}`,
-      ),
+    send: async (form) => {
+      const { targeting, location, name } = await saveTargeting(textField(form, 'environment'), {
+        version: Number(textField(form, 'version')),
+        on: form.has('on'),
+      });
+      return { location, flash: `Targeting switched ${targeting.on ? 'on' : 'off'} in ${name}` };
+    },
   },
   archive: flagAction(
     () => unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/archive', { params })),
@@ -125,23 +124,27 @@ const tabs = environments?.flatMap((environment) => {
   const posted = environment.key === postedEnvironment;
   const switched = posted && post.action === 'targeting';
   const editedForm = posted && post.action === 'edit-targeting' ? post.form : undefined;
-  const edited = editedForm !== undefined;
   // A rejected change keeps what was submitted, and the version it was based on (see ChangedElsewhere).
-  const draft = editedForm
-    ? readTargetingDraft(editedForm, variations.length)
-    : targetingDraft(current, variations.length);
+  const draft = editedForm ? readTargetingDraft(editedForm) : targetingDraft(current, variations.length);
   const currentVersion = String(current.version);
+  const postedVersion = post.value('version') ?? currentVersion;
   return [
     {
       environment,
-      on: switched ? post.value('on') !== undefined : current.on,
-      offVariation: variations[current.offVariation],
-      switchVersion: switched ? (post.value('version') ?? currentVersion) : currentVersion,
-      switchErrors: switched ? post.errors : noFormErrors,
-      draft,
-      editorVersion: edited ? (post.value('version') ?? currentVersion) : currentVersion,
-      editorErrors: edited ? post.errors : noFormErrors,
-      editorFieldErrors: edited ? targetingDraftErrors(post.errors.fields, draft) : undefined,
+      /** The targeting switch: what it shows, and Core's refusal of its last flip, if any. */
+      targetingSwitch: {
+        on: switched ? post.value('on') !== undefined : current.on,
+        offVariation: variations[current.offVariation],
+        version: switched ? postedVersion : currentVersion,
+        errors: switched ? post.errors : noFormErrors,
+      },
+      /** The targeting editor: what it shows, and Core's refusal of its last save, if any. */
+      editor: {
+        draft,
+        version: editedForm ? postedVersion : currentVersion,
+        errors: editedForm ? post.errors : noFormErrors,
+        fieldErrors: editedForm ? targetingDraftErrors(post.errors.fields, draft) : undefined,
+      },
     },
   ];
 });
@@ -234,39 +237,32 @@ const flagMessages =
             ) : (
               <flag-tabs data-selected={Astro.url.searchParams.get('environment') ?? postedEnvironment ?? ''}>
                 <Tabs label="Environments">
-                  {tabs.map(
-                    ({
-                      environment,
-                      on,
-                      offVariation,
-                      switchVersion,
-                      switchErrors,
-                      draft,
-                      editorVersion,
-                      editorErrors,
-                      editorFieldErrors,
-                    }) => (
+                  {tabs.map(({ environment, targetingSwitch, editor }) => (
                     <TabPanel label={environment.name} data-environment={environment.key}>
-                      {switchErrors.changedElsewhere && (
+                      {(targetingSwitch.errors.changedElsewhere || editor.errors.changedElsewhere) && (
                         <ChangedElsewhere
                           what={`the targeting in ${environment.name}`}
                           reloadHref={routes.flag(project.key, flag.key, environment.key)}
                         />
                       )}
-                      <FormAlert messages={switchErrors.form} />
+                      <FormAlert messages={targetingSwitch.errors.form} />
                       <form method="post" class="targeting-switch">
                         <input type="hidden" name="_action" value="targeting" />
                         <input type="hidden" name="environment" value={environment.key} />
-                        <input type="hidden" name="version" value={switchVersion} />
+                        <input type="hidden" name="version" value={targetingSwitch.version} />
                         <label class="switch-label">
-                          <Switch name="on" checked={on} aria-describedby={`served-${environment.key}`} />
-                          Targeting {on ? 'on' : 'off'} in {environment.name}
-                          {switchErrors.changedElsewhere && ' (not saved)'}
+                          <Switch
+                            name="on"
+                            checked={targetingSwitch.on}
+                            aria-describedby={`served-${environment.key}`}
+                          />
+                          Targeting {targetingSwitch.on ? 'on' : 'off'} in {environment.name}
+                          {targetingSwitch.errors.changedElsewhere && ' (not saved)'}
                         </label>
                         <p id={`served-${environment.key}`} class="served">
-                          {on
+                          {targetingSwitch.on
                             ? 'Individual targets and rules decide what each context gets, then the default variation.'
-                            : `Every context gets the off variation, ${offVariation}.`}
+                            : `Every context gets the off variation, ${targetingSwitch.offVariation}.`}
                         </p>
                         <noscript>
                           <Button type="submit" variant="primary" size="small">
@@ -274,23 +270,16 @@ const flagMessages =
                           </Button>
                         </noscript>
                       </form>
-                      {editorErrors.changedElsewhere && (
-                        <ChangedElsewhere
-                          what={`the targeting in ${environment.name}`}
-                          reloadHref={routes.flag(project.key, flag.key, environment.key)}
-                        />
-                      )}
-                      <FormAlert messages={editorErrors.form} />
+                      <FormAlert messages={editor.errors.form} />
                       <TargetingEditor
                         environmentKey={environment.key}
-                        version={editorVersion}
+                        version={editor.version}
                         variations={variations}
-                        draft={draft}
-                        errors={editorFieldErrors}
+                        draft={editor.draft}
+                        errors={editor.fieldErrors}
                       />
                     </TabPanel>
-                    ),
-                  )}
+                  ))}
                 </Tabs>
               </flag-tabs>
             )}

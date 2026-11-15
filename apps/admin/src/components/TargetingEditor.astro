@@ -1,10 +1,11 @@
 ---
 import FormField from '@ds/components/form/FormField.astro';
-import Select from '@ds/components/form/Select.astro';
 import Textarea from '@ds/components/form/Textarea.astro';
 import Button from '@ds/components/ui/Button.astro';
-import type { TargetingDraft, TargetingDraftErrors } from '../lib/targeting-form';
+import { targetFieldName } from '../lib/targeting-fields';
+import type { RuleDraft, TargetingDraft, TargetingDraftErrors } from '../lib/targeting-form';
 import RuleFields from './RuleFields.astro';
+import VariationSelect from './VariationSelect.astro';
 
 interface Props {
   /** The environment whose targeting it edits. */
@@ -22,10 +23,11 @@ interface Props {
 const { environmentKey, version, variations, draft, errors } = Astro.props;
 /** The id of the editor's blank rule: one no rule of the draft has. */
 const blankId = String(Math.max(-1, ...draft.rules.map((rule) => Number(rule.id)).filter(Number.isInteger)) + 1);
-const blankRule = {
+const blankRule: RuleDraft = {
   id: blankId,
-  attribute: 'user_id' as const,
-  operator: 'in' as const,
+  isNew: true,
+  attribute: 'user_id',
+  operator: 'in',
   userIds: '',
   countries: [],
   variation: 0,
@@ -55,7 +57,7 @@ const blankRule = {
             error={errors?.targets[index]}
             data-target={String(index)}
           >
-            <Textarea name={`target.${index}`} value={draft.targets[index] ?? ''} rows={3} />
+            <Textarea name={targetFieldName(index)} value={draft.targets[index] ?? ''} rows={3} />
           </FormField>
         ))}
       </div>
@@ -69,12 +71,12 @@ const blankRule = {
       </p>
       <ol class="rules">
         {draft.rules.map((rule, index) => (
-          <RuleFields rule={rule} position={index + 1} variations={variations} error={errors?.rules[rule.id]} />
+          <RuleFields rule={rule} position={index + 1} variations={variations} errors={errors?.rules[rule.id]} />
         ))}
         <RuleFields rule={blankRule} position={draft.rules.length + 1} variations={variations} blank />
       </ol>
-      <div>
-        <Button type="button" variant="secondary" size="small" data-add-rule hidden>Add rule</Button>
+      <div data-add-rule-row hidden>
+        <Button type="button" variant="secondary" size="small" data-add-rule>Add rule</Button>
       </div>
     </fieldset>
 
@@ -85,22 +87,10 @@ const blankRule = {
         hint="While targeting is on, for a context no individual target or rule matches."
         error={errors?.defaultVariation}
       >
-        <Select name="defaultVariation">
-          {variations.map((variation, index) => (
-            <option value={String(index)} selected={draft.defaultVariation === index}>
-              {variation}
-            </option>
-          ))}
-        </Select>
+        <VariationSelect name="defaultVariation" variations={variations} selected={draft.defaultVariation} />
       </FormField>
       <FormField label="Off variation" hint="For every context while targeting is off." error={errors?.offVariation}>
-        <Select name="offVariation">
-          {variations.map((variation, index) => (
-            <option value={String(index)} selected={draft.offVariation === index}>
-              {variation}
-            </option>
-          ))}
-        </Select>
+        <VariationSelect name="offVariation" variations={variations} selected={draft.offVariation} />
       </FormField>
     </fieldset>
 
@@ -111,6 +101,8 @@ const blankRule = {
 </targeting-editor>
 
 <script>
+  import { parseRuleEdit, renameRuleField, ruleEditField, ruleEditValue } from '../lib/targeting-fields';
+
   /**
    * Moves, removes and adds rules in the page rather than by saving: the order of the rules in the form is the
    * order they are saved in. A new rule is a copy of the blank one, under a rule id and element ids of its own.
@@ -121,11 +113,12 @@ const blankRule = {
     connectedCallback() {
       const list = this.querySelector<HTMLOListElement>('.rules');
       const blank = list?.querySelector<HTMLLIElement>(':scope > [data-blank]');
-      const add = this.querySelector<HTMLButtonElement>('[data-add-rule]');
-      if (!list || !blank || !add) return;
+      const addRow = this.querySelector<HTMLElement>('[data-add-rule-row]');
+      const add = addRow?.querySelector<HTMLButtonElement>('[data-add-rule]');
+      if (!list || !blank || !addRow || !add) return;
       this.#nextId = Number(blank.dataset['rule']) + 1;
       blank.remove();
-      add.hidden = false;
+      addRow.hidden = false;
       add.addEventListener('click', () => {
         const rule = this.#copy(blank);
         list.append(rule);
@@ -134,30 +127,32 @@ const blankRule = {
       });
 
       list.addEventListener('click', (event) => {
-        const button = (event.target as Element).closest<HTMLButtonElement>('button[name="ruleEdit"]');
-        if (!button) return;
+        const button = (event.target as Element).closest<HTMLButtonElement>(`button[name="${ruleEditField}"]`);
+        const edit = button && parseRuleEdit(button.value);
+        if (!button || !edit) return;
         event.preventDefault();
         const rule = button.closest<HTMLLIElement>('.rule');
         if (!rule) return;
-        const [action] = button.value.split(':');
-        if (action === 'remove') rule.remove();
-        if (action === 'up' && rule.previousElementSibling) rule.after(rule.previousElementSibling);
-        if (action === 'down' && rule.nextElementSibling) rule.before(rule.nextElementSibling);
+        if (edit.action === 'remove') rule.remove();
+        if (edit.action === 'up' && rule.previousElementSibling) rule.after(rule.previousElementSibling);
+        if (edit.action === 'down' && rule.nextElementSibling) rule.before(rule.nextElementSibling);
         this.#renumber(list);
         (rule.isConnected ? button : add).focus();
       });
     }
 
-    /** A copy of the blank rule, with the rule buttons and ids of its own; left without values, it is not saved. */
+    /**
+     * A copy of the blank rule, with the rule buttons and ids of its own. It keeps the blank rule's `new` marker:
+     * left without values, it is not saved.
+     */
     #copy(blank: HTMLLIElement): HTMLLIElement {
       const id = String(this.#nextId++);
-      const from = `rule.${blank.dataset['rule']}.`;
       const rule = blank.cloneNode(true) as HTMLLIElement;
       delete rule.dataset['blank'];
       rule.dataset['rule'] = id;
       for (const element of rule.querySelectorAll<HTMLElement>('[name]')) {
         const name = element.getAttribute('name') ?? '';
-        if (name.startsWith(from)) element.setAttribute('name', `rule.${id}.${name.slice(from.length)}`);
+        if (name !== ruleEditField) element.setAttribute('name', renameRuleField(name, id));
       }
       // Element ids (and the labels and descriptions pointing at them) must stay unique in the page.
       for (const attribute of ['id', 'for', 'aria-describedby', 'aria-labelledby']) {
@@ -166,8 +161,9 @@ const blankRule = {
           element.setAttribute(attribute, ids.map((value) => `${value}-r${id}`).join(' '));
         }
       }
-      for (const button of rule.querySelectorAll<HTMLButtonElement>('button[name="ruleEdit"]')) {
-        button.value = button.value.replace(/:.*$/, `:${id}`);
+      for (const button of rule.querySelectorAll<HTMLButtonElement>(`button[name="${ruleEditField}"]`)) {
+        const edit = parseRuleEdit(button.value);
+        if (edit) button.value = ruleEditValue({ ...edit, id });
       }
       rule.querySelector<HTMLElement>('[data-rule-actions]')?.removeAttribute('hidden');
       return rule;

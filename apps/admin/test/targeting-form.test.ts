@@ -22,8 +22,13 @@ const empty: [string, string][] = [
 ];
 
 describe('the targeting editor form, as the change it sends Core', () => {
+  it('reads an individual target for each variation the editor lists', () => {
+    expect(readTargetingDraft(form(empty)).targets).toEqual(['', '']);
+    expect(readTargetingDraft(form([['target.2', 'ada']])).targets).toEqual(['', '', 'ada']);
+  });
+
   it('sends empty individual targets and rules when the editor lists none', () => {
-    expect(targetingChange(readTargetingDraft(form(empty), 2))).toEqual({
+    expect(targetingChange(readTargetingDraft(form(empty)))).toEqual({
       offVariation: 1,
       defaultVariation: 0,
       individualTargets: [],
@@ -38,7 +43,7 @@ describe('the targeting editor form, as the change it sends Core', () => {
       ['target.0', ' ada \r\n\r\ngrace\nada\n'],
       ['target.1', '  \n'],
     ];
-    expect(targetingChange(readTargetingDraft(form(fields), 2))).toEqual({
+    expect(targetingChange(readTargetingDraft(form(fields)))).toEqual({
       offVariation: 1,
       defaultVariation: 1,
       individualTargets: [{ variation: 0, userIds: ['ada', 'grace'] }],
@@ -60,7 +65,7 @@ describe('the targeting editor form, as the change it sends Core', () => {
       ['rule.2.userIds', 'ada\ngrace'],
       ['rule.2.variation', '1'],
     ];
-    expect(targetingChange(readTargetingDraft(form(fields), 2)).rules).toEqual([
+    expect(targetingChange(readTargetingDraft(form(fields))).rules).toEqual([
       { attribute: 'country', operator: 'in', values: ['CA', 'FR'], variation: 0 },
       { attribute: 'user_id', operator: 'not_in', values: ['ada', 'grace'], variation: 1 },
     ]);
@@ -80,7 +85,7 @@ describe('the rule buttons of the targeting editor, when the form is sent by one
     ...(button === undefined ? [] : ([['ruleEdit', button]] as [string, string][])),
   ];
   const countriesOf = (fields: [string, string][]) =>
-    targetingChange(readTargetingDraft(form(fields), 2)).rules.map((rule) => rule.values[0]);
+    targetingChange(readTargetingDraft(form(fields))).rules.map((rule) => rule.values[0]);
 
   it('moves a rule up or down, so it is tried before or after its neighbour', () => {
     expect(countriesOf(threeRules('up:1'))).toEqual(['FR', 'CA', 'MX']);
@@ -114,11 +119,25 @@ describe('the rule buttons of the targeting editor, when the form is sent by one
       ...newRule('5', 'country', [['userIds', 'ada']]),
     ];
     // Each tests an attribute it was given no values for.
-    expect(targetingChange(readTargetingDraft(form(fields), 2)).rules).toEqual([]);
+    expect(targetingChange(readTargetingDraft(form(fields))).rules).toEqual([]);
 
     const typed = [...empty, ...newRule('3', 'user_id', [['userIds', 'ada']])];
-    expect(targetingChange(readTargetingDraft(form(typed), 2)).rules).toEqual([
+    expect(targetingChange(readTargetingDraft(form(typed))).rules).toEqual([
       { attribute: 'user_id', operator: 'in', values: ['ada'], variation: 0 },
+    ]);
+  });
+
+  it('keeps a new rule given values new, so it is still left out once emptied', () => {
+    const fields: [string, string][] = [
+      ...empty,
+      ['rule.3.attribute', 'user_id'],
+      ['rule.3.operator', 'in'],
+      ['rule.3.userIds', 'ada'],
+      ['rule.3.variation', '0'],
+      ['rule.3.new', '1'],
+    ];
+    expect(readTargetingDraft(form(fields)).rules).toEqual([
+      { id: '3', isNew: true, attribute: 'user_id', operator: 'in', userIds: 'ada', countries: [], variation: 0 },
     ]);
   });
 
@@ -130,7 +149,7 @@ describe('the rule buttons of the targeting editor, when the form is sent by one
       ['rule.0.userIds', ''],
       ['rule.0.variation', '0'],
     ];
-    expect(targetingChange(readTargetingDraft(form(fields), 2)).rules).toEqual([
+    expect(targetingChange(readTargetingDraft(form(fields))).rules).toEqual([
       { attribute: 'user_id', operator: 'in', values: [], variation: 0 },
     ]);
   });
@@ -153,8 +172,16 @@ describe('the targeting editor, as it opens', () => {
       defaultVariation: 0,
       targets: ['', 'ada\ngrace'],
       rules: [
-        { id: '0', attribute: 'country', operator: 'not_in', userIds: '', countries: ['CA', 'FR'], variation: 1 },
-        { id: '1', attribute: 'user_id', operator: 'in', userIds: 'linus', countries: [], variation: 0 },
+        {
+          id: '0',
+          isNew: false,
+          attribute: 'country',
+          operator: 'not_in',
+          userIds: '',
+          countries: ['CA', 'FR'],
+          variation: 1,
+        },
+        { id: '1', isNew: false, attribute: 'user_id', operator: 'in', userIds: 'linus', countries: [], variation: 0 },
       ],
     });
   });
@@ -182,14 +209,15 @@ describe("Core's messages about a targeting change, on the editor", () => {
         ['rule.9.userIds', ''],
         ['rule.9.variation', '0'],
       ]),
-      2,
     );
-    // Only variation 1 has an individual target, so it is Core's individualTargets.0; rule 9 is rules.1.
+    // Only variation 1 has an individual target, so it is Core's individualTargets.0; rule 4 is rules.0, rule 9
+    // rules.1. Each message goes to the input of the property it is about.
     expect(
       targetingDraftErrors(
         {
           defaultVariation: 'default bad',
           'individualTargets.0.userIds': 'ada is taken',
+          'rules.0.variation': 'variation 2 does not exist',
           'rules.1.values': 'values must contain at least 1 elements',
         },
         draft,
@@ -198,7 +226,10 @@ describe("Core's messages about a targeting change, on the editor", () => {
       offVariation: undefined,
       defaultVariation: 'default bad',
       targets: [undefined, 'ada is taken'],
-      rules: { '9': 'values must contain at least 1 elements' },
+      rules: {
+        '4': { variation: 'variation 2 does not exist' },
+        '9': { values: 'values must contain at least 1 elements' },
+      },
     });
   });
 });

@@ -115,6 +115,8 @@ describe('admin app: targeting editor', () => {
     expect(selected(development, 'offVariation')).toEqual(['1']);
     expect(development.querySelectorAll('[data-rule]')).toHaveLength(1);
     expect(development.querySelector('input[name="rule.0.new"]')).not.toBeNull();
+    // "Add rule" needs scripts, which show it.
+    expect(development.querySelector('[data-add-rule-row]')?.hasAttribute('hidden')).toBe(true);
   });
 
   it('saves individual targets, rules in order and the variations served, as the SDK sees them', async () => {
