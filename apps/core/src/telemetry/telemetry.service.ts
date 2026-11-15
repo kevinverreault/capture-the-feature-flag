@@ -34,6 +34,14 @@ interface SeenRow {
   lastSeen: string;
 }
 
+/**
+ * The text with the LIKE wildcards (`%`, `_`) and the escape character escaped, so Prisma's `contains` matches it
+ * as itself: it builds a LIKE pattern without escaping them.
+ */
+function escapeLikePattern(text: string): string {
+  return text.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
 /** How long ingesting one batch may wait for a database connection, then take; the Evaluator waits longer. */
 const ingestMaxWaitMs = 10_000;
 const ingestTimeoutMs = 30_000;
@@ -212,7 +220,10 @@ export class TelemetryService {
     }));
   }
 
-  /** The seen contexts of an environment, most recently seen first, up to `limit` (default 100). */
+  /**
+   * The seen contexts of an environment, most recently seen first, up to `limit` (default 100): only those whose
+   * `user_id` contains `userId` (ignoring case), when given.
+   */
   async seenContexts(
     projectKey: string,
     environmentKey: string,
@@ -221,7 +232,12 @@ export class TelemetryService {
     const project = await this.projects.find(projectKey);
     const environment = await this.environments.find(project, environmentKey);
     const rows = await this.prisma.seenContext.findMany({
-      where: { environmentId: environment.id },
+      where: {
+        environmentId: environment.id,
+        ...(query.userId
+          ? { userId: { contains: escapeLikePattern(query.userId), mode: 'insensitive' as const } }
+          : {}),
+      },
       orderBy: [{ lastSeen: 'desc' }, { id: 'asc' }],
       take: query.limit ?? defaultSeenContextsListed,
     });
