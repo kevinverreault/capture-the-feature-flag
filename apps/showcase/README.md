@@ -20,6 +20,8 @@ The guides' code samples are real files in [samples/](samples/), which the pages
 - `samples/sdk/` and `samples/nestjs/` compile with `tsc` against `@ctff/sdk` and `@ctff/nestjs` ([tsconfig.node.json](tsconfig.node.json)).
 - `samples/terraform/` is validated with `terraform init` and `terraform validate` against the provider built from [apps/terraform-provider-ctff](../terraform-provider-ctff/README.md) ([scripts/validate-terraform-samples.ts](scripts/validate-terraform-samples.ts)). The project declares an Nx implicit dependency on the provider, so Nx builds it first (with Go). The Terraform CLI must be on the `PATH`, or named by `TERRAFORM`.
 
+Because of that, the showcase's `typecheck` needs Go (Nx builds the provider first) and the Terraform CLI, like the provider's own targets; its cache key includes `terraform version`. Its `build` only depends on the design system integration's build, not on the provider's, so the site and its image build without Go.
+
 Snippets that aren't code of these packages (shell commands, the Terraform CLI configuration) are inline in the pages.
 
 ## Development

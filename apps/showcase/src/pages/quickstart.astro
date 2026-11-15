@@ -12,7 +12,7 @@ const services = [
   { service: 'Core and the admin app', url: 'http://localhost:3000', what: 'The admin app; the API is under /api/v1 and its OpenAPI UI at /api/docs' },
   { service: 'Evaluator', url: 'http://localhost:3001', what: 'Where SDKs evaluate flags; Prometheus metrics at /metrics' },
   { service: 'Birdwatch website', url: 'http://localhost:4000', what: 'The birding demo, with a flag inspector on every page' },
-  { service: 'Birdwatch API', url: 'http://localhost:4001', what: 'The demo’s backend, which evaluates flags with @ctff/nestjs' },
+  { service: 'Birdwatch API', url: 'http://localhost:4001', what: 'The demo’s API, which evaluates flags with @ctff/nestjs' },
   { service: 'Showcase', url: 'http://localhost:8080', what: 'This site' },
 ];
 ---
@@ -33,8 +33,9 @@ const services = [
     <div class="prose">
       <p>
         Compose builds the images on the first run, then starts PostgreSQL 17, Core, an Evaluator, Birdwatch and
-        this site. <code>docker compose up --wait</code> returns once every service reports healthy. Every image
-        runs as a non-root user, takes its configuration from environment variables and logs JSON.
+        this site. <code>docker compose up --wait</code> returns once every service reports healthy. The
+        project’s images run as non-root users, take their configuration from environment variables and have health
+        checks.
       </p>
     </div>
     <Table caption="What runs where" columns={[
@@ -85,7 +86,7 @@ const services = [
         the <a href="/guides/terraform/">Terraform guide</a>.
       </p>
     </div>
-    <CodeSample lang="bash" title="Variations" code={`SEED_DEMO=false docker compose up      # without the demo project
+    <CodeSample lang="bash" title="Other ways to run it" code={`SEED_DEMO=false docker compose up      # without the demo project
 docker compose --profile terraform up  # and apply the example Terraform configuration
 docker compose down --volumes          # stop, and delete the database`} />
     <Alert variant="warning" icon="triangle-alert" title="No authentication in V1">

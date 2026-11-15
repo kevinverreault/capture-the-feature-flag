@@ -4,7 +4,7 @@ import { Code } from 'astro:components';
 interface Props {
   /** The source to show. Guide samples are imported with `?raw` from samples/, where `typecheck` checks them. */
   code: string;
-  lang: 'ts' | 'hcl' | 'bash' | 'yaml';
+  lang: 'ts' | 'hcl' | 'bash';
   /** A file name or a short caption shown above the code. */
   title?: string;
 }

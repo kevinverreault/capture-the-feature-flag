@@ -4,6 +4,10 @@
   "private": true,
   "type": "module",
   "description": "The showcase website: a static Astro site, served by nginx, that presents Capture The Feature Flag and documents the SDK, the NestJS module and the Terraform provider.",
+  "exports": "./dist/index.html",
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -27,6 +31,15 @@
             "projects": [
               "@ctff/design-system-host"
             ]
+          }
+        ]
+      },
+      "typecheck": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "runtime": "terraform version -json || true"
           }
         ]
       }

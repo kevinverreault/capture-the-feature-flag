@@ -30,16 +30,16 @@ const pageTitle = Astro.url.pathname === '/' ? productName : `${title} · ${prod
         <a href="/" class="brand ff-serif text-xl">{productName}</a>
         <ThemeToggle />
       </div>
-      <NavigationMenu navigationItems={pages.map((page) => ({ text: page.label, path: page.path }))} />
+      <NavigationMenu navigationItems={[...pages]} />
     </header>
     <main class="site-main">
       <slot />
     </main>
     <Footer
-      groups={[
-        { title: 'Product', links: pages.slice(0, 3).map((page) => ({ text: page.label, path: page.path })) },
-        { title: 'Guides', links: pages.slice(3).map((page) => ({ text: page.label, path: page.path })) },
-      ]}
+      groups={(['Product', 'Guides'] as const).map((group) => ({
+        title: group,
+        links: pages.filter((page) => page.group === group),
+      }))}
       copyright="2026 Kevin Verreault. Capture The Feature Flag is MIT licensed."
       navigationLabel="Site"
     />
