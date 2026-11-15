@@ -13,6 +13,12 @@ export type DashboardSummary = Schemas['DashboardSummaryDto'];
 export type EvaluationRange = Schemas['EvaluationRange'];
 export type EvaluationSeries = Schemas['EvaluationSeriesDto'];
 export type StaleFlags = Schemas['StaleFlagsDto'];
+export type ContextAttribute = Schemas['ContextAttributeDto'];
+export type Context = Schemas['ContextDto'];
+export type SeenContext = Schemas['StoredSeenContextDto'];
+export type ContextEvaluation = Schemas['ContextEvaluationDto'];
+export type FlagContextEvaluation = Schemas['FlagContextEvaluationDto'];
+export type EvaluationReason = Schemas['EvaluationReasonDto'];
 
 /** A typed client for Core's API: `core.GET('/api/v1/projects')`, with paths, parameters and bodies checked. */
 export type CoreApiClient = Client<paths>;

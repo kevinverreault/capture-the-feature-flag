@@ -112,3 +112,54 @@ h2 {
 .chart-target:focus-visible .chart-tip {
   display: grid;
 }
+
+/* A plain table whose cells hold links and badges (the design system's Table takes text only). */
+.data-table-root {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table caption {
+  padding-bottom: 0.75em;
+  text-align: start;
+  font-size: var(--fs-sm);
+  color: hsl(var(--color-on-background) / 0.75);
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.75em 1em;
+  text-align: start;
+  vertical-align: top;
+  border-bottom: 1px solid hsl(var(--color-on-background) / 0.15);
+}
+
+.data-table thead th {
+  font-family: var(--ff-sans-condensed);
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: hsl(var(--color-on-background) / 0.75);
+  border-bottom-color: hsl(var(--color-on-background) / 0.4);
+}
+
+.data-table tbody th {
+  display: grid;
+  gap: 0.25em;
+  justify-items: start;
+  font-weight: 400;
+}
+
+.data-table tbody th code {
+  font-size: var(--fs-sm);
+  color: hsl(var(--color-on-background) / 0.75);
+}
+
+.data-table tbody tr[aria-current] {
+  background-color: hsl(var(--color-primary) / 0.08);
+}

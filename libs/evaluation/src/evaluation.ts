@@ -32,6 +32,20 @@ export const evaluationErrorKinds = [
 ] as const;
 export type EvaluationErrorKind = (typeof evaluationErrorKinds)[number];
 
+/**
+ * Every kind of evaluation reason, as `EvaluationReason` names them, in this order. Keyed by kind, so a kind
+ * missing from the list, or one the union doesn't have, fails to compile.
+ */
+const reasonKindsListed: Record<EvaluationReason['kind'], true> = {
+  OFF: true,
+  TARGET_MATCH: true,
+  RULE_MATCH: true,
+  DEFAULT: true,
+  FLAG_NOT_FOUND: true,
+  ERROR: true,
+};
+export const evaluationReasonKinds = Object.keys(reasonKindsListed) as EvaluationReason['kind'][];
+
 /** Why an evaluation produced its variation. `ErrorKind` is widened by callers that add error kinds of their own. */
 export type EvaluationReason<ErrorKind extends string = EvaluationErrorKind> =
   | { kind: 'OFF' }
