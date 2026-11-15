@@ -2,6 +2,7 @@
 import Card from '@ds/components/ui/Card.astro';
 import RarityBadge from '../../components/RarityBadge.astro';
 import BirdwatchLayout from '../../layouts/BirdwatchLayout.astro';
+import { speciesHref } from '../../lib/format';
 import { asBirder } from '../../lib/page-session';
 
 // Every species of the mock data, each linking to its page.
@@ -19,7 +20,7 @@ const { species } = page.loaded;
           <div slot="header">
             <div class="title">
               <h2 class="text-lg">
-                <a href={`/species/${encodeURIComponent(bird.id)}`}>{bird.commonName}</a>
+                <a href={speciesHref(bird.id)}>{bird.commonName}</a>
               </h2>
               <RarityBadge rarity={bird.rarity} />
             </div>

@@ -41,7 +41,7 @@ describe('the demo seed', () => {
     }
   });
 
-  it('targets rare-bird-alerts by country: on for CA, false for everyone else', async () => {
+  it('targets rare-bird-alerts by country: true for CA, false for everyone else', async () => {
     const targeting = await apiClient(core.baseUrl).get('/projects/birdwatch/flags/rare-bird-alerts/targeting');
     expect(targeting.body).toHaveLength(2);
     for (const environment of targeting.body) {

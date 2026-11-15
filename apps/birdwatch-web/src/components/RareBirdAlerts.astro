@@ -1,7 +1,7 @@
 ---
 import Alert from '@ds/components/feedback/Alert.astro';
 import type { FeedSighting } from '../lib/api';
-import { formatObservedAt } from '../lib/format';
+import { formatObservedAt, speciesHref } from '../lib/format';
 
 interface Props {
   /** The latest sightings of rare species, from birdwatch-api while rare-bird-alerts serves true. */
@@ -19,7 +19,7 @@ const { alerts } = Astro.props;
       <ul class="alerts">
         {alerts.map((sighting) => (
           <li>
-            <a href={`/species/${encodeURIComponent(sighting.species.id)}`}>{sighting.species.commonName}</a> at{' '}
+            <a href={speciesHref(sighting.species.id)}>{sighting.species.commonName}</a> at{' '}
             {sighting.location}, by {sighting.birder.name} ·{' '}
             <time datetime={sighting.observedAt}>{formatObservedAt(sighting.observedAt)}</time>
           </li>

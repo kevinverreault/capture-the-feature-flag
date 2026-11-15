@@ -8,7 +8,8 @@
 //
 // Then the targeting showcase, as the seed configures it: Alice (CA) sees the rare-bird alert banner and Bram (NL)
 // doesn't, only Chiara sees "Photo ID (beta)", the flag inspector shows each flag's evaluation reason with a link
-// to the flag in the admin app, and switching the targeting of rare-bird-alerts off makes it serve OFF.
+// to the flag in the admin app, and switching the targeting of rare-bird-alerts off makes it serve its off
+// variation, with the evaluation reason OFF.
 //
 // Environment: CORE_URL (default http://localhost:3000), BIRDWATCH_API_URL (default http://localhost:4001),
 // BIRDWATCH_WEB_URL (default http://localhost:4000) and POLL_INTERVAL_MS (the Evaluator's, default 2000).
@@ -82,16 +83,21 @@ async function feedShowsLogASighting(cookie: string): Promise<boolean> {
   return (await feedPage(cookie)).includes('data-testid="log-sighting"');
 }
 
+/** The HTML of a flag's row in the flag inspector of a page, and what follows it. */
+function inspectedRow(page: string, flagKey: string): string | undefined {
+  return page.split('data-testid="inspected-flag"').find((part) => part.includes(`data-flag="${flagKey}"`));
+}
+
 /** The evaluation reason the flag inspector of a page shows for a flag, such as `RULE_MATCH`. */
 function inspectedReason(page: string, flagKey: string): string | undefined {
-  const row = page.split('data-testid="inspected-flag"').find((part) => part.includes(`data-flag="${flagKey}"`));
-  return row?.match(/data-reason="([A-Z_]+)"/)?.[1];
+  return inspectedRow(page, flagKey)?.match(/data-reason="([A-Z_]+)"/)?.[1];
 }
 
 /** The link of a flag in the flag inspector of a page. */
 function inspectedLink(page: string, flagKey: string): string | undefined {
-  const row = page.split('data-testid="inspected-flag"').find((part) => part.includes(`data-flag="${flagKey}"`));
-  return row?.match(/href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&');
+  return inspectedRow(page, flagKey)
+    ?.match(/href="([^"]+)"/)?.[1]
+    ?.replaceAll('&amp;', '&');
 }
 
 const showsAlert = (page: string) => page.includes('data-testid="rare-bird-alert"');
@@ -131,7 +137,10 @@ async function targetingShowcase(): Promise<void> {
       const page = await feedPage(alice);
       return !showsAlert(page) && inspectedReason(page, 'rare-bird-alerts') === 'OFF';
     }, pollIntervalMs + pollGraceMs);
-    check(off, 'with its targeting off, rare-bird-alerts serves OFF and Alice no longer sees the banner');
+    check(
+      off,
+      'with its targeting off, rare-bird-alerts serves its off variation (OFF) and Alice no longer sees the banner',
+    );
   } finally {
     await setTargeting(true, 'rare-bird-alerts');
   }

@@ -9,6 +9,7 @@ import { flagOn, type Species } from '../lib/api';
 import { postedForm } from '../lib/forms';
 import { asBirder } from '../lib/page-session';
 import { suggestSpecies } from '../lib/photo-id';
+import { speciesHref } from '../lib/format';
 
 // "Photo ID (beta)", for the birders photo-id-beta targets: pick a photo, get a species. It is a mock (see
 // suggestSpecies); while photo-id-beta serves false, the page answers 404.
@@ -39,7 +40,7 @@ if (betaOn && Astro.request.method === 'POST') {
         <p>Pick a photo of a bird, and Birdwatch suggests a species. It is a beta, for the birders invited to try it.</p>
         {suggestion && (
           <Alert variant="success" icon="circle-check" title="It looks like…" data-testid="photo-id-suggestion">
-            <a href={`/species/${encodeURIComponent(suggestion.id)}`}>{suggestion.commonName}</a> (
+            <a href={speciesHref(suggestion.id)}>{suggestion.commonName}</a> (
             <em>{suggestion.scientificName}</em>). This is a demo: the suggestion comes from the photo's bytes, not a
             model.
           </Alert>

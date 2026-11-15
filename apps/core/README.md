@@ -32,7 +32,7 @@ Core seeds the [Birdwatch](../birdwatch-api/README.md) demo before it reports re
 | `rare-bird-alerts`  | The rule `country in [CA]` serves `true`; everyone else gets the default variation `false`       |
 | `photo-id-beta`     | An individual target serves `true` to `chiara`; everyone else gets the default variation `false` |
 
-So Alice and Dev (CA) see the rare-bird alert banner and Bram (NL) and Chiara (IT) don't, and only Chiara sees "Photo ID (beta)".
+So Alice and Dev (CA) see the rare-bird alert banner and Bram (NL) and Chiara (IT) don't, and only Chiara sees "Photo ID (beta)". A database the demo was seeded in before these rules existed keeps the targeting it had: change it in the admin app, or start over on an empty database (`docker compose down -v`).
 
 The seed runs to completion once per database, which it records in the `completed_seeds` table; after that, it does nothing, so an operator who deletes the demo doesn't get it back. Until then, every start runs it, and each step skips what is already there: a seed interrupted halfway (Core killed during it) is finished on the next start, and a database that already had projects of its own gets the demo next to them. Targeting is only switched on where nobody has changed it since the flag was created (version 1). The seed goes through the same services as the API, so its changes have audit entries, by the actor `seed`. Replicas starting together seed once. `SEED_DEMO=false` turns it off, for instance when Terraform creates the project instead.
 

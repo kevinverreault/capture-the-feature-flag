@@ -2,7 +2,7 @@
 import Card from '@ds/components/ui/Card.astro';
 import RarityBadge from './RarityBadge.astro';
 import type { FeedSighting } from '../lib/api';
-import { countryName, formatObservedAt } from '../lib/format';
+import { countryName, formatObservedAt, speciesHref } from '../lib/format';
 
 interface Props {
   sighting: FeedSighting;
@@ -15,7 +15,7 @@ const { sighting } = Astro.props;
   <div slot="header">
     <div class="title">
       <h2 class="text-lg">
-        <a href={`/species/${encodeURIComponent(sighting.species.id)}`}>{sighting.species.commonName}</a>
+        <a href={speciesHref(sighting.species.id)}>{sighting.species.commonName}</a>
       </h2>
       <RarityBadge rarity={sighting.species.rarity} />
     </div>

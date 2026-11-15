@@ -1,7 +1,7 @@
 import type { AllFlags, EvaluationReason } from '@ctff/birdwatch-contract';
 
-/** Where the flag inspector links to: the admin app, and the project and environment Birdwatch evaluates in. */
-export interface AdminLink {
+/** The admin app the flag inspector links to, and the project and environment Birdwatch evaluates in there. */
+export interface AdminApp {
   /** The admin app's address as a browser reaches it (Core's), or `''` when unknown: then there are no links. */
   url: string;
   projectKey: string;
@@ -30,7 +30,7 @@ export function reasonLabel(reason: EvaluationReason): string {
 }
 
 /** The page of a flag in the admin app, on the tab of the environment Birdwatch evaluates in. */
-export function adminFlagUrl(admin: AdminLink, flagKey: string): string | undefined {
+export function adminFlagUrl(admin: AdminApp, flagKey: string): string | undefined {
   if (!admin.url) return undefined;
   const segment = encodeURIComponent;
   const query = new URLSearchParams({ environment: admin.environmentKey }).toString();

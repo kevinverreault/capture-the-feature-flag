@@ -15,8 +15,8 @@ export const seedActor = 'seed';
 const seedLockId = 72707370;
 
 /** The variations of every flag, by index: a boolean flag serves `[true, false]`. */
-const serveTrue = 0;
-const serveFalse = 1;
+const trueVariation = 0;
+const falseVariation = 1;
 
 /** The targeting the seed gives a flag in every environment, on top of the off-state targeting of a new flag. */
 interface SeedTargeting {
@@ -63,8 +63,8 @@ export const birdwatchSeed = {
       tags: ['birdwatch'],
       targeting: {
         on: true,
-        defaultVariation: serveFalse,
-        rules: [{ attribute: 'country', operator: 'in', values: ['CA'], variation: serveTrue }],
+        defaultVariation: falseVariation,
+        rules: [{ attribute: 'country', operator: 'in', values: ['CA'], variation: trueVariation }],
       },
     },
     {
@@ -74,8 +74,8 @@ export const birdwatchSeed = {
       tags: ['birdwatch', 'beta'],
       targeting: {
         on: true,
-        defaultVariation: serveFalse,
-        individualTargets: [{ variation: serveTrue, userIds: ['chiara'] }],
+        defaultVariation: falseVariation,
+        individualTargets: [{ variation: trueVariation, userIds: ['chiara'] }],
       },
     },
   ] satisfies SeedFlag[],
