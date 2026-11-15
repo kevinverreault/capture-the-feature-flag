@@ -13,7 +13,8 @@ export class SnapshotService {
     if (!environment) throw new NotFoundException('Unknown SDK key');
 
     const targeting = await this.prisma.targeting.findMany({
-      where: { environmentId: environment.id },
+      // Archived flags are left out, so they evaluate as not found.
+      where: { environmentId: environment.id, flag: { archivedAt: null } },
       include: { flag: true },
       orderBy: { flag: { key: 'asc' } },
     });

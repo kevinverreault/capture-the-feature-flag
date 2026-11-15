@@ -192,8 +192,12 @@ func (c *Client) UpdateFlag(ctx context.Context, ref Ref, version int64, input F
 	return &out, c.do(ctx, http.MethodPatch, flagPath(ref), body, &out)
 }
 
-// DeleteFlag deletes the flag with its targeting in every environment.
+// DeleteFlag permanently deletes the flag with its targeting in every environment. Core only deletes archived
+// flags, so it archives the flag first (archiving an archived flag changes nothing).
 func (c *Client) DeleteFlag(ctx context.Context, ref Ref) error {
+	if err := c.do(ctx, http.MethodPost, flagPath(ref)+"/archive", nil, nil); err != nil {
+		return err
+	}
 	return c.do(ctx, http.MethodDelete, flagPath(ref), nil, nil)
 }
 

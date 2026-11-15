@@ -48,7 +48,7 @@ output "production_sdk_key" {
 - **Every request sends `X-CTFF-Actor: terraform`**, the actor that Core records on audit entries (#12).
 - **Flags are marked as managed by `terraform`** through Core's `managedBy` field, so the admin app can show a badge and warn before an edit. Nothing is locked: edits made in the admin app show up as drift on the next plan, and applying puts the configuration back. An imported flag gets the marker on the first apply after the import.
 - **Flag edits are versioned.** The provider sends the `version` it last read. If the flag changes between that read and the apply, Core answers `409` and the apply fails, so the plan can be reviewed again.
-- Destroying a project deletes its environments, flags and targeting, and destroying an environment deletes the targeting of every flag in it. A resource that was deleted outside Terraform is planned for creation again.
+- Destroying a project deletes its environments, flags and targeting, and destroying an environment deletes the targeting of every flag in it. Destroying a flag archives it, then permanently deletes it with its targeting, since Core only deletes archived flags. A resource that was deleted outside Terraform is planned for creation again.
 - Targeting (`ctff_flag_environment`) comes in a later change (#20).
 
 ## Using a local build

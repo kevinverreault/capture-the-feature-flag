@@ -38,6 +38,26 @@ describe('filterFlags', () => {
   });
 });
 
+describe('filterFlags with archived flags', () => {
+  const withArchived = [
+    { key: 'new-sighting-form', name: 'New sighting form', tags: ['birdwatch'], archived: false },
+    { key: 'old-feed', name: 'Old feed', tags: ['birdwatch'], archived: true },
+  ];
+
+  it('hides archived flags unless they are asked for', () => {
+    expect(keys(filterFlags(withArchived, {}))).toEqual(['new-sighting-form']);
+    expect(keys(filterFlags(withArchived, { showArchived: false }))).toEqual(['new-sighting-form']);
+    expect(keys(filterFlags(withArchived, { showArchived: true }))).toEqual(['new-sighting-form', 'old-feed']);
+  });
+
+  it('searches and filters archived flags too while they are shown', () => {
+    expect(keys(filterFlags(withArchived, { showArchived: true, search: 'old', tag: 'birdwatch' }))).toEqual([
+      'old-feed',
+    ]);
+    expect(filterFlags(withArchived, { search: 'old' })).toEqual([]);
+  });
+});
+
 describe('listedTags', () => {
   it('lists every tag of the flags once, in alphabetical order', () => {
     expect(listedTags(flags)).toEqual(['alerts', 'birdwatch', 'kill-switch']);
