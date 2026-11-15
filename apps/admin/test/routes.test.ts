@@ -23,6 +23,18 @@ describe('routes', () => {
     expect(routes.flag('a', 'b', 'c&d')).toBe('/projects/a/flags/b?environment=c%26d');
   });
 
+  it('builds the audit log of a project or one flag, from a page of older entries', () => {
+    expect(routes.audit('birdwatch')).toBe('/projects/birdwatch/audit');
+    expect(routes.audit('birdwatch', { flag: 'kill-switch', cursor: 42 })).toBe(
+      '/projects/birdwatch/audit?flag=kill-switch&cursor=42',
+    );
+  });
+
+  it('goes back to the page the display name was set from', () => {
+    expect(routes.displayName()).toBe('/display-name');
+    expect(routes.displayName('/projects/a?tag=b')).toBe('/display-name?returnTo=%2Fprojects%2Fa%3Ftag%3Db');
+  });
+
   it('encodes each key as one path segment', () => {
     expect(routes.environment('a/b', 'c d?')).toBe('/projects/a%2Fb/environments/c%20d%3F');
   });

@@ -26,9 +26,11 @@ export function apiClient(baseUrl: string) {
   return {
     request,
     get: <T = any>(path: string, headers?: Record<string, string>) => request<T>('GET', path, undefined, headers),
-    post: <T = any>(path: string, body: unknown) => request<T>('POST', path, body),
-    patch: <T = any>(path: string, body: unknown) => request<T>('PATCH', path, body),
-    delete: <T = any>(path: string) => request<T>('DELETE', path),
+    post: <T = any>(path: string, body: unknown, headers?: Record<string, string>) =>
+      request<T>('POST', path, body, headers),
+    patch: <T = any>(path: string, body: unknown, headers?: Record<string, string>) =>
+      request<T>('PATCH', path, body, headers),
+    delete: <T = any>(path: string, headers?: Record<string, string>) => request<T>('DELETE', path, undefined, headers),
   };
 }
 

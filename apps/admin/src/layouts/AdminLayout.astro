@@ -20,6 +20,8 @@ interface Props {
 
 const { title, projects, project } = Astro.props;
 const flash = takeFlash(Astro.cookies);
+const actor = Astro.locals.actor;
+const here = `${Astro.url.pathname}${Astro.url.search}`;
 
 const switcherItems = [
   ...projects.map((listed) => ({ text: listed.name, path: routes.project(listed.key) })),
@@ -44,6 +46,16 @@ const switcherItems = [
             {project ? `Project: ${project.name}` : 'Choose a project'}
           </Button>
         </DropdownMenu>
+        <Button
+          href={routes.displayName(here)}
+          variant="muted"
+          decoration="ghost"
+          size="small"
+          class="display-name"
+          title="Changes are recorded in the audit log under this name"
+        >
+          {actor ? `Changes recorded as ${actor}` : 'Set display name'}
+        </Button>
         <ThemeToggle />
       </div>
     </header>

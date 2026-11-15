@@ -1,8 +1,9 @@
 import type { Variation } from '@ctff/evaluation';
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { flagState, recordAudit } from '../audit/audit-entry.js';
 import { assertKeyUnchanged } from '../common/keys.js';
 import { updateAtVersion, withUniqueKey } from '../common/persistence.js';
-import { lockProject } from '../database/lock-project.js';
+import { lockAndReload, lockRow } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
 import type { Flag, Project } from '../generated/prisma/client.js';
 import { projectNotFound, ProjectsService } from '../projects/projects.service.js';
@@ -46,17 +47,17 @@ export class FlagsService {
   /** Loads a flag of the project by key, or fails with 404. */
   async find(project: Project, key: string): Promise<Flag> {
     const flag = await this.prisma.flag.findUnique({ where: { projectId_key: { projectId: project.id, key } } });
-    if (!flag) throw new NotFoundException(`Flag ${key} not found in project ${project.key}`);
+    if (!flag) throw flagNotFound(project, key);
     return flag;
   }
 
   /** Creates the flag with off-state targeting in every environment of the project. */
-  async create(projectKey: string, input: CreateFlagDto): Promise<FlagDto> {
+  async create(projectKey: string, input: CreateFlagDto, actor: string): Promise<FlagDto> {
     const project = await this.projects.find(projectKey);
     const flag = await withUniqueKey(
       () =>
         this.prisma.$transaction(async (tx) => {
-          if (!(await lockProject(tx, project.id))) throw projectNotFound(project.key);
+          if (!(await lockRow(tx, 'project', project.id))) throw projectNotFound(project.key);
           const existing = await tx.flag.findUnique({
             where: { projectId_key: { projectId: project.id, key: input.key } },
           });
@@ -88,6 +89,15 @@ export class FlagsService {
               ...offStateTargeting,
             })),
           });
+          await recordAudit(
+            tx,
+            { type: 'flag', project, flag: created },
+            {
+              action: 'create',
+              actor,
+              after: flagState(created),
+            },
+          );
           return created;
         }),
       `Flag ${input.key} already exists in project ${project.key}`,
@@ -96,61 +106,99 @@ export class FlagsService {
   }
 
   /** Applies an edit based on `input.version`; a flag changed since then is rejected with 409. */
-  async update(projectKey: string, key: string, input: UpdateFlagDto): Promise<FlagDto> {
+  async update(projectKey: string, key: string, input: UpdateFlagDto, actor: string): Promise<FlagDto> {
     const project = await this.projects.find(projectKey);
-    const flag = await this.find(project, key);
-    assertKeyUnchanged('flag', flag.key, input.key);
-    assertNotArchived(flag);
-    await updateAtVersion(
-      () =>
-        this.prisma.flag.updateMany({
-          // Archiving bumps the version, so a flag archived since it was loaded is rejected too.
-          where: { id: flag.id, version: input.version },
-          data: {
-            name: input.name,
-            description: input.description,
-            tags: input.tags,
-            managedBy: input.managedBy,
-            version: { increment: 1 },
-          },
-        }),
-      `Flag ${key}`,
-      input.version,
-    );
-    return toFlagDto(project, await this.find(project, key));
-  }
-
-  /** Archives the flag, leaving its targeting as it is; archiving an archived flag changes nothing. */
-  archive(projectKey: string, key: string): Promise<FlagDto> {
-    return this.setArchived(projectKey, key, true);
-  }
-
-  /** Restores an archived flag, with the targeting it had; restoring a flag that isn't archived changes nothing. */
-  restore(projectKey: string, key: string): Promise<FlagDto> {
-    return this.setArchived(projectKey, key, false);
-  }
-
-  /** Archives or restores the flag, bumping its version only when that changes it. */
-  private async setArchived(projectKey: string, key: string, archive: boolean): Promise<FlagDto> {
-    const project = await this.projects.find(projectKey);
-    const flag = await this.find(project, key);
-    await this.prisma.flag.updateMany({
-      where: { id: flag.id, ...(archive ? notArchived : archived) },
-      data: { archivedAt: archive ? new Date() : null, version: { increment: 1 } },
+    const found = await this.find(project, key);
+    assertKeyUnchanged('flag', found.key, input.key);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const flag = await lockAndReload(tx, 'flag', found.id, () => flagNotFound(project, key));
+      assertNotArchived(flag);
+      await updateAtVersion(
+        () =>
+          tx.flag.updateMany({
+            where: { id: flag.id, version: input.version },
+            data: {
+              name: input.name,
+              description: input.description,
+              tags: input.tags,
+              managedBy: input.managedBy,
+              version: { increment: 1 },
+            },
+          }),
+        `Flag ${key}`,
+        input.version,
+      );
+      const updated = await tx.flag.findUniqueOrThrow({ where: { id: flag.id } });
+      await recordAudit(
+        tx,
+        { type: 'flag', project, flag: updated },
+        {
+          action: 'update',
+          actor,
+          before: flagState(flag),
+          after: flagState(updated),
+        },
+      );
+      return updated;
     });
-    return toFlagDto(project, await this.find(project, key));
+    return toFlagDto(project, updated);
+  }
+
+  /** Archives the flag, leaving its targeting as it is; archiving an archived flag changes (and records) nothing. */
+  archive(projectKey: string, key: string, actor: string): Promise<FlagDto> {
+    return this.setArchived(projectKey, key, true, actor);
+  }
+
+  /**
+   * Restores an archived flag, with the targeting it had; restoring a flag that isn't archived changes (and
+   * records) nothing.
+   */
+  restore(projectKey: string, key: string, actor: string): Promise<FlagDto> {
+    return this.setArchived(projectKey, key, false, actor);
+  }
+
+  /** Archives or restores the flag, bumping its version and recording the change only when that changes it. */
+  private async setArchived(projectKey: string, key: string, archive: boolean, actor: string): Promise<FlagDto> {
+    const project = await this.projects.find(projectKey);
+    const found = await this.find(project, key);
+    const flag = await this.prisma.$transaction(async (tx) => {
+      const flag = await lockAndReload(tx, 'flag', found.id, () => flagNotFound(project, key));
+      if (isArchived(flag) === archive) return flag;
+      const updated = await tx.flag.update({
+        where: { id: flag.id },
+        data: { archivedAt: archive ? new Date() : null, version: { increment: 1 } },
+      });
+      await recordAudit(
+        tx,
+        { type: 'flag', project, flag: updated },
+        {
+          action: archive ? 'archive' : 'restore',
+          actor,
+          before: flagState(flag),
+          after: flagState(updated),
+        },
+      );
+      return updated;
+    });
+    return toFlagDto(project, flag);
   }
 
   /** Permanently deletes an archived flag with its targeting in every environment; any other is rejected with 409. */
-  async delete(projectKey: string, key: string): Promise<void> {
+  async delete(projectKey: string, key: string, actor: string): Promise<void> {
     const project = await this.projects.find(projectKey);
-    const flag = await this.find(project, key);
-    // Filtered on being archived, so a flag restored in the meantime is not deleted.
-    const { count } = await this.prisma.flag.deleteMany({ where: { id: flag.id, ...archived } });
-    if (count === 0 && (await this.prisma.flag.count({ where: { id: flag.id } })) > 0) {
-      throw new ConflictException(`Flag ${key} is not archived; archive it before deleting it`);
-    }
+    const found = await this.find(project, key);
+    await this.prisma.$transaction(async (tx) => {
+      // Checked under the lock, so a flag restored in the meantime is not deleted.
+      const flag = await lockAndReload(tx, 'flag', found.id, () => flagNotFound(project, key));
+      if (!isArchived(flag)) throw new ConflictException(`Flag ${key} is not archived; archive it before deleting it`);
+      await tx.flag.delete({ where: { id: flag.id } });
+      await recordAudit(tx, { type: 'flag', project, flag }, { action: 'delete', actor, before: flagState(flag) });
+    });
   }
+}
+
+function flagNotFound(project: Project, key: string): NotFoundException {
+  return new NotFoundException(`Flag ${key} not found in project ${project.key}`);
 }
 
 function toFlagDto(project: Project, flag: Flag): FlagDto {

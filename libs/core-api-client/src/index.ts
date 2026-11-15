@@ -6,6 +6,8 @@ export type { components, paths } from './generated/schema.js';
 type Schemas = components['schemas'];
 export type Project = Schemas['ProjectDto'];
 export type Environment = Schemas['EnvironmentDto'];
+export type AuditEntry = Schemas['AuditEntryDto'];
+export type AuditEntryPage = Schemas['AuditEntryPageDto'];
 export type Settings = Schemas['SettingsDto'];
 
 /** A typed client for Core's API: `core.GET('/api/v1/projects')`, with paths, parameters and bodies checked. */
@@ -14,10 +16,18 @@ export type CoreApiClient = Client<paths>;
 export interface CoreApiClientOptions {
   /** Core's origin, such as `http://core:3000`. The paths already carry the `/api/v1` prefix. */
   baseUrl: string;
+  /**
+   * Who the changes made with this client are attributed to in their audit entries, sent as `X-CTFF-Actor`. It
+   * is percent-encoded, so any display name fits in the header; empty or absent, Core records `anonymous`.
+   */
+  actor?: string | undefined;
 }
 
-export function createCoreApiClient({ baseUrl }: CoreApiClientOptions): CoreApiClient {
-  return createClient<paths>({ baseUrl: baseUrl.replace(/\/+$/, '') });
+export function createCoreApiClient({ baseUrl, actor }: CoreApiClientOptions): CoreApiClient {
+  return createClient<paths>({
+    baseUrl: baseUrl.replace(/\/+$/, ''),
+    headers: actor ? { 'X-CTFF-Actor': encodeURIComponent(actor) } : {},
+  });
 }
 
 /**

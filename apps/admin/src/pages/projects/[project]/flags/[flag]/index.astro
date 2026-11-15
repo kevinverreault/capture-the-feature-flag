@@ -5,12 +5,14 @@ import TabPanel from '@ds/components/navigation/TabPanel.astro';
 import Tabs from '@ds/components/navigation/Tabs.astro';
 import Badge from '@ds/components/ui/Badge.astro';
 import Button from '@ds/components/ui/Button.astro';
+import AuditEntries from '../../../../../components/AuditEntries.astro';
 import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
 import ConfirmDelete from '../../../../../components/ConfirmDelete.astro';
 import FormAlert from '../../../../../components/FormAlert.astro';
 import NotFound from '../../../../../components/NotFound.astro';
 import ProjectNav from '../../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
+import { flagVariations } from '../../../../../lib/audit';
 import { coreApi } from '../../../../../lib/core';
 import { noFormErrors } from '../../../../../lib/form-errors';
 import { type FormAction, handlePost, orNotFound, textField } from '../../../../../lib/forms';
@@ -70,12 +72,15 @@ const post = await handlePost(Astro, {
 });
 if (post.redirect) return post.redirect;
 
-const [projects, project, environments, flag, targeting] = await Promise.all([
+/** How many of the flag's newest audit entries the page shows; the audit log has the rest. */
+const auditEntriesShown = 10;
+const [projects, project, environments, flag, targeting, auditEntries] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey } } }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params: { path: { projectKey } } }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting', { params }))),
+  unwrap(core.GET('/api/v1/audit-entries', { params: { query: { projectKey, flagKey, limit: auditEntriesShown } } })),
 ]);
 if (!project || !environments || !flag || !targeting) Astro.response.status = 404;
 
@@ -240,6 +245,18 @@ const flagMessages =
         </>
       )}
 
+      <section aria-labelledby="audit-entries" class="flag-audit">
+        <h2 id="audit-entries" class="text-xl">
+          Audit entries
+        </h2>
+        <AuditEntries
+          entries={auditEntries.entries}
+          flags={flagVariations([flag])}
+          olderHref={auditEntries.nextCursor === null ? undefined : routes.audit(project.key, { flag: flag.key, cursor: auditEntries.nextCursor })}
+          empty="No changes yet."
+        />
+      </section>
+
       <Button href={routes.flags(project.key)} variant="muted" decoration="ghost">
         Back to flags
       </Button>
@@ -287,7 +304,8 @@ const flagMessages =
 
 <style>
   .flag-summary,
-  .targeting {
+  .targeting,
+  .flag-audit {
     display: grid;
     gap: var(--space-xs);
   }
