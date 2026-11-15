@@ -10,6 +10,8 @@ export interface CoreConfig {
   adminCoreUrl?: string | undefined;
   /** How often the retention job purges telemetry older than the retention in Settings. */
   retentionIntervalMs: number;
+  /** Whether Core seeds the Birdwatch demo when it starts on a database without projects (see seed/demo-seed.ts). */
+  seedDemo: boolean;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
@@ -29,6 +31,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
     adminEnabled: parseBoolean('ADMIN_ENABLED', env['ADMIN_ENABLED'], true),
     adminCoreUrl: env['ADMIN_CORE_URL']?.trim() || undefined,
     retentionIntervalMs: positiveInteger('RETENTION_INTERVAL_MS', env['RETENTION_INTERVAL_MS'], 60 * 60_000),
+    seedDemo: parseBoolean('SEED_DEMO', env['SEED_DEMO'], true),
   };
 }
 

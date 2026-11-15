@@ -15,11 +15,18 @@ Core owns all admin data and its PostgreSQL schema, and serves the versioned RES
 | `ADMIN_ENABLED`         | `true`      | Whether Core serves the admin app             |
 | `ADMIN_CORE_URL`        | Core itself | The Core the admin app calls (see below)      |
 | `RETENTION_INTERVAL_MS` | `3600000`   | How often the retention job runs (see below)  |
+| `SEED_DEMO`             | `true`      | Whether to seed the demo project (see below)  |
 
 Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --filter @ctff/core start`.
 
 - `/health/live` answers as long as the process runs. `/health/ready` answers once migrations are applied and while the database is reachable.
 - `/api/v1/openapi.json` (and `.yaml`) is the OpenAPI document generated from the controllers. `/api/docs` is a browsable UI.
+
+## The demo seed
+
+On a database with no project at all (a first start), Core seeds the [Birdwatch](../birdwatch-api/README.md) demo before it reports ready ([src/seed/demo-seed.ts](src/seed/demo-seed.ts)): the `birdwatch` project, its `development` and `production` environments, and the flags `new-sighting-form`, `rare-bird-alerts` and `photo-id-beta`. `new-sighting-form` is a kill switch, so its targeting is on in both environments and it serves `true`. The other two keep the off-state targeting of a new flag.
+
+On any later start, and on a database that already has projects, the seed does nothing: an operator who deletes the demo doesn't get it back. The seed goes through the same services as the API, so its changes have audit entries, by the actor `seed`. Replicas starting together on an empty database seed it once, and a seed that fails halfway removes the project and fails the start. `SEED_DEMO=false` turns it off, for instance when Terraform creates the project instead.
 
 ## Evaluation telemetry
 

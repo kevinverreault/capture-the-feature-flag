@@ -31,7 +31,10 @@ export async function createDatabase(): Promise<string> {
   return url.toString();
 }
 
-/** Starts the built Core as its own process, configured only through environment variables. */
+/**
+ * Starts the built Core as its own process, configured only through environment variables. The demo seed is off
+ * (SEED_DEMO=false) unless `env` turns it on, so each test file starts on an empty database.
+ */
 export async function startCore(
   options: { databaseUrl?: string; env?: Record<string, string> } = {},
 ): Promise<RunningCore> {
@@ -43,6 +46,7 @@ export async function startCore(
       PORT: '0',
       HOST: '127.0.0.1',
       LOG_LEVEL: 'info',
+      SEED_DEMO: 'false',
       ...options.env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],

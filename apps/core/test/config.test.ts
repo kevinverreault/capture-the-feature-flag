@@ -29,6 +29,12 @@ describe('configuration', () => {
     );
   });
 
+  it('seeds the demo unless SEED_DEMO is false', () => {
+    expect(loadConfig({ DATABASE_URL: databaseUrl }).seedDemo).toBe(true);
+    expect(loadConfig({ DATABASE_URL: databaseUrl, SEED_DEMO: 'false' }).seedDemo).toBe(false);
+    expect(() => loadConfig({ DATABASE_URL: databaseUrl, SEED_DEMO: 'off' })).toThrow(/SEED_DEMO/);
+  });
+
   it('requires DATABASE_URL', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
   });
