@@ -78,10 +78,10 @@ The `@ctff/workspace` tests fail if a project is missing either tag, because an 
 
 [`kevinverreault/design-system`](https://github.com/kevinverreault/design-system) lives in `vendor/design-system` and is compiled from source by each Astro host. [`@ctff/design-system-host`](libs/design-system-host/) provides the setup it asks hosts for:
 
-1. Install the host dependencies. The `cva` alias is required: components import `'cva'` but use class-variance-authority's API.
+1. Install the host dependencies.
 
    ```bash
-   pnpm --filter <app> add astro@^7 cva@npm:class-variance-authority node-html-parser@^6
+   pnpm --filter <app> add astro@^7
    pnpm --filter <app> add -D @ctff/design-system-host@workspace:*
    ```
 
@@ -94,7 +94,7 @@ The `@ctff/workspace` tests fail if a project is missing either tag, because an 
    export default defineConfig({ integrations: [designSystem()] });
    ```
 
-3. Extend the tsconfig preset, so `astro check` (`pnpm --filter <app> add -D @astrojs/check typescript@~6.0.3`) resolves the same aliases. The preset also points the submodule's own imports (`astro/types`, `cva`, …) at the host's `node_modules`; without it, component props don't type-check. Because a tsconfig's `paths` replaces the inherited ones, a host that adds its own `paths` must repeat the preset's.
+3. Extend the tsconfig preset, so `astro check` (`pnpm --filter <app> add -D @astrojs/check typescript@~6.0.3`) resolves the same aliases. The preset also points the submodule's own imports (`astro/types`, …) at the host's `node_modules`; without it, component props don't type-check. Because a tsconfig's `paths` replaces the inherited ones, a host that adds its own `paths` must repeat the preset's.
 
    ```json
    {

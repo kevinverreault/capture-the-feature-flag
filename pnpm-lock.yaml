@@ -235,12 +235,6 @@ importers:
       astro:
         specifier: ^7.4.12
         version: 7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
-      cva:
-        specifier: npm:class-variance-authority@^0.7.1
-        version: class-variance-authority@0.7.1
-      node-html-parser:
-        specifier: ^6.1.13
-        version: 6.1.13
       pino:
         specifier: ^10.4.0
         version: 10.4.0
@@ -321,12 +315,6 @@ importers:
       astro:
         specifier: ^7.4.12
         version: 7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
-      cva:
-        specifier: npm:class-variance-authority@^0.7.1
-        version: class-variance-authority@0.7.1
-      node-html-parser:
-        specifier: ^6.1.13
-        version: 6.1.13
       pino:
         specifier: ^10.4.0
         version: 10.4.0
@@ -541,12 +529,6 @@ importers:
       astro:
         specifier: ^7.4.12
         version: 7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
-      cva:
-        specifier: npm:class-variance-authority@^0.7.1
-        version: class-variance-authority@0.7.1
-      node-html-parser:
-        specifier: ^6.1.13
-        version: 6.1.13
 
   libs/evaluation: {}
 
@@ -2928,9 +2910,6 @@ packages:
 
   class-validator@0.15.1:
     resolution: {integrity: sha512-LqoS80HBBSCVhz/3KloUly0ovokxpdOLR++Al3J3+dHXWt9sTKlKd4eYtoxhxyUjoe5+UcIM+5k9MIxyBWnRTw==}
-
-  class-variance-authority@0.7.1:
-    resolution: {integrity: sha512-Ka+9Trutv7G8M6WT6SeiRWz792K5qEqIGEGzXKhAE6xOWAY6pPH8U+9IY3oCMv6kqTmLsv7Xh/2w2RigkePMsg==}
 
   classnames@2.5.1:
     resolution: {integrity: sha512-saHYOzhIQs6wy2sVxTM6bUDsQO4F50V9RQ22qBpEdCW+I+/Wmke2HOl6lS6dTpdxVhb88/I6+Hs+438c3lfUow==}
@@ -8259,10 +8238,6 @@ snapshots:
       '@types/validator': 13.15.10
       libphonenumber-js: 1.13.16
       validator: 13.15.35
-
-  class-variance-authority@0.7.1:
-    dependencies:
-      clsx: 2.1.1
 
   classnames@2.5.1: {}
 
