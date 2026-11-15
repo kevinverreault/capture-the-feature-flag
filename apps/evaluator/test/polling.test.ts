@@ -88,9 +88,24 @@ describe('polling Core', () => {
 
   it('polls every interval with the ETags it holds, so unchanged snapshots get 304', async () => {
     const { core } = await start();
-    const before = core.requests.length;
+    // A poll fetches the list, then the snapshot: cut the window between polls, never inside one.
+    const betweenPolls = async (): Promise<number> => {
+      let cut = 0;
+      await expect
+        .poll(
+          () => {
+            cut = core.requests.length;
+            const count = (path: string) => core.requests.filter((request) => request.path === path).length;
+            return count('/api/v1/evaluator/environments') === count('/api/v1/evaluator/snapshot');
+          },
+          { interval: 5 },
+        )
+        .toBe(true);
+      return cut;
+    };
+    const before = await betweenPolls();
     await sleep(pollIntervalMs * 5);
-    const polled = core.requests.slice(before);
+    const polled = core.requests.slice(before, await betweenPolls());
 
     const snapshots = polled.filter((request) => request.path === '/api/v1/evaluator/snapshot');
     const lists = polled.filter((request) => request.path === '/api/v1/evaluator/environments');

@@ -24,13 +24,9 @@
     ]
   },
   "devDependencies": {
-    "astro": "^7.4.12",
-    "cva": "npm:class-variance-authority@^0.7.1",
-    "node-html-parser": "^6.1.13"
+    "astro": "^7.4.12"
   },
   "peerDependencies": {
-    "astro": "^7.4.12",
-    "cva": "npm:class-variance-authority@^0.7.1",
-    "node-html-parser": "^6.1.13"
+    "astro": "^7.4.12"
   }
 }
