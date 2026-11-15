@@ -27,6 +27,8 @@ This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000
 
 On an empty database, Core seeds the `birdwatch` demo project ([the demo seed](apps/core/README.md#the-demo-seed)), used by **Birdwatch**, the birding demo: its website, [birdwatch-web](apps/birdwatch-web/README.md), is on <http://localhost:4000>, and its API, [birdwatch-api](apps/birdwatch-api/README.md), on <http://localhost:4001>. Log in as a birder, and switch the targeting of `new-sighting-form` off in the admin app (project Birdwatch, environment Development): "Log a sighting" disappears within seconds. Switch between birders to see targeting at work: Alice (CA) gets the rare-bird alert banner from a `country in [CA]` rule and Bram (NL) doesn't, only Chiara gets "Photo ID (beta)" as an individual target, and the flag inspector at the bottom of each page shows the context, what each flag serves and why, with a link to the flag in the admin app.
 
+The [showcase website](apps/showcase/README.md), which presents the product and has the quickstart and the SDK, NestJS and Terraform guides, is on <http://localhost:8080>.
+
 To manage flags as code, `docker compose --profile terraform up` also builds the [Terraform provider](apps/terraform-provider-ctff/README.md) and applies its [example configuration](apps/terraform-provider-ctff/examples/birdwatch/main.tf), which declares the Birdwatch project with its environments, flags and targeting. It takes over the project the demo seed created; with `SEED_DEMO=false`, Terraform creates it instead.
 
 ## Layout
@@ -48,7 +50,7 @@ The workspace uses pnpm workspaces and Nx. Every project is a pnpm package whose
 | `build`        | Builds into the project's `dist/`                                                        |
 | `docker-build` | Projects that ship an image: `docker build` from the repo root                           |
 
-The Go Terraform provider follows the same targets with Go tools: `gofmt` for `lint`, `go vet` for `typecheck`, `go build` and `go test`.
+The Go Terraform provider follows the same targets with Go tools: `gofmt` for `lint`, `go vet` for `typecheck`, `go build` and `go test`. The [showcase](apps/showcase/README.md#code-samples) is the one exception to the `typecheck` convention: after `astro check`, it compiles its guides' TypeScript samples and runs `terraform validate` on its Terraform sample against the provider's build, so it needs Go and the Terraform CLI too (it declares an Nx implicit dependency on `@ctff/terraform-provider`).
 
 Run a target for one project with `pnpm nx run <project>:<target>`, for every project with `pnpm nx run-many -t <target>`, or only for projects changed since `main` with `pnpm nx affected -t <target>`.
 
@@ -121,7 +123,7 @@ To move the submodule to a newer design system commit: `git -C vendor/design-sys
 
 - `nx affected -t lint typecheck test build`,
 - `nx affected -t docker-build`, which builds the images of affected projects that define that target.
-- a compose smoke test: `docker compose up --build --wait`, then checks that every service is healthy and runs as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval (plus 500 ms for the poll's own latency) once targeting is switched on through Core's API, and still `true` after `docker compose stop core`. Before stopping Core, [apps/birdwatch-api/scripts/compose-smoke.ts](apps/birdwatch-api/scripts/compose-smoke.ts) checks the Birdwatch demo, its `new-sighting-form` kill switch and its targeting showcase.
+- a compose smoke test: `docker compose up --build --wait`, then checks that every service is healthy and runs as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval (plus 500 ms for the poll's own latency) once targeting is switched on through Core's API, and still `true` after `docker compose stop core`. Before stopping Core, [apps/birdwatch-api/scripts/compose-smoke.ts](apps/birdwatch-api/scripts/compose-smoke.ts) checks the Birdwatch demo, its `new-sighting-form` kill switch and its targeting showcase. It also checks that the showcase runs as non-root, serves each of its pages, and answers `404` for an unknown one.
 - a compose Terraform profile test: `docker compose --profile terraform up --build`, which builds the [Terraform provider](apps/terraform-provider-ctff/README.md) and applies its example configuration, then checks that Core holds the declared targeting with the flags managed by `terraform` and Terraform's changes attributed to it, and that applying again restores targeting edited outside Terraform.
 
 Nothing is published: images are built but not pushed, and packages are not released.

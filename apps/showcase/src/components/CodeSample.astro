@@ -1,0 +1,42 @@
+---
+import { Code } from 'astro:components';
+
+interface Props {
+  /** The source to show. Guide samples are imported with `?raw` from samples/, where `typecheck` checks them. */
+  code: string;
+  lang: 'ts' | 'hcl' | 'bash';
+  /** A file name or a short caption shown above the code. */
+  title?: string;
+}
+
+const { code, lang, title } = Astro.props;
+---
+
+<figure class="code-sample">
+  {title && <figcaption class="text-sm ff-sans-condensed">{title}</figcaption>}
+  <Code code={code.trimEnd()} lang={lang} theme="github-dark" />
+</figure>
+
+<style>
+  .code-sample {
+    margin: 0;
+    min-width: 0;
+    border-radius: var(--border);
+    overflow: hidden;
+    border: 1px solid hsl(var(--color-on-background) / 0.15);
+  }
+
+  figcaption {
+    padding: var(--space-xs) var(--space-sm);
+    background-color: hsl(var(--color-surface));
+    color: hsl(var(--color-on-surface));
+  }
+
+  .code-sample :global(pre) {
+    margin: 0;
+    padding: var(--space-sm);
+    overflow-x: auto;
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+  }
+</style>

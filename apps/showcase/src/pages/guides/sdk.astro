@@ -1,0 +1,163 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import Table from '@ds/components/ui/Table.astro';
+// The samples are real files, compiled against @ctff/sdk and @ctff/nestjs by the `typecheck` target.
+import appAsyncModule from '../../../samples/nestjs/app-async.module.ts?raw';
+import appModule from '../../../samples/nestjs/app.module.ts?raw';
+import contextResolver from '../../../samples/nestjs/birder-context.resolver.ts?raw';
+import sightingController from '../../../samples/nestjs/sighting.controller.ts?raw';
+import evaluate from '../../../samples/sdk/evaluate.ts?raw';
+import CodeSample from '../../components/CodeSample.astro';
+import SiteLayout from '../../layouts/SiteLayout.astro';
+
+const servedReasons = [
+  { reason: "{ kind: 'OFF' }", when: 'Targeting is off, so the off variation is served' },
+  { reason: "{ kind: 'TARGET_MATCH' }", when: 'The context’s user_id is in an individual target' },
+  { reason: "{ kind: 'RULE_MATCH', ruleIndex }", when: 'Rule ruleIndex (counting from 0) is the first rule that matched' },
+  { reason: "{ kind: 'DEFAULT' }", when: 'Targeting is on and no individual target or rule matched: the default variation' },
+];
+
+const fallbackReasons = [
+  { reason: "{ kind: 'FLAG_NOT_FOUND' }", when: 'The environment has no flag with that key, or it is archived' },
+  { reason: 'UNKNOWN_SDK_KEY', when: 'The Evaluator doesn’t know the SDK key' },
+  { reason: 'NOT_READY', when: 'The Evaluator hasn’t loaded the environment’s snapshot yet' },
+  { reason: 'TIMEOUT', when: 'The Evaluator didn’t answer within timeoutMs' },
+  { reason: 'NETWORK_ERROR', when: 'The Evaluator is unreachable' },
+  { reason: 'MALFORMED_CONTEXT', when: 'A context attribute has the wrong type or format' },
+  { reason: 'MALFORMED_FLAG', when: 'The flag’s targeting refers to a variation it doesn’t have' },
+  { reason: 'EVALUATOR_ERROR', when: 'The Evaluator answered with another error, or with something else' },
+];
+---
+
+<SiteLayout
+  title="SDK and NestJS guide"
+  description="Evaluate flags from TypeScript with @ctff/sdk, and from a NestJS app with @ctff/nestjs: variation, variationDetail, allFlags, @Flags() and @RequireFlag."
+>
+  <section class="section">
+    <h1 class="ff-serif text-3xl">SDK and NestJS guide</h1>
+    <div class="prose">
+      <p class="text-lg">
+        <code>@ctff/sdk</code> evaluates flags through an Evaluator, for a context you give it.
+        <code>@ctff/nestjs</code> configures it once for a NestJS app, and builds the context from each request.
+      </p>
+      <p>
+        Both are TypeScript packages of the repository’s pnpm workspace. V1 publishes nothing to a registry, so
+        depend on them from the workspace (<code>"@ctff/sdk": "workspace:*"</code>), as the Birdwatch API does.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">Evaluate a flag with @ctff/sdk</h2>
+    <div class="prose">
+      <p>
+        Create one client per environment with <code>createClient</code>: the Evaluator’s base URL and the
+        environment’s SDK key, from the admin app. It throws a <code>TypeError</code> at once for a missing URL or
+        SDK key, or a timeout that isn’t a positive number, so configuration mistakes show up at startup. There is no
+        local cache: every call is one request to the Evaluator.
+      </p>
+    </div>
+    <CodeSample lang="ts" title="evaluate.ts" code={evaluate} />
+    <div class="prose">
+      <ul>
+        <li>
+          <code>variation(flagKey, context, fallbackValue)</code> resolves to the served variation.
+        </li>
+        <li>
+          <code>variationDetail(flagKey, context, fallbackValue)</code> adds the variation index (<code>null</code>
+          when the fallback value is returned) and the evaluation reason.
+        </li>
+        <li>
+          <code>allFlags(context)</code> is a bulk evaluation of every flag of the environment that isn’t archived:
+          <code>values</code> holds every flag that served a variation, <code>details</code> every flag with its
+          evaluation, and <code>error</code> is <code>null</code> unless the Evaluator couldn’t be asked.
+        </li>
+      </ul>
+      <p>
+        The context is <code>{'{ user_id?: string; country?: string }'}</code>. Either attribute may be left out,
+        and a rule on a missing attribute never matches.
+      </p>
+    </div>
+    <Table caption="Evaluation reasons when a variation is served" columns={[
+      { key: 'reason', label: 'Reason' },
+      { key: 'when', label: 'When' },
+    ]} rows={servedReasons} />
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">The fallback value</h2>
+    <div class="prose">
+      <p>
+        <code>variation</code>, <code>variationDetail</code> and <code>allFlags</code> never throw or reject. When no
+        variation can be served, <code>variation</code> and <code>variationDetail</code> return the fallback value
+        you passed, with one of these reasons; the errors come as
+        <code>{"{ kind: 'ERROR', errorKind }"}</code>. <code>allFlags</code> has no fallback value: when the
+        Evaluator can’t be asked, <code>values</code> is empty and <code>error</code> names the problem, so look
+        flags up with your own, as in <code>all.values['photo-id-beta'] ?? false</code>.
+      </p>
+    </div>
+    <Table caption="When the fallback value is returned" columns={[
+      { key: 'reason', label: 'Reason or error kind' },
+      { key: 'when', label: 'When' },
+    ]} rows={fallbackReasons} />
+    <Alert variant="info" icon="info" title="Not the default variation">
+      The default variation is part of a flag’s targeting, and is served (reason <code>DEFAULT</code>) when
+      targeting is on and no individual target or rule matched. The fallback value belongs to your code, and is
+      returned only when no variation could be served at all. Pick the fallback value your feature can live with
+      if the Evaluator is down.
+    </Alert>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">NestJS: set up @ctff/nestjs</h2>
+    <div class="prose">
+      <p>
+        First, a <code>CtffContextResolver</code>, which builds the context to evaluate flags for from a request.
+        It is created inside <code>CtffModule</code>, so it can inject global providers and those of the modules
+        you pass in <code>imports</code>.
+      </p>
+    </div>
+    <CodeSample lang="ts" title="birder-context.resolver.ts" code={contextResolver} />
+    <div class="prose">
+      <p>
+        Then import <code>CtffModule</code> once, in the root module, with <code>forRoot()</code> and the same
+        options as <code>createClient</code>:
+      </p>
+    </div>
+    <CodeSample lang="ts" title="app.module.ts" code={appModule} />
+    <div class="prose">
+      <p>To configure it from injected providers, use <code>forRootAsync()</code>:</p>
+    </div>
+    <CodeSample lang="ts" title="app.module.ts, with forRootAsync()" code={appAsyncModule} />
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">NestJS: use flags in controllers</h2>
+    <CodeSample lang="ts" title="sighting.controller.ts" code={sightingController} />
+    <div class="prose">
+      <ul>
+        <li>
+          <strong><code>CtffClient</code></strong> is the SDK’s client, injected by its class, for a context you
+          build yourself.
+        </li>
+        <li>
+          <strong><code>@Flags()</code></strong> injects the result of <code>allFlags</code> for the context the
+          resolver builds from the request. However many times <code>@Flags()</code> and <code>@RequireFlag</code>
+          are used in a request, it makes one Evaluator call, and nothing is cached across requests. Evaluator
+          problems never fail the request.
+        </li>
+        <li>
+          <strong><code>@RequireFlag(flagKey)</code></strong>, on a route or a controller, answers
+          <code>404 Not Found</code> unless the flag serves <code>true</code>. A flag that serves no variation
+          (unknown, archived, or the Evaluator unreachable) counts as <code>false</code>.
+        </li>
+      </ul>
+      <p>
+        The resolver runs once per request, the first time the flags are needed, so whatever it reads, such as
+        <code>request.user</code>, must be set by middleware or a guard that runs before. Decorators apply from the
+        bottom up: in <code>@RequireFlag('photo-id-beta') @UseGuards(AuthGuard)</code>, the auth guard runs first.
+        An exception thrown by the resolver fails the request.
+      </p>
+    </div>
+  </section>
+</SiteLayout>

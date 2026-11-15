@@ -11,6 +11,7 @@ COPY apps/terraform-provider-ctff/go.mod apps/terraform-provider-ctff/go.sum ./
 RUN go mod download
 COPY apps/terraform-provider-ctff/ ./
 # Laid out as a filesystem mirror, so `terraform init` installs the provider without a registry.
+# apps/showcase/scripts/validate-terraform-samples.ts lays out the same mirror with this version; keep them equal.
 ARG PROVIDER_VERSION=0.1.0
 RUN plugin_dir="/out/plugins/registry.terraform.io/kevinverreault/ctff/${PROVIDER_VERSION}/$(go env GOOS)_$(go env GOARCH)" \
  && mkdir -p "$plugin_dir" \

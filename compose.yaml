@@ -85,6 +85,17 @@ services:
       - '4000:3000'
     # Reports healthy (ready) while birdwatch-api is.
 
+  # The showcase website, static files served by nginx: http://localhost:8080
+  showcase:
+    build:
+      context: .
+      dockerfile: apps/showcase/Dockerfile
+    image: ctff-showcase:local
+    environment:
+      PORT: '8080'
+    ports:
+      - '8080:8080'
+
   # Optional: `docker compose --profile terraform up` also builds the Terraform provider and applies the example
   # configuration (apps/terraform-provider-ctff/examples/birdwatch) to Core, then exits. The first run imports the
   # demo project Core seeded and applies the configuration over it (with SEED_DEMO=false, it creates the project).

@@ -457,6 +457,42 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  apps/showcase:
+    devDependencies:
+      '@astrojs/check':
+        specifier: ^0.9.12
+        version: 0.9.12(prettier@3.10.1)(typescript@6.0.3)
+      '@ctff/design-system-host':
+        specifier: workspace:*
+        version: link:../../libs/design-system-host
+      '@ctff/nestjs':
+        specifier: workspace:*
+        version: link:../../libs/nestjs
+      '@ctff/sdk':
+        specifier: workspace:*
+        version: link:../../libs/sdk
+      '@nestjs/common':
+        specifier: ^11.2.10
+        version: 11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2)
+      '@nestjs/core':
+        specifier: ^11.2.10
+        version: 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@10.2.2))(@nestjs/platform-express@11.2.10)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      astro:
+        specifier: ^7.4.12
+        version: 7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+
   apps/terraform-provider-ctff: {}
 
   libs/birdwatch-contract:

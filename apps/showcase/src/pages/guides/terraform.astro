@@ -1,0 +1,137 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import Table from '@ds/components/ui/Table.astro';
+// The sample is a real configuration, checked with `terraform validate` against the provider by `typecheck`.
+import mainTf from '../../../samples/terraform/main.tf?raw';
+import CodeSample from '../../components/CodeSample.astro';
+import SiteLayout from '../../layouts/SiteLayout.astro';
+
+const build = `pnpm nx run @ctff/terraform-provider:build
+# → apps/terraform-provider-ctff/dist/terraform-provider-ctff`;
+
+const devOverride = `provider_installation {
+  dev_overrides {
+    "kevinverreault/ctff" = "/path/to/capture-the-feature-flag/apps/terraform-provider-ctff/dist"
+  }
+  direct {}
+}`;
+
+const resources = [
+  { resource: 'ctff_project', arguments: 'key, name', computed: 'id', import: '<project>' },
+  { resource: 'ctff_environment', arguments: 'project_key, key, name', computed: 'id, sdk_key (sensitive)', import: '<project>/<env>' },
+  { resource: 'ctff_flag', arguments: 'project_key, key, name, description, tags (set), archived', computed: 'id, version, managed_by', import: '<project>/<flag>' },
+  {
+    resource: 'ctff_flag_environment',
+    arguments: 'project_key, flag_key, environment_key, on, off_variation, default_variation, individual_targets, rules',
+    computed: 'id, version',
+    import: '<project>/<flag>/<env>',
+  },
+];
+---
+
+<SiteLayout
+  title="Terraform guide"
+  description="Manage projects, environments, flags and targeting as code with the Capture The Feature Flag Terraform provider."
+>
+  <section class="section">
+    <h1 class="ff-serif text-3xl">Terraform guide</h1>
+    <div class="prose">
+      <p class="text-lg">
+        The <code>kevinverreault/ctff</code> provider manages projects, environments, flags and their targeting as
+        code. Like every other client, it talks only to Core’s <code>/api/v1</code>.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">Install the provider</h2>
+    <div class="prose">
+      <p>
+        V1 publishes nothing to a registry, so build the provider from the repository (it needs Go) and point
+        Terraform at the build with a dev override in <code>~/.terraformrc</code>, or in the file named by
+        <code>TF_CLI_CONFIG_FILE</code>. With a dev override, skip <code>terraform init</code> and run
+        <code>terraform plan</code> and <code>apply</code> directly.
+      </p>
+    </div>
+    <CodeSample lang="bash" title="Build" code={build} />
+    <CodeSample lang="hcl" title="~/.terraformrc" code={devOverride} />
+    <div class="prose">
+      <p>
+        Or let compose do it: <code>docker compose --profile terraform up</code> builds the provider in an image
+        and applies the example configuration of the Birdwatch demo to the stack’s Core.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">Declare a flag and its targeting</h2>
+    <CodeSample lang="hcl" title="main.tf" code={mainTf} />
+    <div class="prose">
+      <ul>
+        <li>
+          <strong>Variations are indexes</strong> into the flag’s variations, <code>[true, false]</code> for every
+          V1 flag: <code>0</code> serves <code>true</code> and <code>1</code> serves <code>false</code>.
+          <code>off_variation</code> defaults to <code>1</code> and <code>default_variation</code> to
+          <code>0</code>, as for a new flag.
+        </li>
+        <li>
+          <strong><code>individual_targets</code></strong> is a set of <code>{'{ variation, user_ids }'}</code>, at
+          most one per variation. <strong><code>rules</code></strong> is an ordered list of
+          <code>{'{ attribute, operator, values, variation }'}</code>, where <code>attribute</code> is
+          <code>user_id</code> or <code>country</code> and <code>operator</code> is <code>in</code> or
+          <code>not_in</code>.
+        </li>
+        <li>
+          <strong>Targeting always exists</strong>: Core gives every flag targeting in every environment, so a
+          <code>ctff_flag_environment</code> takes it over. Destroying the resource puts back the off state of a new
+          flag.
+        </li>
+        <li>
+          <strong>Plan checks what Core would reject</strong>: keys (lowercase kebab-case), variation indexes,
+          operators and attributes, country codes and empty user IDs.
+        </li>
+      </ul>
+    </div>
+    <Table caption="Resources" columns={[
+      { key: 'resource', label: 'Resource' },
+      { key: 'arguments', label: 'Arguments' },
+      { key: 'computed', label: 'Computed' },
+      { key: 'import', label: 'Import ID' },
+    ]} rows={resources} rowHeader="resource" />
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">Working alongside the admin app</h2>
+    <div class="prose">
+      <ul>
+        <li>
+          <strong>Managed by Terraform.</strong> The provider marks its flags as managed by
+          <code>terraform</code>, so the admin app shows a badge on them and warns before they are edited. Nothing is
+          locked.
+        </li>
+        <li>
+          <strong>Drift.</strong> Edits made in the admin app show up on the next plan, and applying puts the
+          declared configuration back.
+        </li>
+        <li>
+          <strong>Versions.</strong> Flag and targeting changes send the version Terraform last read. If someone
+          changed it between plan and apply, Core answers <code>409 Conflict</code> and the apply fails instead of
+          overwriting their change.
+        </li>
+        <li>
+          <strong>Audit entries.</strong> Every request carries <code>X-CTFF-Actor: terraform</code>, the actor Core
+          records on the audit entry of each change.
+        </li>
+        <li>
+          <strong>Archiving.</strong> <code>archived = true</code> archives a flag: it is no longer served, so SDKs
+          get their fallback value. Setting it back to <code>false</code> restores it. Destroying a
+          <code>ctff_flag</code> archives it, then deletes it permanently.
+        </li>
+      </ul>
+    </div>
+    <Alert variant="warning" icon="triangle-alert" title="Keys are immutable">
+      Changing a <code>key</code> or <code>project_key</code> replaces the resource. Replacing a flag deletes its
+      targeting in every environment, and replacing an environment gives it a new SDK key.
+    </Alert>
+  </section>
+</SiteLayout>

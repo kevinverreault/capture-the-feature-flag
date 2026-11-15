@@ -1,0 +1,61 @@
+{
+  "name": "@ctff/showcase",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The showcase website: a static Astro site, served by nginx, that presents Capture The Feature Flag and documents the SDK, the NestJS module and the Terraform provider.",
+  "exports": "./dist/index.html",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "typecheck": "astro check && tsc -p tsconfig.node.json && node scripts/validate-terraform-samples.ts",
+    "lint": "eslint .",
+    "docker-build": "docker build -f Dockerfile -t ctff-showcase:local ../.."
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:showcase"
+    ],
+    "implicitDependencies": [
+      "@ctff/terraform-provider"
+    ],
+    "targets": {
+      "build": {
+        "dependsOn": [
+          {
+            "target": "build",
+            "projects": [
+              "@ctff/design-system-host"
+            ]
+          }
+        ]
+      },
+      "typecheck": {
+        "inputs": [
+          "default",
+          "^production",
+          {
+            "runtime": "CHECKPOINT_DISABLE=1 terraform version -json || true"
+          }
+        ]
+      }
+    }
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@ctff/design-system-host": "workspace:*",
+    "@ctff/nestjs": "workspace:*",
+    "@ctff/sdk": "workspace:*",
+    "@nestjs/common": "^11.2.10",
+    "@nestjs/core": "^11.2.10",
+    "@types/express": "^5.0.6",
+    "astro": "^7.4.12",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "typescript": "~6.0.3"
+  }
+}

@@ -1,0 +1,71 @@
+---
+import Badge from '@ds/components/ui/Badge.astro';
+import Card from '@ds/components/ui/Card.astro';
+import SiteLayout from '../layouts/SiteLayout.astro';
+
+const next = [
+  {
+    title: 'Migration flags',
+    body: 'Flags that walk a data or service migration through its six steps (off, dual writes, shadow reads, live reads, ramp-down and complete), with the evaluation telemetry to tell when each step is safe.',
+  },
+  {
+    title: 'Progressive rollout',
+    body: 'Serve a variation to a percentage of contexts, kept stable for each context, and raise the percentage over time instead of switching everyone at once.',
+  },
+  {
+    title: 'Richer context',
+    body: 'Context attributes of your own beyond user_id and country, more than one context kind, reusable segments, and rule operators beyond in and not in.',
+  },
+  {
+    title: 'Authentication and authorization',
+    body: 'Admin users and roles, API tokens for automation such as Terraform, and SDK keys that are secrets rather than identifiers.',
+  },
+];
+---
+
+<SiteLayout
+  title="Roadmap"
+  description="What comes after V1 of Capture The Feature Flag: migration flags, progressive rollout, richer context, and authentication."
+>
+  <section class="section">
+    <h1 class="ff-serif text-3xl">Roadmap</h1>
+    <div class="prose">
+      <p class="text-lg">
+        V1 does one thing well: boolean flags with targeting on <code>user_id</code> and <code>country</code>, served
+        by Evaluators you scale yourself. Flags are already stored as a list of variations, so what comes next fits
+        the same model.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">Next</h2>
+    <ul class="cards">
+      {
+        next.map((item) => (
+          <Card as="li">
+            <Fragment slot="header">
+              <Badge variant="muted">Planned</Badge>
+              <h3 class="text-xl">{item.title}</h3>
+            </Fragment>
+            <p>{item.body}</p>
+          </Card>
+        ))
+      }
+    </ul>
+  </section>
+
+  <section class="section">
+    <h2 class="ff-serif text-2xl">In V1 today</h2>
+    <div class="prose">
+      <ul>
+        <li>Projects, environments with their SDK keys, and boolean flags with targeting in each environment.</li>
+        <li>Individual targets and ordered rules (<code>in</code> / <code>not in</code>) on <code>user_id</code> and <code>country</code>.</li>
+        <li>Archived flags, restored or permanently deleted, and an audit entry for every change.</li>
+        <li>A dashboard of evaluation counts, stale flags, and a Contexts explorer of seen contexts.</li>
+        <li>The TypeScript SDK, the NestJS module, and the Terraform provider.</li>
+        <li>Containers for everything, with health checks, JSON logs and Prometheus metrics on the Evaluator.</li>
+      </ul>
+    </div>
+  </section>
+</SiteLayout>
