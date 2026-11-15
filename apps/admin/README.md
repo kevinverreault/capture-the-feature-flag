@@ -25,6 +25,8 @@ The header's project switcher lists every project, next to a link to the install
 
 Saves of a flag or its targeting send the `version` the page was loaded at. When Core answers `409` because someone else (or Terraform) changed it since, the page says "Changed elsewhere — reload" instead of overwriting: the form keeps what the admin submitted, and the version it was based on, so saving again can't overwrite the other change. A targeting switch saves as soon as it is flipped (without scripts, through a Save button).
 
+A flag managed as code (its "managed by" marker is `terraform`, set by the [Terraform provider](../terraform-provider-ctff/README.md)) shows a "Managed by Terraform" badge in the flag list and on its page, and its page and edit page warn that changes made here show up as drift on the next Terraform plan, and that applying the configuration puts back what it declares. Nothing is locked.
+
 Deleting asks for confirmation in a dialog (or, without scripts, through a plain submit button). Each page's actions go through `handlePost` ([src/lib/forms.ts](src/lib/forms.ts)), and page addresses come from [src/lib/routes.ts](src/lib/routes.ts).
 
 A form post must come from the admin app's own pages: Astro checks its `Origin` (or `Sec-Fetch-Site`), and one carrying neither is refused. When a page fails (Core unreachable, or answering `5xx`), the admin app logs it and answers with its 500 page, which doesn't call Core.

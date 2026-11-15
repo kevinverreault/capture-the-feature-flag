@@ -93,11 +93,15 @@ jobs:
       - uses: actions/checkout@v7
         with:
           submodules: true
-      - run: docker compose --profile terraform build
+      # The documented command, detached. The one-shot terraform service applies the example configuration once Core
+      # is healthy, and exits with the apply's exit code.
+      - name: The terraform profile builds the provider and applies the example configuration
+        run: |
+          docker compose --profile terraform up --build --detach
+          docker compose --profile terraform wait terraform || true
+          container=$(docker compose --profile terraform ps --all --quiet terraform)
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" = 0
       - run: docker compose up --detach --wait --wait-timeout 300
-      # The one-shot terraform service applies the example configuration; its exit code is the apply's.
-      - name: The terraform profile applies the example configuration
-        run: docker compose --profile terraform run --rm terraform
       - name: Core holds the seeded project, attributed to terraform
         run: |
           curl --fail --silent --show-error http://localhost:3000/api/v1/projects/birdwatch/flags/rare-bird-alerts/targeting/production \

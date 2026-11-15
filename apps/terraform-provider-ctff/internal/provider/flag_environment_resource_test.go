@@ -256,6 +256,39 @@ func TestAccFlagEnvironmentResource_staleVersion(t *testing.T) {
 	})
 }
 
+// Core keeps an archived flag's targeting as it was archived, so changing it fails with a clear error, and
+// destroying it leaves it as it is.
+func TestAccFlagEnvironmentResource_archivedFlag(t *testing.T) {
+	api := testAPI(t)
+	projectKey := randomKey("project")
+	ref := client.TargetingRef{ProjectKey: projectKey, FlagKey: targetingFlagKey, EnvironmentKey: targetingEnvironmentKey}
+	archiveFlag := func(config string) string {
+		return strings.Replace(config, `name        = "Rare bird alerts"`, `name        = "Rare bird alerts"
+  archived    = true`, 1)
+	}
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: protoV6ProviderFactories,
+		CheckDestroy:             checkProjectsGone(api, projectKey),
+		Steps: []resource.TestStep{
+			{
+				Config: targetingConfig(projectKey, targetingOffCanadaOnly),
+				Check:  checkTargeting(api, ref, wantOffCanadaOnly),
+			},
+			{
+				// The flag is archived first, since the targeting depends on it; then the targeting change fails.
+				Config:      archiveFlag(targetingConfig(projectKey, targetingOnByCountry)),
+				ExpectError: regexp.MustCompile(`The\s+flag\s+is\s+archived`),
+			},
+			{
+				// Destroying the targeting resource keeps the archived flag's targeting as it was archived.
+				Config: archiveFlag(targetingConfig(projectKey, "")),
+				Check:  checkTargeting(api, ref, wantOffCanadaOnly),
+			},
+		},
+	})
+}
+
 func TestAccFlagEnvironmentResource_invalidAttributes(t *testing.T) {
 	invalid := []struct {
 		targeting string

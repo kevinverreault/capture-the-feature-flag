@@ -238,7 +238,7 @@ func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 			return
 		}
 		if current.Version != version {
-			flagChangedOutsideTerraform(&resp.Diagnostics, fmt.Sprintf("Flag %s is at version %d, not %d.", ref.Key, current.Version, version))
+			changedOutsideTerraform(&resp.Diagnostics, "flag", fmt.Sprintf("Flag %s is at version %d, not %d.", ref.Key, current.Version, version))
 			return
 		}
 		if flag, err = r.client.RestoreFlag(ctx, ref); err != nil {
@@ -273,15 +273,10 @@ func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 // flagUpdateError reports Core's refusal of a change; a 409 means the flag changed since Terraform read it.
 func flagUpdateError(diags *diag.Diagnostics, action string, err error) {
 	if client.IsConflict(err) {
-		flagChangedOutsideTerraform(diags, err.Error())
+		changedOutsideTerraform(diags, "flag", err.Error())
 		return
 	}
 	apiError(diags, action, err)
-}
-
-func flagChangedOutsideTerraform(diags *diag.Diagnostics, detail string) {
-	diags.AddError("The flag changed outside Terraform",
-		detail+"\n\nIt was edited after Terraform read it. Run terraform plan again to see the change, then apply.")
 }
 
 func (r *flagResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {

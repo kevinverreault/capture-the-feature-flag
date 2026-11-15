@@ -58,7 +58,8 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound
 }
 
-// IsConflict reports whether err is Core answering 409 (a key already in use, or a stale version).
+// IsConflict reports whether err is Core answering 409 (a key already in use, a stale version, or a change to an
+// archived flag).
 func IsConflict(err error) bool {
 	var apiErr *APIError
 	return errors.As(err, &apiErr) && apiErr.Status == http.StatusConflict
@@ -229,6 +230,9 @@ type TargetingRef struct {
 // ID is the Terraform resource ID of the targeting, and its import ID: "<project key>/<flag key>/<environment key>".
 func (r TargetingRef) ID() string { return r.ProjectKey + "/" + r.FlagKey + "/" + r.EnvironmentKey }
 
+// FlagRef addresses the flag of the targeting.
+func (r TargetingRef) FlagRef() Ref { return Ref{ProjectKey: r.ProjectKey, Key: r.FlagKey} }
+
 // ParseTargetingRef parses an ID made by TargetingRef.ID.
 func ParseTargetingRef(id string) (TargetingRef, error) {
 	parts := strings.Split(id, "/")
@@ -308,7 +312,7 @@ func flagPath(ref Ref) string {
 }
 
 func targetingPath(ref TargetingRef) string {
-	return flagPath(Ref{ProjectKey: ref.ProjectKey, Key: ref.FlagKey}) + "/targeting/" + url.PathEscape(ref.EnvironmentKey)
+	return flagPath(ref.FlagRef()) + "/targeting/" + url.PathEscape(ref.EnvironmentKey)
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body, out any) error {

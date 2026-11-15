@@ -79,3 +79,10 @@ func importRef(ctx context.Context, req resource.ImportStateRequest, resp *resou
 func apiError(diags *diag.Diagnostics, action string, err error) {
 	diags.AddError("Could not "+action, err.Error())
 }
+
+// changedOutsideTerraform reports that Core rejected a change to what (such as "flag" or "targeting") because it
+// changed since Terraform read it.
+func changedOutsideTerraform(diags *diag.Diagnostics, what, detail string) {
+	diags.AddError("The "+what+" changed outside Terraform",
+		detail+"\n\nIt was edited after Terraform read it. Run terraform plan again to see the change, then apply.")
+}

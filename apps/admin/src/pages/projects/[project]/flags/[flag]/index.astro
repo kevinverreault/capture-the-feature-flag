@@ -153,6 +153,7 @@ const flagMessages =
         )}
       </section>
 
+      <ManagedByWarning managedBy={flag.managedBy} what="this flag and its targeting" />
       <FormAlert messages={flagMessages} />
 
       {flag.archived ? (
@@ -184,7 +185,6 @@ const flagMessages =
             <h2 id="targeting-heading" class="text-xl">
               Targeting
             </h2>
-            <ManagedByWarning managedBy={flag.managedBy} what="this flag's targeting" />
             <FormAlert messages={unplacedMessages} />
             {tabs.length === 0 ? (
               <p>

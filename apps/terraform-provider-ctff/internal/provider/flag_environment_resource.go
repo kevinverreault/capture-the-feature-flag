@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -261,7 +262,7 @@ func (r *flagEnvironmentResource) ValidateConfig(ctx context.Context, req resour
 			for _, userID := range target.userIDs {
 				if userID == "" {
 					resp.Diagnostics.AddAttributeError(target.at.AtName("user_ids"), "Invalid individual targets",
-						"user IDs must be non-empty strings")
+						ruleValueProblem("user_id", userID))
 					continue
 				}
 				if other, seen := variationOfUserID[userID]; seen && other != target.variation {
@@ -461,15 +462,14 @@ func (r *flagEnvironmentResource) updateError(ctx context.Context, diags *diag.D
 			fmt.Sprintf("%s\n\nCore keeps an archived flag's targeting as it was archived. Restore the flag (set "+
 				"archived = false on its ctff_flag, or restore it in the admin app), then apply again.", err))
 	case client.IsConflict(err):
-		diags.AddError("The targeting changed outside Terraform",
-			fmt.Sprintf("%s\n\nIt was edited after Terraform read it. Run terraform plan again to see the change, then apply.", err))
+		changedOutsideTerraform(diags, "targeting", err.Error())
 	default:
 		apiError(diags, "update the targeting", err)
 	}
 }
 
 func (r *flagEnvironmentResource) flagArchived(ctx context.Context, ref client.TargetingRef) bool {
-	flag, err := r.client.GetFlag(ctx, client.Ref{ProjectKey: ref.ProjectKey, Key: ref.FlagKey})
+	flag, err := r.client.GetFlag(ctx, ref.FlagRef())
 	return err == nil && flag.Archived
 }
 
@@ -505,9 +505,16 @@ func targetingInput(ctx context.Context, plan flagEnvironmentModel) (client.Targ
 	})
 	var rules []ruleModel
 	diags.Append(plan.Rules.ElementsAs(ctx, &rules, false)...)
-	for _, rule := range rules {
+	for index, rule := range rules {
 		var values []string
 		diags.Append(rule.Values.ElementsAs(ctx, &values, false)...)
+		// Values unknown at plan time are checked now: Core would store a lowercase country code in uppercase,
+		// which Terraform rejects as an inconsistent result.
+		for _, value := range values {
+			if problem := ruleValueProblem(rule.Attribute.ValueString(), value); problem != "" {
+				diags.AddAttributeError(path.Root("rules").AtListIndex(index).AtName("values"), "Invalid rule value", problem)
+			}
+		}
 		sort.Strings(values)
 		input.Rules = append(input.Rules, client.Rule{
 			Attribute: rule.Attribute.ValueString(),
@@ -523,13 +530,13 @@ func targetingInput(ctx context.Context, plan flagEnvironmentModel) (client.Targ
 func setTargetingState(ctx context.Context, state *tfsdk.State, diags *diag.Diagnostics, ref client.TargetingRef, targeting *client.Targeting) {
 	targets := make([]individualTargetModel, 0, len(targeting.IndividualTargets))
 	for _, target := range targeting.IndividualTargets {
-		userIDs, d := types.SetValueFrom(ctx, types.StringType, sorted(target.UserIDs))
+		userIDs, d := types.SetValueFrom(ctx, types.StringType, slices.Sorted(slices.Values(target.UserIDs)))
 		diags.Append(d...)
 		targets = append(targets, individualTargetModel{Variation: types.Int64Value(target.Variation), UserIDs: userIDs})
 	}
 	rules := make([]ruleModel, 0, len(targeting.Rules))
 	for _, rule := range targeting.Rules {
-		values, d := types.SetValueFrom(ctx, types.StringType, sorted(rule.Values))
+		values, d := types.SetValueFrom(ctx, types.StringType, slices.Sorted(slices.Values(rule.Values)))
 		diags.Append(d...)
 		rules = append(rules, ruleModel{
 			Attribute: types.StringValue(rule.Attribute),
@@ -557,10 +564,4 @@ func setTargetingState(ctx context.Context, state *tfsdk.State, diags *diag.Diag
 		Rules:             ruleList,
 		Version:           types.Int64Value(targeting.Version),
 	})...)
-}
-
-func sorted(values []string) []string {
-	out := append([]string{}, values...)
-	sort.Strings(out)
-	return out
 }
