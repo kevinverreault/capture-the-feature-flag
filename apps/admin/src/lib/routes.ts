@@ -5,7 +5,16 @@ const flagPath = (project: string, flagKey: string) => `/projects/${segment(proj
 
 export const routes = {
   projects: () => '/projects',
+  /** A project's dashboard, its landing page. */
   project: (project: string) => `/projects/${segment(project)}`,
+  /** The dashboard, with its evaluation charts over `range` and of `environment` only, when given. */
+  dashboard: (project: string, { range, environment }: { range?: string; environment?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (range !== undefined) query.set('range', range);
+    if (environment !== undefined) query.set('environment', environment);
+    const search = query.toString();
+    return `/projects/${segment(project)}${search ? `?${search}` : ''}`;
+  },
   environments: (project: string) => `/projects/${segment(project)}/environments`,
   environment: (project: string, environment: string) =>
     `/projects/${segment(project)}/environments/${segment(environment)}`,

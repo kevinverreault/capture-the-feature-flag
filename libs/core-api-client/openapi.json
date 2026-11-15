@@ -1220,6 +1220,114 @@
           "audit"
         ]
       }
+    },
+    "/api/v1/projects/{projectKey}/dashboard/summary": {
+      "get": {
+        "operationId": "DashboardController_summary",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The flag counts, and how many flags are on and off in each environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/dashboard/evaluations": {
+      "get": {
+        "operationId": "DashboardController_evaluations",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "required": false,
+            "in": "query",
+            "description": "The last 24 hours, in hourly buckets, or the last 7 days, in 6-hour buckets.",
+            "schema": {
+              "$ref": "#/components/schemas/EvaluationRange"
+            }
+          },
+          {
+            "name": "environment",
+            "required": false,
+            "in": "query",
+            "description": "Only this environment.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The evaluations of the last 24 hours (hourly buckets) or 7 days (6-hour buckets), per flag, environment and variation, from the stored count buckets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluationSeriesDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "dashboard"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/dashboard/stale-flags": {
+      "get": {
+        "operationId": "DashboardController_staleFlags",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The flags with no evaluations in any environment for the stale-flag threshold of the settings. Archived flags, and flags younger than the threshold, are left out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaleFlagsDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "dashboard"
+        ]
+      }
     }
   },
   "info": {
@@ -2232,6 +2340,195 @@
         "required": [
           "entries",
           "nextCursor"
+        ]
+      },
+      "EnvironmentFlagCountsDto": {
+        "type": "object",
+        "properties": {
+          "environmentKey": {
+            "type": "string",
+            "example": "production"
+          },
+          "name": {
+            "type": "string",
+            "example": "Production"
+          },
+          "on": {
+            "type": "number",
+            "description": "Flags (not archived) with targeting on in the environment."
+          },
+          "off": {
+            "type": "number",
+            "description": "Flags (not archived) with targeting off in the environment."
+          }
+        },
+        "required": [
+          "environmentKey",
+          "name",
+          "on",
+          "off"
+        ]
+      },
+      "DashboardSummaryDto": {
+        "type": "object",
+        "properties": {
+          "flagCount": {
+            "type": "number",
+            "description": "The flags of the project, archived flags left out."
+          },
+          "archivedFlagCount": {
+            "type": "number",
+            "description": "The archived flags of the project."
+          },
+          "environments": {
+            "description": "Every environment of the project, in the environments' order.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentFlagCountsDto"
+            }
+          }
+        },
+        "required": [
+          "flagCount",
+          "archivedFlagCount",
+          "environments"
+        ]
+      },
+      "EvaluationRange": {
+        "type": "string",
+        "enum": [
+          "24h",
+          "7d"
+        ]
+      },
+      "EvaluationSeriesCountDto": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "format": "date-time",
+            "type": "string",
+            "description": "The start of the bucket."
+          },
+          "flagKey": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "environmentKey": {
+            "type": "string",
+            "example": "production"
+          },
+          "variationIndex": {
+            "type": "number",
+            "description": "Index into the flag variations."
+          },
+          "count": {
+            "type": "number",
+            "description": "Never 0: buckets without evaluations are left out."
+          }
+        },
+        "required": [
+          "start",
+          "flagKey",
+          "environmentKey",
+          "variationIndex",
+          "count"
+        ]
+      },
+      "EvaluationSeriesDto": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EvaluationRange"
+              }
+            ]
+          },
+          "environmentKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "The environment asked for, or null for all of them."
+          },
+          "bucketMinutes": {
+            "type": "number",
+            "description": "The size of each bucket, in minutes.",
+            "example": 60
+          },
+          "from": {
+            "format": "date-time",
+            "type": "string",
+            "description": "The start of the first bucket."
+          },
+          "to": {
+            "format": "date-time",
+            "type": "string",
+            "description": "The end of the last bucket, exclusive: it is in the future."
+          },
+          "counts": {
+            "description": "Oldest first, then by environment, flag and variation; only buckets with evaluations.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EvaluationSeriesCountDto"
+            }
+          }
+        },
+        "required": [
+          "range",
+          "environmentKey",
+          "bucketMinutes",
+          "from",
+          "to",
+          "counts"
+        ]
+      },
+      "StaleFlagDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "name": {
+            "type": "string",
+            "example": "Rare bird alerts"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "lastEvaluatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "The start of the last minute it was evaluated in, in any environment, or null when the count buckets kept (see the metric retention) have none."
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "createdAt",
+          "lastEvaluatedAt"
+        ]
+      },
+      "StaleFlagsDto": {
+        "type": "object",
+        "properties": {
+          "thresholdDays": {
+            "type": "number",
+            "description": "The stale-flag threshold of the settings, in days.",
+            "example": 7
+          },
+          "flags": {
+            "description": "Never evaluated first, then the longest without evaluations; then by key.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StaleFlagDto"
+            }
+          }
+        },
+        "required": [
+          "thresholdDays",
+          "flags"
         ]
       }
     }

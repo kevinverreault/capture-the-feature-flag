@@ -36,13 +36,6 @@ describe('admin app: flags', () => {
     return key;
   }
 
-  it('opens a project on its flags', async () => {
-    const projectKey = await project();
-    const response = await admin.get(`/projects/${projectKey}`);
-    expect(response.status).toBe(302);
-    expect(response.headers.get('location')).toBe(`/projects/${projectKey}/flags`);
-  });
-
   it('lists every flag of the project with its targeting on or off in each environment', async () => {
     const projectKey = await project();
     await api.post(`/projects/${projectKey}/flags`, { key: 'rare-bird-alerts', name: 'Rare bird alerts' });

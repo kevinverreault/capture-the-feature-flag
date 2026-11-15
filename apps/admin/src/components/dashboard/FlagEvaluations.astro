@@ -1,0 +1,212 @@
+---
+import Badge from '@ds/components/ui/Badge.astro';
+import Table from '@ds/components/ui/Table.astro';
+import { compactCount, type EvaluationChart, fullCount } from '../../lib/dashboard';
+import { routes } from '../../lib/routes';
+import ChartLegend from './ChartLegend.astro';
+import { seriesColor } from './series';
+
+interface Props {
+  chart: EvaluationChart;
+  projectKey: string;
+  /** What the chart counts, for its accessible name: "Evaluations per flag over the last 24 hours". */
+  label: string;
+}
+
+/** How many flags get a bar; the table view lists them all. */
+const shownFlags = 10;
+
+const { chart, projectKey, label } = Astro.props;
+const shown = chart.flags.slice(0, shownFlags);
+const max = Math.max(1, ...shown.map((flag) => flag.total));
+const describe = (counts: readonly number[]) =>
+  chart.variations.map((variation, slot) => `${fullCount(counts[slot] ?? 0)} ${variation}`).join(', ');
+---
+
+<figure class="flag-evaluations" aria-label={label}>
+  <ChartLegend variations={chart.variations} />
+  <ol class="bars">
+    {
+      shown.map((flag) => (
+        <li data-flag={flag.key}>
+          <span class="flag-label">
+            {flag.known ? <a href={routes.flag(projectKey, flag.key)}>{flag.name}</a> : <span>{flag.name}</span>}
+            {flag.archived && <Badge variant="muted">Archived</Badge>}
+            {!flag.known && <Badge variant="muted">Deleted</Badge>}
+          </span>
+          <span class="track" tabindex="0" aria-label={`${flag.name}: ${describe(flag.counts)}`}>
+            <span class="bar" style={`width: ${((flag.total / max) * 100).toFixed(3)}%`}>
+              {flag.counts.map((count, slot) =>
+                count > 0 ? <span style={`flex-grow: ${count}; background-color: ${seriesColor(slot)}`} /> : null,
+              )}
+            </span>
+            <span class="value" aria-hidden="true">
+              {compactCount(flag.total)}
+            </span>
+            <span class="tip" aria-hidden="true">
+              {chart.variations.map((variation, slot) => (
+                <span class="tip-row">
+                  <span class="tip-key" style={`background-color: ${seriesColor(slot)}`} />
+                  <strong>{fullCount(flag.counts[slot] ?? 0)}</strong>
+                  <code>{variation}</code>
+                </span>
+              ))}
+            </span>
+          </span>
+        </li>
+      ))
+    }
+  </ol>
+  {
+    chart.flags.length > shown.length && (
+      <figcaption>
+        The {shown.length} most evaluated flags; the table lists all {chart.flags.length}.
+      </figcaption>
+    )
+  }
+  <details>
+    <summary>Show per environment as a table</summary>
+    <Table
+      caption={`${label}, per environment`}
+      rowHeader="flag"
+      columns={[
+        { key: 'flag', label: 'Flag' },
+        { key: 'environment', label: 'Environment' },
+        ...chart.variations.map((variation, slot) => ({ key: `v${slot}`, label: variation, align: 'end' as const })),
+        { key: 'total', label: 'Total', align: 'end' },
+      ]}
+      rows={chart.rows.map((row) => ({
+        flag: row.flagName,
+        environment: row.environmentKey,
+        ...Object.fromEntries(chart.variations.map((_, slot) => [`v${slot}`, fullCount(row.counts[slot] ?? 0)])),
+        total: fullCount(row.total),
+      }))}
+    />
+  </details>
+</figure>
+
+<style>
+  .flag-evaluations {
+    display: grid;
+    gap: var(--space-sm);
+    margin: 0;
+  }
+
+  .bars {
+    display: grid;
+    grid-template-columns: minmax(8rem, max-content) 1fr;
+    gap: var(--space-xs) var(--space-sm);
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .bars li {
+    display: contents;
+  }
+
+  .flag-label {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
+    overflow-wrap: anywhere;
+  }
+
+  .flag-label a {
+    color: inherit;
+    font-weight: 700;
+  }
+
+  /* The whole row of the bar is the target, not only its painted part. */
+  .track {
+    position: relative;
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+    min-height: 2rem;
+    padding-inline: 2px;
+    border-radius: 2px;
+    border-left: 1px solid hsl(var(--chart-axis));
+    outline: none;
+  }
+
+  .track:hover,
+  .track:focus-visible {
+    background-color: hsl(var(--color-on-background) / 0.06);
+  }
+
+  .track:focus-visible {
+    outline: 2px solid hsl(var(--color-accent));
+    outline-offset: -2px;
+  }
+
+  .bar {
+    display: flex;
+    gap: 2px;
+    height: 16px;
+    min-width: 2px;
+    overflow: hidden;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .bar span {
+    flex-basis: 0;
+    min-width: 1px;
+  }
+
+  .value {
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .tip {
+    position: absolute;
+    bottom: calc(100% + 0.25em);
+    left: 0;
+    z-index: 1;
+    display: none;
+    gap: 0.2em;
+    min-width: max-content;
+    padding: 0.5em 0.75em;
+    border: 1px solid hsl(var(--color-on-background) / 0.15);
+    border-radius: var(--border);
+    background-color: hsl(var(--color-background));
+    box-shadow: 0 0.25rem 1rem hsl(var(--color-on-background) / 0.12);
+    font-size: var(--fs-sm);
+  }
+
+  .track:hover .tip,
+  .track:focus-visible .tip {
+    display: grid;
+  }
+
+  .tip-row {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+  }
+
+  .tip-key {
+    width: 0.75em;
+    height: 2px;
+  }
+
+  figcaption {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  summary {
+    cursor: pointer;
+  }
+
+  @media (forced-colors: active) {
+    .bar span,
+    .tip-key {
+      forced-color-adjust: none;
+    }
+  }
+</style>

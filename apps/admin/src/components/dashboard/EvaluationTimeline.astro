@@ -1,0 +1,265 @@
+---
+import type { EvaluationRange } from '@ctff/core-api-client';
+import Table from '@ds/components/ui/Table.astro';
+import {
+  axisLabel,
+  bucketTime,
+  compactCount,
+  type EvaluationChart,
+  fullCount,
+  hasAxisLabel,
+  niceTicks,
+} from '../../lib/dashboard';
+import ChartLegend from './ChartLegend.astro';
+import { seriesColor } from './series';
+
+interface Props {
+  chart: EvaluationChart;
+  range: EvaluationRange;
+  /** What the chart counts, for its accessible name: "Evaluations over the last 24 hours". */
+  label: string;
+}
+
+const { chart, range, label } = Astro.props;
+const ticks = niceTicks(Math.max(0, ...chart.buckets.map((bucket) => bucket.total)));
+const top = ticks.at(-1) ?? 1;
+const percent = (value: number) => `${((value / top) * 100).toFixed(3)}%`;
+// Tooltips near either end open inwards, so they stay inside the chart.
+const edge = Math.ceil(chart.buckets.length / 6);
+const describe = (counts: readonly number[]) =>
+  chart.variations.map((variation, slot) => `${fullCount(counts[slot] ?? 0)} ${variation}`).join(', ');
+---
+
+<figure class="timeline" aria-label={label}>
+  <ChartLegend variations={chart.variations} />
+  <div class="plot">
+    <div class="y-ticks" aria-hidden="true">
+      {ticks.map((tick) => <span style={`bottom: ${percent(tick)}`}>{compactCount(tick)}</span>)}
+    </div>
+    <div class="area">
+      <div class="gridlines" aria-hidden="true">
+        {ticks.map((tick) => <span class:list={[tick === 0 && 'baseline']} style={`bottom: ${percent(tick)}`} />)}
+      </div>
+      <ol class="columns">
+        {
+          chart.buckets.map((bucket, index) => (
+            <li
+              tabindex="0"
+              class:list={[index < edge && 'start', index >= chart.buckets.length - edge && 'end']}
+              aria-label={`${bucketTime(bucket.start)} UTC: ${describe(bucket.counts)}`}
+            >
+              <span class="stack" style={`height: ${percent(bucket.total)}`}>
+                {bucket.counts.map((count, slot) =>
+                  count > 0 ? <span style={`flex-grow: ${count}; background-color: ${seriesColor(slot)}`} /> : null,
+                )}
+              </span>
+              {hasAxisLabel(bucket.start, range) && (
+                <span class="x-label" aria-hidden="true">
+                  {axisLabel(bucket.start, range)}
+                </span>
+              )}
+              <span class="tip" aria-hidden="true">
+                <span class="tip-time">{bucketTime(bucket.start)} UTC</span>
+                {chart.variations.map((variation, slot) => (
+                  <span class="tip-row">
+                    <span class="tip-key" style={`background-color: ${seriesColor(slot)}`} />
+                    <strong>{fullCount(bucket.counts[slot] ?? 0)}</strong>
+                    <code>{variation}</code>
+                  </span>
+                ))}
+              </span>
+            </li>
+          ))
+        }
+      </ol>
+    </div>
+  </div>
+  <figcaption>Times are UTC. The last {range === '24h' ? 'hour' : '6 hours'} is still filling.</figcaption>
+  <details>
+    <summary>Show as a table</summary>
+    <Table
+      caption={label}
+      rowHeader="time"
+      columns={[
+        { key: 'time', label: 'Time (UTC)' },
+        ...chart.variations.map((variation, slot) => ({ key: `v${slot}`, label: variation, align: 'end' as const })),
+        { key: 'total', label: 'Total', align: 'end' },
+      ]}
+      rows={chart.buckets.map((bucket) => ({
+        time: bucketTime(bucket.start),
+        ...Object.fromEntries(chart.variations.map((_, slot) => [`v${slot}`, fullCount(bucket.counts[slot] ?? 0)])),
+        total: fullCount(bucket.total),
+      }))}
+    />
+  </details>
+</figure>
+
+<style>
+  .timeline {
+    display: grid;
+    gap: var(--space-sm);
+    margin: 0;
+    --plot-height: 12rem;
+  }
+
+  .plot {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--space-xs);
+    /* Room for the time axis labels under the plot. */
+    padding-bottom: 1.75em;
+  }
+
+  .y-ticks {
+    position: relative;
+    height: var(--plot-height);
+    min-width: 2.5em;
+    font-size: var(--fs-sm);
+    font-variant-numeric: tabular-nums;
+    color: hsl(var(--color-on-background) / 0.7);
+  }
+
+  .y-ticks span {
+    position: absolute;
+    right: 0;
+    transform: translateY(50%);
+    line-height: 1;
+  }
+
+  .area {
+    position: relative;
+    height: var(--plot-height);
+  }
+
+  .gridlines span {
+    position: absolute;
+    inset-inline: 0;
+    border-top: 1px solid hsl(var(--chart-grid));
+  }
+
+  .gridlines .baseline {
+    border-top-color: hsl(var(--chart-axis));
+  }
+
+  .columns {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .columns li {
+    position: relative;
+    display: flex;
+    flex: 1 1 0;
+    align-items: flex-end;
+    justify-content: center;
+    min-width: 0;
+    padding-inline: 1px;
+    border-radius: 2px;
+    outline: none;
+  }
+
+  /* The whole column is the target: a ghost wash shows the one hovered or focused. */
+  .columns li:hover,
+  .columns li:focus-visible {
+    background-color: hsl(var(--color-on-background) / 0.06);
+  }
+
+  .columns li:focus-visible {
+    outline: 2px solid hsl(var(--color-accent));
+    outline-offset: -2px;
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    width: 100%;
+    max-width: 24px;
+    overflow: hidden;
+    border-radius: 4px 4px 0 0;
+  }
+
+  .stack span {
+    flex-basis: 0;
+    min-height: 1px;
+  }
+
+  .x-label {
+    position: absolute;
+    top: calc(100% + 0.4em);
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: var(--fs-sm);
+    white-space: nowrap;
+    color: hsl(var(--color-on-background) / 0.7);
+  }
+
+  .tip {
+    position: absolute;
+    bottom: calc(100% + 0.25em);
+    left: 50%;
+    z-index: 1;
+    display: none;
+    gap: 0.2em;
+    min-width: max-content;
+    padding: 0.5em 0.75em;
+    transform: translateX(-50%);
+    border: 1px solid hsl(var(--color-on-background) / 0.15);
+    border-radius: var(--border);
+    background-color: hsl(var(--color-background));
+    box-shadow: 0 0.25rem 1rem hsl(var(--color-on-background) / 0.12);
+    font-size: var(--fs-sm);
+  }
+
+  .start .tip {
+    left: 0;
+    transform: none;
+  }
+
+  .end .tip {
+    right: 0;
+    left: auto;
+    transform: none;
+  }
+
+  li:hover .tip,
+  li:focus-visible .tip {
+    display: grid;
+  }
+
+  .tip-time {
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  .tip-row {
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+  }
+
+  /* A short line keys each row, rather than a box. */
+  .tip-key {
+    width: 0.75em;
+    height: 2px;
+  }
+
+  figcaption {
+    font-size: var(--fs-sm);
+    color: hsl(var(--color-on-background) / 0.75);
+  }
+
+  summary {
+    cursor: pointer;
+  }
+
+  @media (forced-colors: active) {
+    .stack span,
+    .tip-key {
+      forced-color-adjust: none;
+    }
+  }
+</style>
