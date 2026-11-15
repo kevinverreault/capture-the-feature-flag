@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { BIRDWATCH_API_CONFIG } from '../tokens.js';
 import type { BirdwatchApiConfig } from '../config.js';
+import { type Birder, findBirder } from '../data/birders.js';
 import { type SessionClaims, verifySession } from './session-token.js';
 
 const publicKey = 'birdwatch:public';
@@ -42,4 +43,14 @@ export class AuthGuard implements CanActivate {
     request.birder = birder;
     return true;
   }
+}
+
+/**
+ * The birder a request is for, on a route that isn't `@Public()` (the AuthGuard has checked their token). A token
+ * for a birder the API doesn't know (signed by another version of the demo) gets `401`, so the visitor logs in again.
+ */
+export function loggedInBirder(request: BirderRequest): Birder {
+  const birder = findBirder(request.birder?.sub ?? '');
+  if (!birder) throw new UnauthorizedException('Log in as a birder first');
+  return birder;
 }

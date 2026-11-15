@@ -1,37 +1,16 @@
-import type { AllFlags, Context } from '@ctff/sdk';
+import type {
+  AllFlags,
+  BirdersResponse,
+  FeedResponse,
+  LoggedSightingResponse,
+  SessionResponse,
+  SpeciesResponse,
+} from '@ctff/birdwatch-contract';
 
-// The shapes birdwatch-api answers with (see apps/birdwatch-api). The flags are the SDK's `AllFlags`, as
-// `@Flags()` loads them for the logged-in birder.
-export type { AllFlags, Context };
+// The shapes birdwatch-api answers with come from @ctff/birdwatch-contract, which both apps share.
+export type { AllFlags, Birder, FeedSighting, Rarity, Species } from '@ctff/birdwatch-contract';
 
-export interface Birder {
-  id: string;
-  name: string;
-  country: string;
-  homePatch: string;
-}
-
-export type Rarity = 'common' | 'uncommon' | 'rare';
-
-export interface Species {
-  id: string;
-  commonName: string;
-  scientificName: string;
-  family: string;
-  rarity: Rarity;
-  description: string;
-}
-
-export interface FeedSighting {
-  id: string;
-  location: string;
-  count: number;
-  notes: string;
-  observedAt: string;
-  species: Pick<Species, 'id' | 'commonName' | 'scientificName' | 'rarity'>;
-  birder: Pick<Birder, 'id' | 'name' | 'country'>;
-}
-
+/** What the "log a sighting" form sends, as typed in (birdwatch-api checks it). */
 export interface NewSighting {
   speciesId: string;
   location: string;
@@ -84,13 +63,11 @@ export function birdwatchApi(locals: App.Locals, token?: string) {
   }
 
   return {
-    birders: () => call<{ birders: Birder[] }>('GET', '/birders'),
-    logIn: (birderId: string) =>
-      call<{ token: string; expiresInSeconds: number; birder: Birder }>('POST', '/session', { birderId }),
-    me: () => call<{ birder: Birder; context: Context; flags: AllFlags }>('GET', '/me'),
-    sightings: () => call<{ sightings: FeedSighting[]; flags: AllFlags }>('GET', '/sightings'),
-    species: () => call<{ species: Species[]; flags: AllFlags }>('GET', '/species'),
-    logSighting: (sighting: NewSighting) => call<{ sighting: { id: string } }>('POST', '/sightings', sighting),
+    birders: () => call<BirdersResponse>('GET', '/birders'),
+    logIn: (birderId: string) => call<SessionResponse>('POST', '/session', { birderId }),
+    sightings: () => call<FeedResponse>('GET', '/sightings'),
+    species: () => call<SpeciesResponse>('GET', '/species'),
+    logSighting: (sighting: NewSighting) => call<LoggedSightingResponse>('POST', '/sightings', sighting),
   };
 }
 

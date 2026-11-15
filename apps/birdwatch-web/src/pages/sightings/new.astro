@@ -6,28 +6,25 @@ import Select from '@ds/components/form/Select.astro';
 import Textarea from '@ds/components/form/Textarea.astro';
 import Button from '@ds/components/ui/Button.astro';
 import BirdwatchLayout from '../../layouts/BirdwatchLayout.astro';
+import { birdwatchFlags, sightingLimits } from '@ctff/birdwatch-contract';
 import { ApiError, flagOn, type NewSighting } from '../../lib/api';
+import { postedForm, textField } from '../../lib/forms';
 import { asBirder } from '../../lib/page-session';
 
 // "Log a sighting", behind the new-sighting-form kill switch. While it serves false, the form is gone, and
 // birdwatch-api answers 404 to a post made from a page loaded before the switch.
-const field = (form: FormData, name: string): string => {
-  const value = form.get(name);
-  return typeof value === 'string' ? value : '';
-};
-
 let submitted: NewSighting = { speciesId: '', location: '', count: '1', notes: '' };
 let errors: Record<string, string> = {};
 let switchedOff = false;
 
 const page = await asBirder(Astro, async (api) => {
   if (Astro.request.method === 'POST') {
-    const form = await Astro.request.formData();
+    const form = await postedForm(Astro.request);
     submitted = {
-      speciesId: field(form, 'speciesId'),
-      location: field(form, 'location'),
-      count: field(form, 'count'),
-      notes: field(form, 'notes'),
+      speciesId: textField(form, 'speciesId'),
+      location: textField(form, 'location'),
+      count: textField(form, 'count'),
+      notes: textField(form, 'notes'),
     };
     try {
       await api.logSighting(submitted);
@@ -38,13 +35,12 @@ const page = await asBirder(Astro, async (api) => {
       else errors = { ...error.fields };
     }
   }
-  const [me, catalogue] = await Promise.all([api.me(), api.species()]);
-  return { logged: false, birder: me.birder, species: catalogue.species, flags: catalogue.flags } as const;
+  return { logged: false, ...(await api.species()) } as const;
 });
 if ('redirect' in page) return page.redirect;
 if (page.loaded.logged) return Astro.redirect('/?logged', 303);
 const { birder, species, flags } = page.loaded;
-const formShown = flagOn(flags, 'new-sighting-form');
+const formShown = flagOn(flags, birdwatchFlags.newSightingForm);
 if (!formShown) Astro.response.status = 404;
 ---
 
@@ -66,13 +62,13 @@ if (!formShown) Astro.response.status = 404;
           </Select>
         </FormField>
         <FormField label="Where" error={errors['location']}>
-          <Input name="location" value={submitted.location} required maxlength={120} />
+          <Input name="location" value={submitted.location} required maxlength={sightingLimits.maxLocationLength} />
         </FormField>
         <FormField label="How many" error={errors['count']}>
-          <Input name="count" type="number" min="1" max="10000" step="1" value={submitted.count} required />
+          <Input name="count" type="number" min="1" max={sightingLimits.maxCount} step="1" value={submitted.count} required />
         </FormField>
         <FormField label="Notes" hint="Optional: behaviour, plumage, weather…" error={errors['notes']}>
-          <Textarea name="notes" value={submitted.notes} maxlength={500} />
+          <Textarea name="notes" value={submitted.notes} maxlength={sightingLimits.maxNotesLength} />
         </FormField>
         <Button type="submit" variant="primary">
           Log it

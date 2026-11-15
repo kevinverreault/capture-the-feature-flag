@@ -1,12 +1,6 @@
-/** A birder of the demo. Logging in as one makes their `id` the context's `user_id`, and their `country` its country. */
-export interface Birder {
-  id: string;
-  name: string;
-  /** ISO 3166-1 alpha-2. */
-  country: string;
-  /** Where they usually go birding, for the login screen. */
-  homePatch: string;
-}
+import type { Birder } from '@ctff/birdwatch-contract';
+
+export type { Birder };
 
 export const birders: readonly Birder[] = [
   { id: 'alice', name: 'Alice Tremblay', country: 'CA', homePatch: 'Point Pelee, Ontario' },

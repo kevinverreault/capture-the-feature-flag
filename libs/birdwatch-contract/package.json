@@ -1,0 +1,33 @@
+{
+  "name": "@ctff/birdwatch-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "What birdwatch-api and birdwatch-web agree on: the API's response shapes, the limits of a new sighting and the demo's flag keys.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "tags": [
+      "type:lib",
+      "scope:birdwatch"
+    ]
+  },
+  "dependencies": {
+    "@ctff/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3"
+  }
+}

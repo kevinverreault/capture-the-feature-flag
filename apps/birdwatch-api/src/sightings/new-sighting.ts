@@ -1,3 +1,4 @@
+import { sightingLimits } from '@ctff/birdwatch-contract';
 import { findSpecies } from '../data/species.js';
 
 /** A sighting a birder logs, as checked: trimmed, with its count as a number and its time in ISO 8601. */
@@ -14,9 +15,7 @@ export type NewSightingField = keyof NewSighting;
 export type CheckedSighting =
   { valid: true; sighting: NewSighting } | { valid: false; errors: Partial<Record<NewSightingField, string>> };
 
-const maxLocationLength = 120;
-const maxNotesLength = 500;
-const maxCount = 10_000;
+const { maxLocationLength, maxNotesLength, maxCount } = sightingLimits;
 /** How far ahead of the server's clock an observation may be, for clocks that disagree a little. */
 const clockSkewMs = 5 * 60_000;
 

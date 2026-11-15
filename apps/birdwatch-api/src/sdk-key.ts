@@ -11,7 +11,7 @@ const retryIntervalMs = 2000;
  * environment (Core starting, or the project not created yet, as when Terraform creates it), it keeps trying, and
  * the API doesn't start listening.
  */
-export async function resolveSdkKey(source: BirdwatchApiConfig['sdkKey'], logger: Logger): Promise<string> {
+export async function resolveSdkKey(source: BirdwatchApiConfig['sdkKeySource'], logger: Logger): Promise<string> {
   if ('sdkKey' in source) return source.sdkKey;
   const { coreUrl, projectKey, environmentKey } = source;
   const core = createCoreApiClient({ baseUrl: coreUrl });
@@ -32,7 +32,9 @@ export async function resolveSdkKey(source: BirdwatchApiConfig['sdkKey'], logger
     }
     logger.warn(
       { coreUrl, projectKey, environmentKey, problem },
-      'Waiting for the environment in Core to get its SDK key',
+      `Waiting for environment ${environmentKey} of project ${projectKey} in Core, for its SDK key. Core's demo ` +
+        'seed creates it unless SEED_DEMO=false; otherwise create it (in the admin app or with Terraform), or set ' +
+        'CTFF_SDK_KEY. birdwatch-api starts listening once it has the key.',
     );
     await new Promise((resolve) => setTimeout(resolve, retryIntervalMs));
   }

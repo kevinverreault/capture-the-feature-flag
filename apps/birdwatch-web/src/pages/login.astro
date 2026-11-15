@@ -5,18 +5,19 @@ import Avatar from '@ds/components/ui/Avatar.astro';
 import BirdwatchLayout from '../layouts/BirdwatchLayout.astro';
 import { ApiError, birdwatchApi } from '../lib/api';
 import { countryName } from '../lib/format';
+import { postedForm, textField } from '../lib/forms';
 import { startSession } from '../lib/session';
 
 // The fake login: picking a birder gets a session token signed by birdwatch-api, kept in a cookie.
 const api = birdwatchApi(Astro.locals);
 if (Astro.request.method === 'POST') {
-  const birderId = (await Astro.request.formData()).get('birderId');
+  const birderId = textField(await postedForm(Astro.request), 'birderId');
   try {
-    const session = await api.logIn(typeof birderId === 'string' ? birderId : '');
+    const session = await api.logIn(birderId);
     startSession(Astro.cookies, session.token, session.expiresInSeconds);
     return Astro.redirect('/', 303);
   } catch (error) {
-    // An unknown birder (a stale page) just shows the picker again.
+    // An unknown (or missing) birder, as from a stale page, just shows the picker again.
     if (!(error instanceof ApiError && error.status === 404)) throw error;
   }
 }

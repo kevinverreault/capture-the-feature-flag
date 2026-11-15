@@ -1,6 +1,6 @@
 # birdwatch-web
 
-The website of **Birdwatch**, the birding demo of Capture The Feature Flag: Astro 7, server-rendered on Node, built from [`kevinverreault/design-system`](https://github.com/kevinverreault/design-system) components. It calls [birdwatch-api](../birdwatch-api/README.md) for everything, and shows what each birder's flags serve.
+The website of **Birdwatch**, the birding demo of Capture The Feature Flag: Astro 7, server-rendered on Node, built from [`kevinverreault/design-system`](https://github.com/kevinverreault/design-system) components. It calls [birdwatch-api](../birdwatch-api/README.md) for everything, one call per page, and shows what each birder's flags serve. The two share their response shapes, the form's limits and the flag keys through [`@ctff/birdwatch-contract`](../../libs/birdwatch-contract/README.md).
 
 ## Pages
 

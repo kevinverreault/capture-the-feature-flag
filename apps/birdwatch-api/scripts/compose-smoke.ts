@@ -13,8 +13,12 @@ const coreUrl = process.env['CORE_URL'] ?? 'http://localhost:3000';
 const apiUrl = process.env['BIRDWATCH_API_URL'] ?? 'http://localhost:4001';
 const webUrl = process.env['BIRDWATCH_WEB_URL'] ?? 'http://localhost:4000';
 const pollIntervalMs = Number(process.env['POLL_INTERVAL_MS'] ?? 2000);
-/** One poll's own latency, the pause between this script's attempts and one round trip (see the Evaluator's). */
-const pollGraceMs = 1000;
+/**
+ * On top of one poll interval: the poll's own latency, the pause between this script's attempts, and a page load
+ * through the website, birdwatch-api and the Evaluator, with room for a busy CI runner. The spec asks for "within
+ * seconds", and the script prints how long it actually took.
+ */
+const pollGraceMs = 3000;
 const killSwitch = 'new-sighting-form';
 const targetingPath = `/projects/birdwatch/flags/${killSwitch}/targeting/development`;
 

@@ -1,13 +1,6 @@
-/** A sighting as kept: who saw how many of what, where and when. */
-export interface Sighting {
-  id: string;
-  speciesId: string;
-  birderId: string;
-  location: string;
-  count: number;
-  notes: string;
-  observedAt: string;
-}
+import type { Sighting } from '@ctff/birdwatch-contract';
+
+export type { Sighting };
 
 /** The sightings the feed starts with. Sightings logged while the API runs are added to them, in memory only. */
 export const mockSightings: readonly Sighting[] = [

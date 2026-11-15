@@ -3,17 +3,15 @@ import Alert from '@ds/components/feedback/Alert.astro';
 import Button from '@ds/components/ui/Button.astro';
 import SightingCard from '../components/SightingCard.astro';
 import BirdwatchLayout from '../layouts/BirdwatchLayout.astro';
+import { birdwatchFlags } from '@ctff/birdwatch-contract';
 import { flagOn } from '../lib/api';
 import { asBirder } from '../lib/page-session';
 
 // The sighting feed. "Log a sighting" shows only while the new-sighting-form kill switch serves true.
-const page = await asBirder(Astro, async (api) => {
-  const [me, feed] = await Promise.all([api.me(), api.sightings()]);
-  return { birder: me.birder, sightings: feed.sightings, flags: feed.flags };
-});
+const page = await asBirder(Astro, (api) => api.sightings());
 if ('redirect' in page) return page.redirect;
 const { birder, sightings, flags } = page.loaded;
-const canLogSightings = flagOn(flags, 'new-sighting-form');
+const canLogSightings = flagOn(flags, birdwatchFlags.newSightingForm);
 const justLogged = Astro.url.searchParams.has('logged');
 ---
 

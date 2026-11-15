@@ -8,7 +8,7 @@ const config = loadConfig();
 const logger = pino({ level: config.logLevel, redact: ['req.headers.authorization'] });
 
 try {
-  const sdkKey = await resolveSdkKey(config.sdkKey, logger);
+  const sdkKey = await resolveSdkKey(config.sdkKeySource, logger);
   const app = await createApp(config, sdkKey, logger);
   await app.listen(config.port, config.host);
   const address = app.getHttpServer().address();

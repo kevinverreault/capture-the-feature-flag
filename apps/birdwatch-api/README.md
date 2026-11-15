@@ -14,14 +14,13 @@ Every other `/api` route needs `Authorization: Bearer <token>`, and answers `401
 | :-------------------- | :---------------------------------------------------------------------------------------------------------------- |
 | `GET /api/birders`    | The birders a visitor can log in as (no token needed)                                                             |
 | `POST /api/session`   | Logs in as `{ "birderId": "alice" }`: `{ token, expiresInSeconds, birder }`, or `404` for an unknown birder       |
-| `GET /api/me`         | The logged-in birder, their context, and their flags                                                              |
-| `GET /api/sightings`  | The sighting feed, most recently observed first, with the birder's flags                                          |
+| `GET /api/sightings`  | The sighting feed, most recently observed first, with the birder and their flags                                  |
 | `POST /api/sightings` | Logs a sighting (`speciesId`, `location`, `count`, optional `notes` and `observedAt`), behind `new-sighting-form` |
-| `GET /api/species`    | Every species, with the birder's flags                                                                            |
+| `GET /api/species`    | Every species, with the birder and their flags                                                                    |
 | `GET /health/live`    | Liveness                                                                                                          |
 | `GET /health/ready`   | Readiness: the API only listens once it has its SDK key, so once it answers it is ready                           |
 
-The flags come as the SDK's `AllFlags` (see [`allFlags`](../../libs/sdk/README.md#allflags)), loaded with `@Flags()`, so one request makes one Evaluator call. When the Evaluator can't be asked, `values` is empty and the website falls back to `false`.
+The response shapes, the limits of a new sighting and the demo's flag keys live in [`@ctff/birdwatch-contract`](../../libs/birdwatch-contract/README.md), which the website uses too. The flags come as the SDK's `AllFlags` (see [`allFlags`](../../libs/sdk/README.md#allflags)), loaded with `@Flags()`, so one request makes one Evaluator call. When the Evaluator can't be asked, `values` is empty and the website falls back to `false`.
 
 `POST /api/sightings` is guarded by `@RequireFlag('new-sighting-form')`: while the kill switch serves `false` (or the Evaluator is unreachable), it answers `404`, as if the endpoint didn't exist. A sighting that doesn't check out gets `400`, with a message per field in `fields` ([src/sightings/new-sighting.ts](src/sightings/new-sighting.ts)). Logged sightings are kept in memory, up to 500: a restart, or another replica, shows the mock sightings alone.
 

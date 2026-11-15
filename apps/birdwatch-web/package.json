@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@astrojs/node": "^11.1.13",
+    "@ctff/birdwatch-contract": "workspace:*",
     "astro": "^7.4.12",
     "cva": "npm:class-variance-authority@^0.7.1",
     "node-html-parser": "^6.1.13",
@@ -35,7 +36,6 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.12",
     "@ctff/design-system-host": "workspace:*",
-    "@ctff/sdk": "workspace:*",
     "@types/serve-static": "^2.2.0",
     "typescript": "~6.0.3"
   }

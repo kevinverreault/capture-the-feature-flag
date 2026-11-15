@@ -8,7 +8,7 @@ export interface BirdwatchApiConfig {
   /** How long the SDK waits for the Evaluator before falling back. */
   evaluatorTimeoutMs: number;
   /** Where the SDK key comes from: given, or looked up in Core by project and environment key. */
-  sdkKey: { sdkKey: string } | { coreUrl: string; projectKey: string; environmentKey: string };
+  sdkKeySource: { sdkKey: string } | { coreUrl: string; projectKey: string; environmentKey: string };
   /** The fixed dev key session tokens (fake JWTs) are signed with. It protects nothing: this is a demo. */
   sessionSecret: string;
 }
@@ -32,7 +32,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BirdwatchApiCo
     logLevel: env['LOG_LEVEL'] ?? 'info',
     evaluatorUrl,
     evaluatorTimeoutMs: integer(env, 'CTFF_TIMEOUT_MS', 500, 1),
-    sdkKey: sdkKey
+    sdkKeySource: sdkKey
       ? { sdkKey }
       : {
           coreUrl: coreUrl as string,

@@ -1,13 +1,6 @@
-export type Rarity = 'common' | 'uncommon' | 'rare';
+import type { Species } from '@ctff/birdwatch-contract';
 
-export interface Species {
-  id: string;
-  commonName: string;
-  scientificName: string;
-  family: string;
-  rarity: Rarity;
-  description: string;
-}
+export type { Species };
 
 export const species: readonly Species[] = [
   {

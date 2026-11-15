@@ -23,6 +23,7 @@
     ]
   },
   "dependencies": {
+    "@ctff/birdwatch-contract": "workspace:*",
     "@ctff/core-api-client": "workspace:*",
     "@ctff/nestjs": "workspace:*",
     "@nestjs/common": "^11.2.10",

@@ -1,15 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import type { FeedSighting } from '@ctff/birdwatch-contract';
 import { Injectable } from '@nestjs/common';
-import { type Birder, findBirder } from '../data/birders.js';
-import { findSpecies, type Species } from '../data/species.js';
+import { findBirder } from '../data/birders.js';
+import { findSpecies } from '../data/species.js';
 import { mockSightings, type Sighting } from '../data/sightings.js';
 import type { NewSighting } from './new-sighting.js';
-
-/** A sighting in the feed, with its species and birder. */
-export interface FeedSighting extends Sighting {
-  species: Pick<Species, 'id' | 'commonName' | 'scientificName' | 'rarity'>;
-  birder: Pick<Birder, 'id' | 'name' | 'country'>;
-}
 
 /** The most sightings logged while the API runs that it keeps, so a busy demo doesn't grow without bound. */
 const maxLoggedSightings = 500;
