@@ -33,9 +33,13 @@ export function evaluationMetricsMiddleware(metrics: EvaluatorMetrics, snapshots
   };
 }
 
-/** The evaluation reason kind of a `FlagEvaluation`, or the Evaluator error of an `EvaluatorErrorBody`. */
+/**
+ * The evaluation reason kind of a `FlagEvaluation`, `BULK` for a `BulkEvaluation` (which answers many reasons), or
+ * the Evaluator error of an `EvaluatorErrorBody`.
+ */
 function resultOf(body: unknown): EvaluationRequestResult | undefined {
   if (typeof body !== 'object' || body === null) return undefined;
+  if ('flags' in body && Array.isArray(body.flags)) return 'BULK';
   if ('reason' in body && typeof body.reason === 'object' && body.reason !== null && 'kind' in body.reason) {
     return body.reason.kind as EvaluationRequestResult;
   }

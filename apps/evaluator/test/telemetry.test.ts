@@ -84,6 +84,26 @@ describe('evaluation telemetry', () => {
     expect(counts.length).toBeLessThanOrEqual(3 * core.telemetry.length);
   });
 
+  it('counts each flag of a bulk evaluation, and sees its context, as if each flag had been evaluated alone', async () => {
+    const { core, evaluator } = await start({ TELEMETRY_FLUSH_INTERVAL_MS: '60000' });
+    const production = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-production' });
+
+    const minute = await withinOneMinute(async () => {
+      for (let i = 0; i < 3; i += 1) await production.allFlags({ user_id: 'alice', country: 'CA' });
+      // A malformed context serves no variation, so it is neither counted nor seen.
+      await production.allFlags({ country: 'Canada' });
+    });
+
+    await evaluator.stop();
+    expect(totals(core.telemetry)).toEqual({
+      [`ctff-env-production photo-id-beta 1 ${minute}`]: 3,
+      [`ctff-env-production rare-bird-alerts 0 ${minute}`]: 3,
+    });
+    expect([...seen(core.telemetry, 'ctff-env-production').keys()]).toEqual([
+      JSON.stringify({ user_id: 'alice', country: 'CA' }),
+    ]);
+  });
+
   /** The seen contexts of every batch so far for an SDK key, by context, with the latest last-seen of each. */
   function seen(batches: TelemetryBatch[], sdkKey: string): Map<string, string> {
     const result = new Map<string, string>();

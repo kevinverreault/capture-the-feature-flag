@@ -8,7 +8,7 @@ import type { EnvironmentIdentity, SnapshotPoller } from '../snapshots/snapshot-
  * for any other answer that never reached evaluation, such as a body that isn't JSON.
  */
 export type EvaluationRequestResult =
-  EvaluationReason['kind'] | EvaluatorError | 'MISSING_SDK_KEY' | 'ABORTED' | `HTTP_${number}`;
+  EvaluationReason['kind'] | 'BULK' | EvaluatorError | 'MISSING_SDK_KEY' | 'ABORTED' | `HTTP_${number}`;
 
 type EnvironmentLabelName = 'project_key' | 'environment_key';
 
