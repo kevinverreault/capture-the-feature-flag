@@ -24,8 +24,10 @@
       }
     }
   },
+  "dependencies": {
+    "@ctff/core-api-client": "workspace:*"
+  },
   "devDependencies": {
-    "@ctff/core-api-client": "workspace:*",
     "@playwright/test": "^1.65.1",
     "typescript": "~6.0.3"
   }

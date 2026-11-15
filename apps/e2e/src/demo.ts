@@ -9,6 +9,8 @@ export const core = createCoreApiClient({ baseUrl: urls.core, actor: 'e2e' });
 /** The project and environment Birdwatch evaluates its flags in (compose.yaml's birdwatch services). */
 export const projectKey = 'birdwatch';
 export const environmentKey = 'development';
+/** The name the admin app shows for Birdwatch's environment, as Core's demo seed names it. */
+export const environmentName = 'Development';
 
 /** Variation indexes of a boolean flag, stored as `[true, false]` (ADR 0002). */
 export const trueVariation = 0;
@@ -57,6 +59,15 @@ export const seededTargeting = {
 export type DemoFlagKey = keyof typeof seededTargeting;
 
 const flagPath = (flagKey: string) => ({ path: { projectKey, flagKey } });
+
+/** Creates a flag in Birdwatch's project through Core's API, keyed with {@link createdFlagPrefix}; it starts off. */
+export async function createFlag(name: string): Promise<string> {
+  const key = `${createdFlagPrefix}${Date.now().toString(36)}`;
+  await unwrap(
+    core.POST('/api/v1/projects/{projectKey}/flags', { params: { path: { projectKey } }, body: { key, name } }),
+  );
+  return key;
+}
 
 /** JSON with object keys sorted, to compare what Core answers with what was asked whatever their key order. */
 function canonical(value: unknown): string {

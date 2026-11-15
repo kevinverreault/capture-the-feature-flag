@@ -19,9 +19,10 @@ const pollIntervalMs = Number(process.env['POLL_INTERVAL_MS'] ?? 2000);
 
 /**
  * How long a targeting change may take to show in Birdwatch: one poll interval, plus the poll itself, a page load
- * through birdwatch-web, birdwatch-api and the Evaluator, and room for a busy CI runner.
+ * through birdwatch-web, birdwatch-api and the Evaluator, and room for a busy CI runner (the grace the compose smoke
+ * test, apps/birdwatch-api/scripts/compose-smoke.ts, allows too). A change that took a second poll would miss it.
  */
-export const withinPollInterval = pollIntervalMs + 5000;
+export const withinPollInterval = pollIntervalMs + 3000;
 
 /**
  * How long Birdwatch's evaluations may take to show in the admin app: the Evaluator's telemetry flush interval

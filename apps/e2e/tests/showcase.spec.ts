@@ -23,6 +23,9 @@ test.describe('the showcase', () => {
       expect(response?.status()).toBe(200);
       await expect(page).toHaveTitle(/Capture The Feature Flag/);
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+      // Requests started after the load event (lazy images, scripts' own fetches) can fail too: the static pages
+      // go quiet once they are done, so the errors are checked after that.
+      await page.waitForLoadState('networkidle');
       expect(errors).toEqual([]);
 
       // Every link to another page of the showcase leads to one of its pages.

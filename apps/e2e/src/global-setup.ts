@@ -13,15 +13,20 @@ export default async function globalSetup(): Promise<(() => Promise<void>) | und
   if (!['auto', 'attach', 'compose'].includes(mode)) throw new Error(`E2E_STACK must be auto, attach or compose`);
 
   const wasReady = await stackIsReady();
-  let started = false;
-  if (mode === 'compose' || (mode === 'auto' && !wasReady)) {
-    await startStack();
-    started = true;
-    // As compose.e2e.yaml sets it, for the scenarios waiting on telemetry (the workers inherit it).
-    process.env['TELEMETRY_FLUSH_INTERVAL_MS'] ??= '2000';
+  const starts = mode === 'compose' || (mode === 'auto' && !wasReady);
+  const stopsAtTheEnd = starts && !wasReady && process.env['E2E_KEEP_STACK'] !== '1';
+  try {
+    if (starts) {
+      await startStack();
+      // As compose.e2e.yaml sets it, for the scenarios waiting on telemetry (the workers inherit it).
+      process.env['TELEMETRY_FLUSH_INTERVAL_MS'] ??= '2000';
+    }
+    if (!(await stackIsReady())) throw new Error('The compose stack is not ready: start it with `docker compose up`');
+    await resetDemo();
+  } catch (error) {
+    // No scenario runs, so no teardown either: stop now what the suite started (or half started).
+    if (stopsAtTheEnd) await stopStack().catch(() => undefined);
+    throw error;
   }
-  if (!(await stackIsReady())) throw new Error('The compose stack is not ready: start it with `docker compose up`');
-
-  await resetDemo();
-  return started && !wasReady && process.env['E2E_KEEP_STACK'] !== '1' ? stopStack : undefined;
+  return stopsAtTheEnd ? stopStack : undefined;
 }

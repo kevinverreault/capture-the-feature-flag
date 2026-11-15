@@ -4,10 +4,26 @@ import { birders, resetDemo, type BirderId } from './demo.js';
 import { urls, withinPollInterval } from './stack.js';
 
 /**
- * For the expectations retried by `toPass`, such as in {@link BirdwatchSession.expectFeedSoon}: each checks the
- * page as it is, and the retry waits. (A timeout of 0 would wait forever.)
+ * The timeout of one attempt of an expectation retried by {@link reloadUntil}: each attempt checks the page as it
+ * loaded, and the retry does the waiting. (A timeout of 0 would wait forever.)
  */
-export const now = { timeout: 500 };
+export const perAttempt = { timeout: 500 };
+
+/**
+ * Loads `url` in `page` again and again until `expectation` holds, for at most `timeout` ms: what a page shows
+ * once a change made elsewhere (targeting, telemetry) has reached the service rendering it.
+ */
+export async function reloadUntil(
+  page: Page,
+  url: string,
+  expectation: () => Promise<void>,
+  { timeout, interval = 250 }: { timeout: number; interval?: number },
+): Promise<void> {
+  await expect(async () => {
+    await page.goto(url);
+    await expectation();
+  }).toPass({ timeout, intervals: [interval] });
+}
 
 /** Birdwatch's website, logged in as one birder in a browser context of their own. */
 export class BirdwatchSession {
@@ -45,8 +61,8 @@ export class BirdwatchSession {
   /** Expects the flag inspector to show a flag serving `variation` for `reason`, such as `RULE_MATCH`. */
   async expectInspected(flagKey: string, variation: boolean, reason: EvaluationReason['kind']): Promise<void> {
     const row = this.inspectedFlag(flagKey);
-    await expect(row.getByTestId('flag-variation')).toHaveAttribute('data-variation', String(variation), now);
-    await expect(row.getByTestId('flag-reason')).toHaveAttribute('data-reason', reason, now);
+    await expect(row.getByTestId('flag-variation')).toHaveAttribute('data-variation', String(variation), perAttempt);
+    await expect(row.getByTestId('flag-reason')).toHaveAttribute('data-reason', reason, perAttempt);
   }
 
   /**
@@ -54,10 +70,7 @@ export class BirdwatchSession {
    * load): what a birder sees after a targeting change.
    */
   async expectFeedSoon(expectation: (session: this) => Promise<void>): Promise<void> {
-    await expect(async () => {
-      await this.page.goto('/');
-      await expectation(this);
-    }).toPass({ timeout: withinPollInterval, intervals: [250] });
+    await reloadUntil(this.page, '/', () => expectation(this), { timeout: withinPollInterval });
   }
 
   async close(): Promise<void> {
@@ -94,6 +107,3 @@ export const test = base.extend<Fixtures>({
 });
 
 export { expect };
-
-/** A page of the admin app, served by Core. */
-export const adminUrl = (path: string) => `${urls.core}${path}`;

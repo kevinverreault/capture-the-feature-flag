@@ -1,5 +1,6 @@
+import { adminPages, FlagPage } from '../src/admin.js';
 import { createdFlagPrefix, falseVariation } from '../src/demo.js';
-import { adminUrl, expect, now, test } from '../src/fixtures.js';
+import { expect, perAttempt, test } from '../src/fixtures.js';
 
 test('a country rule added in the targeting editor changes what a CA birder and an NL birder see', async ({
   page,
@@ -9,35 +10,28 @@ test('a country rule added in the targeting editor changes what a CA birder and 
   const alice = await birdwatch('alice');
   const bram = await birdwatch('bram');
   await alice.expectFeedSoon(async (feed) => {
-    await expect(feed.rareBirdAlert).toBeVisible(now);
+    await expect(feed.rareBirdAlert).toBeVisible(perAttempt);
     await feed.expectInspected('rare-bird-alerts', true, 'RULE_MATCH');
   });
   await bram.expectFeedSoon(async (feed) => {
-    await expect(feed.rareBirdAlert).toBeHidden(now);
+    await expect(feed.rareBirdAlert).toBeHidden(perAttempt);
     await feed.expectInspected('rare-bird-alerts', false, 'DEFAULT');
   });
 
   // The alerts move from Canada to the Netherlands: the CA rule is removed, and a country in [NL] rule added.
-  await page.goto(adminUrl('/projects/birdwatch/flags/rare-bird-alerts?environment=development'));
-  const development = page.getByRole('tabpanel', { name: 'Development' });
-  await development.getByRole('group', { name: 'Rule 1' }).getByRole('button', { name: 'Remove' }).click();
-  await development.getByRole('button', { name: 'Add rule' }).click();
-  const rule = development.getByRole('group', { name: 'Rule 1' });
-  await rule.getByLabel('Attribute').selectOption('country');
-  await rule.getByLabel('Operator').selectOption('in');
-  await rule.getByLabel('Countries').selectOption(['NL']);
-  await rule.getByLabel('Serve').selectOption({ label: 'true' });
-  await development.getByRole('button', { name: 'Save targeting' }).click();
-  await expect(page.getByText('Targeting saved in Development')).toBeVisible();
+  const flag = await new FlagPage(page, 'rare-bird-alerts').open();
+  await flag.removeRule(1);
+  await flag.addCountryRule({ countries: ['NL'], serve: 'true' });
+  await flag.saveTargeting();
 
   // Bram now matches the rule and gets the banner; Alice gets the default variation, false, and loses it.
   await bram.expectFeedSoon(async (feed) => {
-    await expect(feed.rareBirdAlert).toBeVisible(now);
+    await expect(feed.rareBirdAlert).toBeVisible(perAttempt);
     await feed.expectInspected('rare-bird-alerts', true, 'RULE_MATCH');
   });
   await expect(bram.inspectedFlag('rare-bird-alerts')).toContainText('RULE_MATCH (rule 1)');
   await alice.expectFeedSoon(async (feed) => {
-    await expect(feed.rareBirdAlert).toBeHidden(now);
+    await expect(feed.rareBirdAlert).toBeHidden(perAttempt);
     await feed.expectInspected('rare-bird-alerts', false, 'DEFAULT');
   });
 });
@@ -47,7 +41,7 @@ test('a flag created in the admin app is served to Birdwatch, to the birder and 
   birdwatch,
 }) => {
   const flagKey = `${createdFlagPrefix}${Date.now().toString(36)}`;
-  await page.goto(adminUrl('/projects/birdwatch/new-flag'));
+  await page.goto(adminPages.newFlag());
   await page.getByLabel('Key').fill(flagKey);
   await page.getByLabel('Name').fill('End-to-end flag');
   await page.getByRole('button', { name: 'Create flag' }).click();
@@ -60,19 +54,12 @@ test('a flag created in the admin app is served to Birdwatch, to the birder and 
   await bram.expectFeedSoon((feed) => feed.expectInspected(flagKey, false, 'OFF'));
 
   // Bram is targeted individually and CA by a rule, both with true; everyone else gets the default variation, false.
-  await page.goto(adminUrl(`/projects/birdwatch/flags/${flagKey}?environment=development`));
-  const development = page.getByRole('tabpanel', { name: 'Development' });
-  await development.getByLabel('User IDs served true').fill('bram');
-  await development.getByRole('button', { name: 'Add rule' }).click();
-  const rule = development.getByRole('group', { name: 'Rule 1' });
-  await rule.getByLabel('Attribute').selectOption('country');
-  await rule.getByLabel('Countries').selectOption(['CA']);
-  await rule.getByLabel('Serve').selectOption({ label: 'true' });
-  await development.getByLabel('Default variation').selectOption(String(falseVariation));
-  await development.getByRole('button', { name: 'Save targeting' }).click();
-  await expect(page.getByText('Targeting saved in Development')).toBeVisible();
-  await development.getByRole('switch', { name: 'Targeting off in Development' }).click();
-  await expect(page.getByText('Targeting switched on in Development')).toBeVisible();
+  const flag = await new FlagPage(page, flagKey).open();
+  await flag.environment.getByLabel('User IDs served true').fill('bram');
+  await flag.addCountryRule({ countries: ['CA'], serve: 'true' });
+  await flag.environment.getByLabel('Default variation').selectOption(String(falseVariation));
+  await flag.saveTargeting();
+  await flag.switchTargeting('off');
 
   await bram.expectFeedSoon((feed) => feed.expectInspected(flagKey, true, 'TARGET_MATCH'));
   await alice.expectFeedSoon((feed) => feed.expectInspected(flagKey, true, 'RULE_MATCH'));
