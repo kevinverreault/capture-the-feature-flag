@@ -366,11 +366,21 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "includeArchived",
+            "required": false,
+            "in": "query",
+            "description": "Whether to list archived flags too. They are left out by default.",
+            "schema": {
+              "default": false,
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "By key, each with its targeting on or off per environment.",
+            "description": "By key, each with its targeting on or off per environment. Archived flags only when asked for.",
             "content": {
               "application/json": {
                 "schema": {
@@ -508,7 +518,7 @@
             }
           },
           "409": {
-            "description": "The flag changed since the version the edit is based on."
+            "description": "The flag changed since the version the edit is based on, or is archived."
           }
         },
         "tags": [
@@ -537,7 +547,86 @@
         ],
         "responses": {
           "204": {
-            "description": "Deleted, with its targeting in every environment."
+            "description": "Permanently deleted, with its targeting in every environment."
+          },
+          "409": {
+            "description": "The flag is not archived: only an archived flag can be deleted."
+          }
+        },
+        "tags": [
+          "flags"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/flags/{flagKey}/archive": {
+      "post": {
+        "operationId": "FlagsController_archive",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archived: hidden from the flag list and left out of snapshots, with its targeting kept for a restore. Archiving an archived flag changes nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flags"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/flags/{flagKey}/restore": {
+      "post": {
+        "operationId": "FlagsController_restore",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Restored: listed and served again, with the targeting it had when archived. Restoring a flag that isn't archived changes nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDto"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -681,7 +770,7 @@
             }
           },
           "409": {
-            "description": "The targeting changed since the version the change is based on."
+            "description": "The targeting changed since the version the change is based on, or its flag is archived."
           }
         },
         "tags": [
@@ -1176,6 +1265,16 @@
             "nullable": true,
             "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
           },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the flag is archived: hidden from the flag list and left out of snapshots, so SDKs get their fallback value with FLAG_NOT_FOUND. Restoring it brings back its targeting as it was."
+          },
+          "archivedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the flag was archived, or null while it is not."
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -1201,6 +1300,8 @@
           "variations",
           "version",
           "managedBy",
+          "archived",
+          "archivedAt",
           "createdAt",
           "updatedAt",
           "targeting"
@@ -1299,6 +1400,16 @@
             "nullable": true,
             "description": "The tool managing the flag as code: \"terraform\" when the Terraform provider manages it, null otherwise. The admin app shows a badge and warns before edits. It is informational: it does not lock the flag."
           },
+          "archived": {
+            "type": "boolean",
+            "description": "Whether the flag is archived: hidden from the flag list and left out of snapshots, so SDKs get their fallback value with FLAG_NOT_FOUND. Restoring it brings back its targeting as it was."
+          },
+          "archivedAt": {
+            "format": "date-time",
+            "type": "string",
+            "nullable": true,
+            "description": "When the flag was archived, or null while it is not."
+          },
           "createdAt": {
             "format": "date-time",
             "type": "string"
@@ -1317,6 +1428,8 @@
           "variations",
           "version",
           "managedBy",
+          "archived",
+          "archivedAt",
           "createdAt",
           "updatedAt"
         ]

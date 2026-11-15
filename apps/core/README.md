@@ -55,6 +55,8 @@ Projects, environments and flags are addressed by their keys, which are lowercas
 | `/api/v1/projects/{project}/environments/{environment}`               | `GET`, `PATCH`, `DELETE`  |
 | `/api/v1/projects/{project}/flags`                                    | `GET`, `POST`             |
 | `/api/v1/projects/{project}/flags/{flag}`                             | `GET`, `PATCH`, `DELETE`  |
+| `/api/v1/projects/{project}/flags/{flag}/archive`                     | `POST`                    |
+| `/api/v1/projects/{project}/flags/{flag}/restore`                     | `POST`                    |
 | `/api/v1/projects/{project}/flags/{flag}/targeting`                   | `GET` (every environment) |
 | `/api/v1/projects/{project}/flags/{flag}/targeting/{env}`             | `GET`, `PATCH`            |
 | `/api/v1/evaluator/environments`                                      | `GET` (for Evaluators)    |
@@ -66,13 +68,14 @@ Projects, environments and flags are addressed by their keys, which are lowercas
 
 - Each environment gets a generated SDK key (`ctff-env-…`).
 - The flag list (`GET /flags`) gives each flag's `targeting`: whether it is on or off in every environment, in the environments' order, for the admin app's flag list.
-- `DELETE` on a flag deletes it outright for now; archiving, and deleting only archived flags, come with #11.
+- Archiving a flag (`POST …/archive`) hides it from the flag list (`GET /flags?includeArchived=true` lists it again) and leaves it out of snapshots, so SDKs get their fallback value with `FLAG_NOT_FOUND`. Its targeting is kept, and restoring it (`POST …/restore`) serves that targeting again. Both bump the flag's `version` and change nothing when the flag is already in that state. While archived, a flag and its targeting can't be changed (`409 Conflict`), so a restore serves exactly what it had. Its key stays taken: creating a flag with it gets `409`, saying the flag is archived. A flag reads `archived` and `archivedAt`.
+- `DELETE` on a flag permanently deletes it with its targeting, and only once it is archived: a flag that is not archived gets `409 Conflict`.
 - Every flag is stored with the variations `[true, false]` ([ADR 0002](../../docs/adr/0002-boolean-flags-stored-as-variations.md)), and targeting refers to them by index. Creating a flag gives it off-state targeting in every environment: targeting off, off variation `false` (index 1), default variation `true` (index 0). Creating an environment gives every existing flag the same off-state targeting there.
 - A flag carries a "managed by" marker (`managedBy`): `terraform` when the Terraform provider manages it, otherwise `null`. It is informational (the admin app shows a badge and a warning) and locks nothing. A `PATCH` can set it, or clear it with `null`.
 - Flags and targeting carry a `version`. A `PATCH` must send the version it is based on, and an outdated one is rejected with `409 Conflict`. A duplicate key also gets `409`.
 - A `400` for an invalid body lists every message in `message`, and groups the same messages by property in `fields` (e.g. `{ "name": ["name must not be blank"] }`), so a form can show each next to its input.
 - The environment list (`EnvironmentList` from `@ctff/evaluation`) names every environment of every project with its SDK key, ordered by SDK key, so Evaluators know which snapshots to poll. It has a strong `ETag` and answers `304 Not Modified` to a matching `If-None-Match`. It only changes when an environment is added or deleted.
-- The snapshot endpoint returns the targeting of every flag in the environment named by the `X-CTFF-SDK-Key` header (kept out of URLs and redacted from logs), typed by `EnvironmentSnapshot` from `@ctff/evaluation`. It sends a strong `ETag` derived from the snapshot's content, and answers `304 Not Modified` to a matching `If-None-Match` ([ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md)).
+- The snapshot endpoint returns the targeting of every flag that is not archived in the environment named by the `X-CTFF-SDK-Key` header (kept out of URLs and redacted from logs), typed by `EnvironmentSnapshot` from `@ctff/evaluation`. It sends a strong `ETag` derived from the snapshot's content, and answers `304 Not Modified` to a matching `If-None-Match` ([ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md)).
 
 ## Schema and migrations
 

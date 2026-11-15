@@ -1,5 +1,5 @@
 import type { Variation } from '@ctff/evaluation';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { assertKeyUnchanged } from '../common/keys.js';
 import { updateAtVersion, withUniqueKey } from '../common/persistence.js';
 import { lockProject } from '../database/lock-project.js';
@@ -9,6 +9,7 @@ import { projectNotFound, ProjectsService } from '../projects/projects.service.j
 import { offStateTargeting } from '../targeting/off-state.js';
 import type { FlagListItemDto } from './flag-list.dto.js';
 import type { CreateFlagDto, FlagDto, UpdateFlagDto } from './flags.dto.js';
+import { archived, assertNotArchived, isArchived, notArchived } from './archived.js';
 import { booleanVariations } from './variations.js';
 
 @Injectable()
@@ -18,11 +19,11 @@ export class FlagsService {
     private readonly projects: ProjectsService,
   ) {}
 
-  /** The project's flags by key, each with its targeting on or off in every environment. */
-  async list(projectKey: string): Promise<FlagListItemDto[]> {
+  /** The project's flags by key, each with its targeting on or off in every environment; archived ones on request. */
+  async list(projectKey: string, { includeArchived }: { includeArchived: boolean }): Promise<FlagListItemDto[]> {
     const project = await this.projects.find(projectKey);
     const flags = await this.prisma.flag.findMany({
-      where: { projectId: project.id },
+      where: { projectId: project.id, ...(includeArchived ? {} : notArchived) },
       orderBy: { key: 'asc' },
       include: {
         targeting: {
@@ -56,6 +57,15 @@ export class FlagsService {
       () =>
         this.prisma.$transaction(async (tx) => {
           if (!(await lockProject(tx, project.id))) throw projectNotFound(project.key);
+          const existing = await tx.flag.findUnique({
+            where: { projectId_key: { projectId: project.id, key: input.key } },
+          });
+          if (existing && isArchived(existing)) {
+            throw new ConflictException(
+              `Flag ${input.key} already exists in project ${project.key} and is archived; ` +
+                'restore it, or delete it permanently to reuse its key',
+            );
+          }
           const created = await tx.flag.create({
             data: {
               projectId: project.id,
@@ -90,9 +100,11 @@ export class FlagsService {
     const project = await this.projects.find(projectKey);
     const flag = await this.find(project, key);
     assertKeyUnchanged('flag', flag.key, input.key);
+    assertNotArchived(flag);
     await updateAtVersion(
       () =>
         this.prisma.flag.updateMany({
+          // Archiving bumps the version, so a flag archived since it was loaded is rejected too.
           where: { id: flag.id, version: input.version },
           data: {
             name: input.name,
@@ -108,11 +120,36 @@ export class FlagsService {
     return toFlagDto(project, await this.find(project, key));
   }
 
-  /** Deletes the flag with its targeting in every environment. */
+  /** Archives the flag, leaving its targeting as it is; archiving an archived flag changes nothing. */
+  archive(projectKey: string, key: string): Promise<FlagDto> {
+    return this.setArchived(projectKey, key, true);
+  }
+
+  /** Restores an archived flag, with the targeting it had; restoring a flag that isn't archived changes nothing. */
+  restore(projectKey: string, key: string): Promise<FlagDto> {
+    return this.setArchived(projectKey, key, false);
+  }
+
+  /** Archives or restores the flag, bumping its version only when that changes it. */
+  private async setArchived(projectKey: string, key: string, archive: boolean): Promise<FlagDto> {
+    const project = await this.projects.find(projectKey);
+    const flag = await this.find(project, key);
+    await this.prisma.flag.updateMany({
+      where: { id: flag.id, ...(archive ? notArchived : archived) },
+      data: { archivedAt: archive ? new Date() : null, version: { increment: 1 } },
+    });
+    return toFlagDto(project, await this.find(project, key));
+  }
+
+  /** Permanently deletes an archived flag with its targeting in every environment; any other is rejected with 409. */
   async delete(projectKey: string, key: string): Promise<void> {
     const project = await this.projects.find(projectKey);
     const flag = await this.find(project, key);
-    await this.prisma.flag.deleteMany({ where: { id: flag.id } });
+    // Filtered on being archived, so a flag restored in the meantime is not deleted.
+    const { count } = await this.prisma.flag.deleteMany({ where: { id: flag.id, ...archived } });
+    if (count === 0 && (await this.prisma.flag.count({ where: { id: flag.id } })) > 0) {
+      throw new ConflictException(`Flag ${key} is not archived; archive it before deleting it`);
+    }
   }
 }
 
@@ -126,6 +163,8 @@ function toFlagDto(project: Project, flag: Flag): FlagDto {
     variations: flag.variations as Variation[],
     version: flag.version,
     managedBy: flag.managedBy,
+    archived: isArchived(flag),
+    archivedAt: flag.archivedAt,
     createdAt: flag.createdAt,
     updatedAt: flag.updatedAt,
   };
