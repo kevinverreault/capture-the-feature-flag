@@ -1,4 +1,11 @@
-import type { EnvironmentSnapshot, Variation } from './snapshot.js';
+import {
+  contextAttributeKeys,
+  type EnvironmentSnapshot,
+  type Rule,
+  ruleOperators,
+  type TargetingSnapshot,
+  type Variation,
+} from './snapshot.js';
 
 /**
  * Whoever a flag is evaluated for. V1 has the two built-in context attributes: `user_id`, any non-empty string,
@@ -23,14 +30,23 @@ export type EvaluationErrorKind = (typeof evaluationErrorKinds)[number];
 
 /** Why an evaluation produced its variation. `ErrorKind` is widened by callers that add error kinds of their own. */
 export type EvaluationReason<ErrorKind extends string = EvaluationErrorKind> =
-  { kind: 'OFF' } | { kind: 'DEFAULT' } | { kind: 'FLAG_NOT_FOUND' } | { kind: 'ERROR'; errorKind: ErrorKind };
+  | { kind: 'OFF' }
+  | { kind: 'TARGET_MATCH' }
+  /** `ruleIndex` is the index, in the targeting's ordered rules, of the first rule that matched. */
+  | { kind: 'RULE_MATCH'; ruleIndex: number }
+  | { kind: 'DEFAULT' }
+  | { kind: 'FLAG_NOT_FOUND' }
+  | { kind: 'ERROR'; errorKind: ErrorKind };
+
+/** The evaluation reasons that come with a served variation. */
+export type ServedReason = Extract<EvaluationReason, { kind: 'OFF' | 'TARGET_MATCH' | 'RULE_MATCH' | 'DEFAULT' }>;
 
 /**
  * The outcome of one evaluation. When no variation is served (flag not found, or an error) `value` and
  * `variationIndex` are `null`, and the SDK returns the caller's fallback value instead.
  */
 export type EvaluationResult =
-  | { value: Variation; variationIndex: number; reason: Extract<EvaluationReason, { kind: 'OFF' | 'DEFAULT' }> }
+  | { value: Variation; variationIndex: number; reason: ServedReason }
   | { value: null; variationIndex: null; reason: Extract<EvaluationReason, { kind: 'FLAG_NOT_FOUND' | 'ERROR' }> };
 
 const error = (errorKind: EvaluationErrorKind): EvaluationResult => ({
@@ -51,14 +67,64 @@ export function evaluate(
 ): EvaluationResult {
   const flag = snapshot.flags.find((candidate) => candidate.key === flagKey);
   if (!flag) return { value: null, variationIndex: null, reason: { kind: 'FLAG_NOT_FOUND' } };
-  if (!normalizeContext(context)) return error('MALFORMED_CONTEXT');
+  const normalized = normalizeContext(context);
+  if (!normalized) return error('MALFORMED_CONTEXT');
 
-  const { targeting } = flag;
-  const [index, reason]: [number, { kind: 'OFF' | 'DEFAULT' }] = targeting.on
-    ? [targeting.defaultVariation, { kind: 'DEFAULT' }]
-    : [targeting.offVariation, { kind: 'OFF' }];
+  const served = decide(flag.targeting, normalized);
+  if (!served) return error('MALFORMED_FLAG');
+  const [index, reason] = served;
   if (!Number.isInteger(index) || index < 0 || index >= flag.variations.length) return error('MALFORMED_FLAG');
   return { value: flag.variations[index] as Variation, variationIndex: index, reason };
+}
+
+/**
+ * The index of the variation the targeting serves to the context, with why, or `null` when the targeting is
+ * malformed. While targeting is on: individual targets first, then the ordered rules (first match wins), then the
+ * default variation. The index itself is checked against the flag's variations by the caller.
+ */
+function decide(targeting: TargetingSnapshot, context: Context): [number, ServedReason] | null {
+  if (!targeting.on) return [targeting.offVariation, { kind: 'OFF' }];
+
+  const { individualTargets } = targeting;
+  if (!Array.isArray(individualTargets)) return null;
+  for (const target of individualTargets) {
+    if (!isObject(target) || !isStringArray(target.userIds)) return null;
+    if (context.user_id !== undefined && target.userIds.includes(context.user_id)) {
+      return [target.variation, { kind: 'TARGET_MATCH' }];
+    }
+  }
+
+  const { rules } = targeting;
+  if (!Array.isArray(rules)) return null;
+  for (const [ruleIndex, rule] of rules.entries()) {
+    const matched = matches(rule, context);
+    if (matched === null) return null;
+    if (matched) return [rule.variation, { kind: 'RULE_MATCH', ruleIndex }];
+  }
+
+  return [targeting.defaultVariation, { kind: 'DEFAULT' }];
+}
+
+/**
+ * Whether the rule matches the context, or `null` when the rule is malformed. A context without the attribute the
+ * rule tests never matches it, whichever the operator: `not in` only matches a value that is there.
+ */
+function matches(rule: Rule, context: Context): boolean | null {
+  if (!isObject(rule) || !isStringArray(rule.values)) return null;
+  if (!contextAttributeKeys.includes(rule.attribute) || !ruleOperators.includes(rule.operator)) return null;
+  const value = context[rule.attribute];
+  if (value === undefined) return false;
+  // Core stores rule countries in uppercase, and the context's country has been uppercased.
+  const listed = rule.values.includes(value);
+  return rule.operator === 'in' ? listed : !listed;
+}
+
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 /**

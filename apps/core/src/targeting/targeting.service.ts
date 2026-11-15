@@ -1,11 +1,14 @@
+import type { Variation } from '@ctff/evaluation';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { updateAtVersion } from '../common/persistence.js';
+import { invalidBody } from '../common/validation.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { FlagsService } from '../flags/flags.service.js';
-import type { Environment, Flag, Targeting } from '../generated/prisma/client.js';
+import type { Environment, Flag, Prisma, Targeting } from '../generated/prisma/client.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import type { TargetingDto, UpdateTargetingDto } from './targeting.dto.js';
+import { checkTargeting } from './check-targeting.js';
 import { toTargetingSnapshot } from './targeting-snapshot.js';
 
 @Injectable()
@@ -42,11 +45,32 @@ export class TargetingService {
     input: UpdateTargetingDto,
   ): Promise<TargetingDto> {
     const { flag, environment, targeting } = await this.find(projectKey, flagKey, environmentKey);
+    // The change is checked as the whole targeting it would make, so it can never store targeting that refers to
+    // a variation the flag doesn't have. Should the row have changed in between, the version check below fails.
+    const current = toTargetingSnapshot(targeting);
+    const checked = checkTargeting(
+      {
+        offVariation: input.offVariation ?? current.offVariation,
+        defaultVariation: input.defaultVariation ?? current.defaultVariation,
+        individualTargets: input.individualTargets ?? current.individualTargets,
+        rules: input.rules ?? current.rules,
+      },
+      (flag.variations as Variation[]).length,
+    );
+    if (!checked.valid) throw invalidBody(checked.fields);
+    const { offVariation, defaultVariation, individualTargets, rules } = checked.targeting;
     await updateAtVersion(
       () =>
         this.prisma.targeting.updateMany({
           where: { id: targeting.id, version: input.version },
-          data: { on: input.on, version: { increment: 1 } },
+          data: {
+            on: input.on,
+            offVariation,
+            defaultVariation,
+            individualTargets: individualTargets as unknown as Prisma.InputJsonArray,
+            rules: rules as unknown as Prisma.InputJsonArray,
+            version: { increment: 1 },
+          },
         }),
       `Targeting of ${flagKey} in ${environmentKey}`,
       input.version,

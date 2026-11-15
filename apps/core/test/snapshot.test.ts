@@ -58,6 +58,30 @@ describe('evaluator snapshot', () => {
     expect(other.body.flags.map((flag) => flag.targeting.on)).toEqual([false, false]);
   });
 
+  it('includes full targeting: individual targets, rules, the default and the off variation', async () => {
+    const { projectKey, production } = await project();
+    await api.post(`/projects/${projectKey}/flags`, { key: 'rare-bird-alerts', name: 'Rare bird alerts' });
+    const targeting = {
+      on: true,
+      offVariation: 0,
+      defaultVariation: 1,
+      individualTargets: [{ variation: 0, userIds: ['alice'] }],
+      rules: [
+        { attribute: 'country', operator: 'in', values: ['CA'], variation: 0 },
+        { attribute: 'user_id', operator: 'not_in', values: ['bob'], variation: 1 },
+      ],
+    } as const;
+    await api.patch(`/projects/${projectKey}/flags/rare-bird-alerts/targeting/production`, {
+      version: 1,
+      ...targeting,
+    });
+
+    const response = await snapshot(production);
+    expect(response.body.flags).toEqual([
+      { key: 'rare-bird-alerts', variations: [true, false], version: 1, targeting: { ...targeting, version: 2 } },
+    ]);
+  });
+
   it('only contains the flags of its own project', async () => {
     const first = await project();
     const second = await project();
@@ -83,6 +107,27 @@ describe('evaluator snapshot', () => {
     [
       'switching targeting',
       (p: string) => api.patch(`/projects/${p}/flags/watched/targeting/production`, { version: 1, on: true }),
+    ],
+    [
+      'setting rules',
+      (p: string) =>
+        api.patch(`/projects/${p}/flags/watched/targeting/production`, {
+          version: 1,
+          rules: [{ attribute: 'country', operator: 'in', values: ['CA'], variation: 0 }],
+        }),
+    ],
+    [
+      'setting individual targets',
+      (p: string) =>
+        api.patch(`/projects/${p}/flags/watched/targeting/production`, {
+          version: 1,
+          individualTargets: [{ variation: 1, userIds: ['alice'] }],
+        }),
+    ],
+    [
+      'changing the default variation',
+      (p: string) =>
+        api.patch(`/projects/${p}/flags/watched/targeting/production`, { version: 1, defaultVariation: 1 }),
     ],
     ['adding a flag', (p: string) => api.post(`/projects/${p}/flags`, { key: 'added', name: 'Added' })],
     ['editing a flag', (p: string) => api.patch(`/projects/${p}/flags/watched`, { version: 1, name: 'Edited' })],
