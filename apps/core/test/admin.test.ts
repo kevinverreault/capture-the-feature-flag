@@ -155,6 +155,21 @@ describe('admin app inside Core', () => {
   });
 });
 
+describe('Core without the admin app', () => {
+  let core: RunningCore;
+  beforeAll(async () => {
+    core = await startCore({ env: { ADMIN_ENABLED: 'false' } });
+  });
+  afterAll(() => core?.stop());
+
+  it('serves only its API when ADMIN_ENABLED is false', async () => {
+    const page = await fetch(`${core.baseUrl}/projects`);
+    expect(page.status).toBe(404);
+    expect(page.headers.get('content-type')).toMatch(/application\/json/);
+    expect((await fetch(`${core.baseUrl}/api/v1/projects`)).status).toBe(200);
+  });
+});
+
 describe('admin app pointed at a separate Core', () => {
   let backend: RunningCore;
   let frontend: RunningCore;

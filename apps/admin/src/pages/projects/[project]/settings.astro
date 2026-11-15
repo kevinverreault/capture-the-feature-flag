@@ -15,14 +15,14 @@ import { orNotFound, submit, textField } from '../../../lib/forms';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
-const path = { path: { projectKey } };
+const params = { path: { projectKey } };
 let name: string | undefined;
 let errors = noFormErrors;
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   if (textField(form, '_action') === 'delete') {
-    const deleted = await submit(() => unwrap(core.DELETE('/api/v1/projects/{projectKey}', { params: path })), []);
+    const deleted = await submit(() => unwrap(core.DELETE('/api/v1/projects/{projectKey}', { params })), []);
     if (deleted.ok) {
       setFlash(Astro.cookies, `Project ${projectKey} deleted`);
       return Astro.redirect('/projects', 303);
@@ -32,7 +32,7 @@ if (Astro.request.method === 'POST') {
   } else {
     name = textField(form, 'name');
     const renamed = await submit(
-      () => unwrap(core.PATCH('/api/v1/projects/{projectKey}', { params: path, body: { name } })),
+      () => unwrap(core.PATCH('/api/v1/projects/{projectKey}', { params, body: { name } })),
       ['name'],
     );
     if (renamed.ok) {
@@ -46,7 +46,7 @@ if (Astro.request.method === 'POST') {
 
 const [projects, project] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
-  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: path }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
 ]);
 if (!project) Astro.response.status = 404;
 ---

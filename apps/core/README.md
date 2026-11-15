@@ -12,6 +12,7 @@ Core owns all admin data and its PostgreSQL schema, and serves the versioned RES
 | `PORT`           | `3000`      | HTTP port (`0` picks a free one)              |
 | `HOST`           | `0.0.0.0`   | Interface to listen on                        |
 | `LOG_LEVEL`      | `info`      | pino log level; logs are JSON lines on stdout |
+| `ADMIN_ENABLED`  | `true`      | Whether Core serves the admin app             |
 | `ADMIN_CORE_URL` | Core itself | The Core the admin app calls (see below)      |
 
 Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --filter @ctff/core start`.
@@ -23,7 +24,7 @@ Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --fi
 
 Core mounts the [admin app](../admin/README.md) on its origin ([ADR 0003](../../docs/adr/0003-admin-app-mounted-inside-core.md)): every path outside `/api` and `/health` (matched case-insensitively, as Express routes are) goes to it, so Core's API, docs and health checks always take precedence. The admin app is registered ahead of Nest's body parsers, so its form posts reach it unread ([src/admin.ts](src/admin.ts)).
 
-The admin app calls Core's API over HTTP through the core-api-client: this Core's own, through loopback, unless `ADMIN_CORE_URL` names another one.
+The admin app calls Core's API over HTTP through the core-api-client: this Core's own, through loopback, unless `ADMIN_CORE_URL` names another one. With the admin app in its own container (its `standalone.js`), `ADMIN_ENABLED=false` turns it off in Core.
 
 The core-api-client is generated from a committed copy of the OpenAPI document. `pnpm nx run @ctff/core:openapi` refreshes it ([src/export-openapi.ts](src/export-openapi.ts), no database needed), and a test fails when the copy differs from what Core serves.
 

@@ -13,7 +13,7 @@ export const noFormErrors: FormErrors = { fields: {}, form: [] };
  * with the property they are about, optionally after what it belongs to ("name must not be blank", "project key
  * must be lowercase kebab-case"), so each goes to the listed field it names, and the rest to the whole form. A
  * 409 (a key in use) goes to `conflictField` when given. Anything other than an error response from Core is
- * rethrown: it is not the user's to fix.
+ * rethrown: it is not something the admin can fix in the form.
  */
 export function formErrors(
   error: unknown,

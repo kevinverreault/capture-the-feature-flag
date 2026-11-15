@@ -21,7 +21,7 @@ const { sdkKey, environmentName } = Astro.props;
 <script>
   import { toast } from '@ds/components/feedback/toast';
 
-  /** Copies the SDK key to the clipboard, or selects it for the user to copy where the clipboard is unavailable. */
+  /** Copies the SDK key to the clipboard, or selects it to copy by hand where the clipboard is unavailable. */
   class SdkKey extends HTMLElement {
     connectedCallback() {
       const input = this.querySelector('input');

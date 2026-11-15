@@ -2,7 +2,7 @@
 
 The admin app: projects and their environments (flags come with #9). It is Astro 7, server-rendered with the Node adapter in `middleware` mode, built from [`kevinverreault/design-system`](https://github.com/kevinverreault/design-system) components, and mounted in Core's Express app on Core's origin ([ADR 0003](../../docs/adr/0003-admin-app-mounted-inside-core.md)).
 
-It talks to Core only through [`@ctff/core-api-client`](../../libs/core-api-client/), over HTTP even inside Core's process, and never imports Core or Prisma (`lint` fails if it does). Running it in its own container is a deployment change: start `standalone.js` with `CORE_URL` pointing at Core.
+It talks to Core only through [`@ctff/core-api-client`](../../libs/core-api-client/), over HTTP even inside Core's process, and never imports Core or Prisma (`lint` fails if it does). Running it in its own container is a deployment change: start `standalone.js` with `CORE_URL` pointing at Core, and set `ADMIN_ENABLED=false` on Core.
 
 ## Pages
 
@@ -29,4 +29,4 @@ The header's project switcher lists every project. Forms are plain server-render
 
 - `build`: `astro build` into `dist/` (Core's build depends on it).
 - `typecheck`: `astro check`.
-- `test`: the unit tests of the pure helpers in `src/lib`. The pages are covered by Core's S2 tests (`apps/core/test/admin.test.ts`) and, later, by the S5 Playwright suite.
+- `test`: the unit tests of the pure helpers in `src/lib`. The pages are covered by Core's S2 tests (`apps/core/test/admin.test.ts`) and, with #23, by the Playwright end-to-end suite over compose.

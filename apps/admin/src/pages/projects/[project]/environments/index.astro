@@ -17,7 +17,7 @@ import { orNotFound, submit, textField } from '../../../../lib/forms';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
-const path = { path: { projectKey } };
+const params = { path: { projectKey } };
 let values = { key: '', name: '' };
 let errors = noFormErrors;
 
@@ -25,7 +25,7 @@ if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   values = { key: textField(form, 'key'), name: textField(form, 'name') };
   const created = await submit(
-    () => unwrap(core.POST('/api/v1/projects/{projectKey}/environments', { params: path, body: values })),
+    () => unwrap(core.POST('/api/v1/projects/{projectKey}/environments', { params, body: values })),
     ['key', 'name'],
     { conflictField: 'key' },
   );
@@ -39,8 +39,8 @@ if (Astro.request.method === 'POST') {
 
 const [projects, project, environments] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
-  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: path }))),
-  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params: path }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params }))),
 ]);
 if (!project || !environments) Astro.response.status = 404;
 ---

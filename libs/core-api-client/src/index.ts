@@ -5,11 +5,7 @@ export type { components, paths } from './generated/schema.js';
 
 type Schemas = components['schemas'];
 export type Project = Schemas['ProjectDto'];
-export type CreateProject = Schemas['CreateProjectDto'];
-export type UpdateProject = Schemas['UpdateProjectDto'];
 export type Environment = Schemas['EnvironmentDto'];
-export type CreateEnvironment = Schemas['CreateEnvironmentDto'];
-export type UpdateEnvironment = Schemas['UpdateEnvironmentDto'];
 
 /** A typed client for Core's API: `core.GET('/api/v1/projects')`, with paths, parameters and bodies checked. */
 export type CoreApiClient = Client<paths>;

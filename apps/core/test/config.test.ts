@@ -14,6 +14,12 @@ describe('configuration', () => {
     expect(() => loadConfig({ DATABASE_URL: databaseUrl, PORT: 'http' })).toThrow(/PORT/);
   });
 
+  it('serves the admin app unless ADMIN_ENABLED is false', () => {
+    expect(loadConfig({ DATABASE_URL: databaseUrl }).adminEnabled).toBe(true);
+    expect(loadConfig({ DATABASE_URL: databaseUrl, ADMIN_ENABLED: 'false' }).adminEnabled).toBe(false);
+    expect(() => loadConfig({ DATABASE_URL: databaseUrl, ADMIN_ENABLED: 'no' })).toThrow(/ADMIN_ENABLED/);
+  });
+
   it('requires DATABASE_URL', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
   });
