@@ -3,10 +3,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { flagState, recordAudit } from '../audit/audit-entry.js';
 import { assertKeyUnchanged } from '../common/keys.js';
 import { updateAtVersion, withUniqueKey } from '../common/persistence.js';
-import { lockProject } from '../database/lock-project.js';
-import { lockRow } from '../database/lock-row.js';
+import { lockAndReload, lockRow } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Flag, Prisma, Project } from '../generated/prisma/client.js';
+import type { Flag, Project } from '../generated/prisma/client.js';
 import { projectNotFound, ProjectsService } from '../projects/projects.service.js';
 import { offStateTargeting } from '../targeting/off-state.js';
 import type { FlagListItemDto } from './flag-list.dto.js';
@@ -57,7 +56,7 @@ export class FlagsService {
     const flag = await withUniqueKey(
       () =>
         this.prisma.$transaction(async (tx) => {
-          if (!(await lockProject(tx, project.id))) throw projectNotFound(project.key);
+          if (!(await lockRow(tx, 'project', project.id))) throw projectNotFound(project.key);
           const created = await tx.flag.create({
             data: {
               projectId: project.id,
@@ -102,7 +101,7 @@ export class FlagsService {
     const found = await this.find(project, key);
     assertKeyUnchanged('flag', found.key, input.key);
     const updated = await this.prisma.$transaction(async (tx) => {
-      const flag = await this.lock(tx, project, found);
+      const flag = await lockAndReload(tx, 'flag', found.id, () => flagNotFound(project, key));
       await updateAtVersion(
         () =>
           tx.flag.updateMany({
@@ -139,16 +138,10 @@ export class FlagsService {
     const project = await this.projects.find(projectKey);
     const found = await this.find(project, key);
     await this.prisma.$transaction(async (tx) => {
-      const flag = await this.lock(tx, project, found);
+      const flag = await lockAndReload(tx, 'flag', found.id, () => flagNotFound(project, key));
       await tx.flag.delete({ where: { id: flag.id } });
       await recordAudit(tx, { type: 'flag', project, flag }, { action: 'delete', actor, before: flagState(flag) });
     });
-  }
-
-  /** Locks the flag's row and reloads it, or fails with 404 when it was deleted meanwhile. */
-  private async lock(tx: Prisma.TransactionClient, project: Project, flag: Flag): Promise<Flag> {
-    if (!(await lockRow(tx, 'flag', flag.id))) throw flagNotFound(project, flag.key);
-    return tx.flag.findUniqueOrThrow({ where: { id: flag.id } });
   }
 }
 

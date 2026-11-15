@@ -12,11 +12,23 @@ export function displayName(cookies: AstroCookies): string | undefined {
   return name ? name : undefined;
 }
 
-/** Keeps the display name for a year; an empty name clears it, and changes are then made as `anonymous`. */
-export function setDisplayName(cookies: AstroCookies, name: string): void {
-  const trimmed = name.replace(/\s+/g, ' ').trim().slice(0, displayNameMaxLength);
-  if (trimmed === '') cookies.delete(cookie, { path: '/' });
-  else cookies.set(cookie, trimmed, { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 });
+/**
+ * The display name as kept: runs of whitespace as one space, trimmed, at most {@link displayNameMaxLength}
+ * characters. Empty means no display name.
+ */
+export function normalizeDisplayName(name: string): string {
+  return name.replace(/\s+/g, ' ').trim().slice(0, displayNameMaxLength).trim();
+}
+
+/**
+ * Keeps the display name for a year, and returns it as kept (see {@link normalizeDisplayName}); an empty name
+ * clears it, and changes are then made as `anonymous`.
+ */
+export function setDisplayName(cookies: AstroCookies, name: string): string {
+  const kept = normalizeDisplayName(name);
+  if (kept === '') cookies.delete(cookie, { path: '/' });
+  else cookies.set(cookie, kept, { path: '/', httpOnly: true, sameSite: 'lax', maxAge: 60 * 60 * 24 * 365 });
+  return kept;
 }
 
 /** Where to go back to after setting the display name: a path of the admin app only, never another site. */

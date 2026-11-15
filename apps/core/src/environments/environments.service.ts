@@ -2,10 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { environmentState, recordAudit } from '../audit/audit-entry.js';
 import { assertKeyUnchanged } from '../common/keys.js';
 import { withUniqueKey } from '../common/persistence.js';
-import { lockProject } from '../database/lock-project.js';
-import { lockRow } from '../database/lock-row.js';
+import { lockAndReload, lockRow } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Environment, Prisma, Project } from '../generated/prisma/client.js';
+import type { Environment, Project } from '../generated/prisma/client.js';
 import { projectNotFound, ProjectsService } from '../projects/projects.service.js';
 import { offStateTargeting } from '../targeting/off-state.js';
 import type { CreateEnvironmentDto, EnvironmentDto, UpdateEnvironmentDto } from './environments.dto.js';
@@ -47,7 +46,7 @@ export class EnvironmentsService {
     const environment = await withUniqueKey(
       () =>
         this.prisma.$transaction(async (tx) => {
-          if (!(await lockProject(tx, project.id))) throw projectNotFound(project.key);
+          if (!(await lockRow(tx, 'project', project.id))) throw projectNotFound(project.key);
           const created = await tx.environment.create({
             data: { projectId: project.id, key: input.key, name: input.name, sdkKey: generateSdkKey() },
           });
@@ -77,7 +76,7 @@ export class EnvironmentsService {
     assertKeyUnchanged('environment', found.key, input.key);
     assertKeyUnchanged('SDK', found.sdkKey, input.sdkKey, 'sdkKey');
     const updated = await this.prisma.$transaction(async (tx) => {
-      const environment = await this.lock(tx, project, found);
+      const environment = await lockAndReload(tx, 'environment', found.id, () => environmentNotFound(project, key));
       const updated = await tx.environment.update({ where: { id: environment.id }, data: { name: input.name } });
       await recordAudit(
         tx,
@@ -100,8 +99,8 @@ export class EnvironmentsService {
     const found = await this.find(project, key);
     // Under the project lock, so a flag being created can't write targeting for this environment meanwhile.
     await this.prisma.$transaction(async (tx) => {
-      if (!(await lockProject(tx, project.id))) throw projectNotFound(project.key);
-      const environment = await this.lock(tx, project, found);
+      if (!(await lockRow(tx, 'project', project.id))) throw projectNotFound(project.key);
+      const environment = await lockAndReload(tx, 'environment', found.id, () => environmentNotFound(project, key));
       await tx.environment.delete({ where: { id: environment.id } });
       await recordAudit(
         tx,
@@ -113,12 +112,6 @@ export class EnvironmentsService {
         },
       );
     });
-  }
-
-  /** Locks the environment's row and reloads it, or fails with 404 when it was deleted meanwhile. */
-  private async lock(tx: Prisma.TransactionClient, project: Project, environment: Environment): Promise<Environment> {
-    if (!(await lockRow(tx, 'environment', environment.id))) throw environmentNotFound(project, environment.key);
-    return tx.environment.findUniqueOrThrow({ where: { id: environment.id } });
   }
 }
 

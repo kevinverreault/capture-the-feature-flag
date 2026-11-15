@@ -77,14 +77,14 @@ describe('audit entries', () => {
     await api.post('/projects', { key, name: 'Birdwatch' }, as('Ada'));
     await api.delete(`/projects/${key}`, as('Grace'));
 
-    const all = await api.get('/audit-entries?limit=200');
-    const own = all.body.entries.filter((entry: any) => entry.projectKey === key);
-    expect(own.map((entry: any) => [entry.action, entry.actor])).toEqual([
+    const own = await entries(key);
+    expect(own.map((entry) => [entry.action, entry.actor])).toEqual([
       ['delete', 'Grace'],
       ['create', 'Ada'],
     ]);
     expect(own[0]).toMatchObject({ before: { key, name: 'Birdwatch' }, after: null });
-    expect((await api.get(`/audit-entries?projectKey=${key}`)).status).toBe(404);
+    const all = await api.get('/audit-entries?limit=200');
+    expect(all.body.entries.filter((entry: any) => entry.projectKey === key)).toEqual(own);
   });
 
   it('records nothing for a change that is rejected', async () => {
@@ -243,12 +243,45 @@ describe('audit entries', () => {
     expect(own.every((entry) => entry.flagKey === 'kill-switch')).toBe(true);
   });
 
-  it('rejects a flag filter without a project, and unknown projects and flags', async () => {
+  it('lists the history of a flag key, across a delete and a new flag with the same key', async () => {
     const projectKey = await project();
+    await api.post(`/projects/${projectKey}/flags`, { key: 'kill-switch', name: 'First' });
+    await api.delete(`/projects/${projectKey}/flags/kill-switch`);
+    await api.post(`/projects/${projectKey}/flags`, { key: 'kill-switch', name: 'Second' });
+
+    const own = await entries(projectKey, '&flagKey=kill-switch');
+    expect(own.map((entry) => `${entry.action} ${(entry.after ?? entry.before).name}`)).toEqual([
+      'create Second',
+      'delete First',
+      'create First',
+    ]);
+  });
+
+  it('lists nothing for keys that never had entries, and rejects a flag filter without a project', async () => {
+    const projectKey = await project();
+    expect(await entries(projectKey, '&flagKey=missing')).toEqual([]);
+    expect(await entries('missing-project')).toEqual([]);
     expect((await api.get('/audit-entries?flagKey=kill-switch')).status).toBe(400);
-    expect((await api.get(`/audit-entries?projectKey=${projectKey}&flagKey=missing`)).status).toBe(404);
-    expect((await api.get('/audit-entries?projectKey=missing-project')).status).toBe(404);
     expect((await api.get(`/audit-entries?projectKey=${projectKey}&limit=0`)).status).toBe(400);
+  });
+
+  it('lists concurrent changes in the order they were made, by id and by time alike', async () => {
+    const projectKey = await project();
+    const flagKeys = Array.from({ length: 12 }, (_, index) => `flag-${index}`);
+    for (const key of flagKeys) await api.post(`/projects/${projectKey}/flags`, { key, name: key });
+
+    await Promise.all(
+      flagKeys.flatMap((key) => [
+        api.patch(`/projects/${projectKey}/flags/${key}`, { version: 1, name: `${key}!` }),
+        api.patch(`/projects/${projectKey}`, { name: key }),
+      ]),
+    );
+
+    const listed = await entries(projectKey, '&limit=200');
+    const times = listed.map((entry) => new Date(entry.createdAt).getTime());
+    expect(times).toEqual([...times].sort((a, b) => b - a));
+    const ids = listed.map((entry) => entry.id);
+    expect(ids).toEqual([...ids].sort((a, b) => b - a));
   });
 
   it('pages through entries, newest first, with a cursor', async () => {

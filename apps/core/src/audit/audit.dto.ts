@@ -2,12 +2,16 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsInt, IsString, Max, Min } from 'class-validator';
 import { IsOmittable } from '../common/keys.js';
+import { AuditAction, AuditTargetType } from '../generated/prisma/enums.js';
 
-export const auditTargetTypes = ['project', 'environment', 'flag', 'targeting'] as const;
-export const auditActions = ['create', 'update', 'archive', 'restore', 'delete'] as const;
-export const auditPageMaxSize = 200;
+/** What an audit entry can be about: the values of the AuditTargetType enum in schema.prisma, read from it. */
+const auditTargetTypes = Object.values(AuditTargetType);
+/** What can be done to an audit entry's target: the values of the AuditAction enum in schema.prisma, read from it. */
+const auditActions = Object.values(AuditAction);
+const auditPageMaxSize = 200;
 const auditPageDefaultSize = 50;
 
+/** The query of the audit entry list: its filters and the page wanted. */
 export class ListAuditEntriesQuery {
   @ApiProperty({ required: false, description: 'Only the entries of this project.' })
   @IsOmittable()
@@ -55,6 +59,7 @@ const stateSchema = {
   additionalProperties: true,
 } as const;
 
+/** An audit entry: what changed (target and action), who changed it, when, and its state before and after. */
 export class AuditEntryDto {
   @ApiProperty({ description: 'Increases with every entry: a higher id is a later entry.' })
   id!: number;
@@ -63,7 +68,7 @@ export class AuditEntryDto {
   projectKey!: string;
 
   @ApiProperty({ enum: auditTargetTypes, enumName: 'AuditTargetType' })
-  targetType!: (typeof auditTargetTypes)[number];
+  targetType!: AuditTargetType;
 
   @ApiProperty({ format: 'uuid', description: 'The id of the project, environment, flag or targeting changed.' })
   targetId!: string;
@@ -75,7 +80,7 @@ export class AuditEntryDto {
   environmentKey!: string | null;
 
   @ApiProperty({ enum: auditActions, enumName: 'AuditAction' })
-  action!: (typeof auditActions)[number];
+  action!: AuditAction;
 
   @ApiProperty({ description: 'Who made the change, from the X-CTFF-Actor header.', example: 'anonymous' })
   actor!: string;
@@ -90,6 +95,7 @@ export class AuditEntryDto {
   createdAt!: Date;
 }
 
+/** A page of audit entries, newest first, and the cursor of the next (older) page. */
 export class AuditEntryPageDto {
   @ApiProperty({ type: [AuditEntryDto], description: 'Newest first.' })
   entries!: AuditEntryDto[];

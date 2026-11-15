@@ -13,8 +13,7 @@ import { routes } from '../lib/routes';
 // Setting the display name only touches this browser's cookie: nothing is sent to Core.
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
-  const name = textField(form, 'name');
-  setDisplayName(Astro.cookies, name);
+  const name = setDisplayName(Astro.cookies, textField(form, 'name'));
   setFlash(
     Astro.cookies,
     name === '' ? 'Display name cleared: changes are now recorded as anonymous' : `Changes are now recorded as ${name}`,

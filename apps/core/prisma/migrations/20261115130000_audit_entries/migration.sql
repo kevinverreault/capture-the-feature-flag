@@ -18,13 +18,13 @@ CREATE TABLE "audit_entries" (
     "actor" TEXT NOT NULL,
     "before" JSONB,
     "after" JSONB,
-    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMPTZ(3) NOT NULL DEFAULT clock_timestamp(),
 
     CONSTRAINT "audit_entries_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE INDEX "audit_entries_project_id_id_idx" ON "audit_entries"("project_id", "id");
+CREATE INDEX "audit_entries_project_key_id_idx" ON "audit_entries"("project_key", "id");
 
 -- CreateIndex
-CREATE INDEX "audit_entries_flag_id_id_idx" ON "audit_entries"("flag_id", "id");
+CREATE INDEX "audit_entries_project_key_flag_key_id_idx" ON "audit_entries"("project_key", "flag_key", "id");

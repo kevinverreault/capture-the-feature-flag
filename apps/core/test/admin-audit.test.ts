@@ -114,4 +114,18 @@ describe('admin app: audit', () => {
     const flags = await page(await admin.get(`/projects/${projectKey}/flags`));
     expect(flags.querySelector(`nav a[href="/projects/${projectKey}/audit"]`)?.textContent.trim()).toBe('Audit log');
   });
+
+  it('keeps the audit log of a deleted flag, named by its key', async () => {
+    const projectKey = await project();
+    await api.post(`/projects/${projectKey}/flags`, { key: 'kill-switch', name: 'Kill switch' });
+    await api.delete(`/projects/${projectKey}/flags/kill-switch`);
+
+    const response = await admin.get(`/projects/${projectKey}/audit?flag=kill-switch`);
+    expect(response.status).toBe(200);
+    const log = await page(response);
+    expect(log.querySelector('#audit-heading')?.textContent.trim()).toBe('Audit log of kill-switch');
+    expect(
+      log.querySelectorAll('[data-audit-entry] .audit-summary').map((summary) => summary.textContent.trim()),
+    ).toEqual(['Deleted flag kill-switch', 'Created flag kill-switch']);
+  });
 });

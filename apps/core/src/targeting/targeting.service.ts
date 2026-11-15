@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { recordAudit, targetingState } from '../audit/audit-entry.js';
 import { updateAtVersion } from '../common/persistence.js';
-import { lockRow } from '../database/lock-row.js';
+import { lockAndReload } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { FlagsService } from '../flags/flags.service.js';
@@ -46,8 +46,9 @@ export class TargetingService {
   ): Promise<TargetingDto> {
     const { project, flag, environment, targeting: found } = await this.find(projectKey, flagKey, environmentKey);
     const updated = await this.prisma.$transaction(async (tx) => {
-      if (!(await lockRow(tx, 'targeting', found.id))) throw targetingNotFound(flagKey, environmentKey);
-      const targeting = await tx.targeting.findUniqueOrThrow({ where: { id: found.id } });
+      const targeting = await lockAndReload(tx, 'targeting', found.id, () =>
+        targetingNotFound(flagKey, environmentKey),
+      );
       await updateAtVersion(
         () =>
           tx.targeting.updateMany({

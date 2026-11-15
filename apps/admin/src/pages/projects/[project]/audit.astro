@@ -20,37 +20,37 @@ const [projects, project, flags, page] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags', { params }))),
-  orNotFound(
-    unwrap(
-      core.GET('/api/v1/audit-entries', {
-        params: { query: { projectKey, flagKey, cursor, limit: auditPageSize } },
-      }),
-    ),
+  unwrap(
+    core.GET('/api/v1/audit-entries', {
+      params: { query: { projectKey, flagKey, cursor, limit: auditPageSize } },
+    }),
   ),
 ]);
-if (!project || !flags || !page) Astro.response.status = 404;
-const flag = flagKey === undefined ? undefined : flags?.find((listed) => listed.key === flagKey);
+if (!project || !flags) Astro.response.status = 404;
+// A flag's entries stay listed after it is deleted: then it is named by its key.
+const flagName = flagKey === undefined ? undefined : (flags?.find((listed) => listed.key === flagKey)?.name ?? flagKey);
 const olderHref =
   page?.nextCursor == null ? undefined : routes.audit(projectKey, { flag: flagKey, cursor: page.nextCursor });
 ---
 
 {
-  project && flags && page ? (
+  project && flags ? (
     <AdminLayout title={`Audit log · ${project.name}`} projects={projects} project={project}>
       <ProjectNav project={project} current="audit" />
       <section aria-labelledby="audit-heading" class="audit-log">
         <div class="section-heading">
           <h2 id="audit-heading" class="text-xl">
-            {flag ? `Audit log of ${flag.name}` : 'Audit log'}
+            {flagName === undefined ? 'Audit log' : `Audit log of ${flagName}`}
           </h2>
-          {flag && (
+          {flagName !== undefined && (
             <Button href={routes.audit(project.key)} variant="muted" decoration="ghost" size="small">
               Every change in the project
             </Button>
           )}
         </div>
         <p>
-          Every change to {flag ? 'this flag and its targeting' : 'the project, its environments, flags and targeting'},
+          Every change to{' '}
+          {flagName === undefined ? 'the project, its environments, flags and targeting' : 'this flag and its targeting'},
           newest first.
         </p>
         <AuditEntries
@@ -62,10 +62,8 @@ const olderHref =
       </section>
     </AdminLayout>
   ) : (
-    <AdminLayout title="Not found" projects={projects} project={project}>
-      <NotFound>
-        {project ? `There is no flag ${flagKey ?? ''} in project ${project.name}.` : `There is no project ${projectKey}.`}
-      </NotFound>
+    <AdminLayout title="Project not found" projects={projects}>
+      <NotFound>There is no project {projectKey}.</NotFound>
     </AdminLayout>
   )
 }

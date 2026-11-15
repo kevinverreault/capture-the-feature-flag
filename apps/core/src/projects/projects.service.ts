@@ -2,9 +2,9 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { projectState, recordAudit } from '../audit/audit-entry.js';
 import { assertKeyUnchanged } from '../common/keys.js';
 import { withUniqueKey } from '../common/persistence.js';
-import { lockRow } from '../database/lock-row.js';
+import { lockAndReload } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
-import type { Prisma, Project } from '../generated/prisma/client.js';
+import type { Project } from '../generated/prisma/client.js';
 import type { CreateProjectDto, ProjectDto, UpdateProjectDto } from './projects.dto.js';
 
 @Injectable()
@@ -52,7 +52,7 @@ export class ProjectsService {
     const found = await this.find(key);
     assertKeyUnchanged('project', found.key, input.key);
     const updated = await this.prisma.$transaction(async (tx) => {
-      const project = await this.lock(tx, found);
+      const project = await lockAndReload(tx, 'project', found.id, () => projectNotFound(key));
       const updated = await tx.project.update({ where: { id: project.id }, data: { name: input.name } });
       await recordAudit(
         tx,
@@ -73,16 +73,10 @@ export class ProjectsService {
   async delete(key: string, actor: string): Promise<void> {
     const found = await this.find(key);
     await this.prisma.$transaction(async (tx) => {
-      const project = await this.lock(tx, found);
+      const project = await lockAndReload(tx, 'project', found.id, () => projectNotFound(key));
       await tx.project.delete({ where: { id: project.id } });
       await recordAudit(tx, { type: 'project', project }, { action: 'delete', actor, before: projectState(project) });
     });
-  }
-
-  /** Locks the project's row and reloads it, or fails with 404 when it was deleted meanwhile. */
-  private async lock(tx: Prisma.TransactionClient, project: Project): Promise<Project> {
-    if (!(await lockRow(tx, 'project', project.id))) throw projectNotFound(project.key);
-    return tx.project.findUniqueOrThrow({ where: { id: project.id } });
   }
 }
 

@@ -48,18 +48,17 @@ const post = await handlePost(Astro, {
 });
 if (post.redirect) return post.redirect;
 
-const historySize = 10;
-const [projects, project, environments, flag, targeting, history] = await Promise.all([
+/** How many of the flag's newest audit entries the page shows; the audit log has the rest. */
+const auditEntriesShown = 10;
+const [projects, project, environments, flag, targeting, auditEntries] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey } } }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params: { path: { projectKey } } }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting', { params }))),
-  orNotFound(
-    unwrap(core.GET('/api/v1/audit-entries', { params: { query: { projectKey, flagKey, limit: historySize } } })),
-  ),
+  unwrap(core.GET('/api/v1/audit-entries', { params: { query: { projectKey, flagKey, limit: auditEntriesShown } } })),
 ]);
-if (!project || !environments || !flag || !targeting || !history) Astro.response.status = 404;
+if (!project || !environments || !flag || !targeting) Astro.response.status = 404;
 
 /** The environment whose targeting form was just submitted and rejected, if any. */
 const postedEnvironment = post.action === 'targeting' ? post.value('environment') : undefined;
@@ -86,7 +85,7 @@ const unplacedMessages = unplaced
 ---
 
 {
-  project && environments && flag && tabs && history ? (
+  project && environments && flag && tabs ? (
     <AdminLayout title={`${flag.name} · ${project.name}`} projects={projects} project={project}>
       <ProjectNav project={project} current="flags" />
 
@@ -161,14 +160,14 @@ const unplacedMessages = unplaced
         )}
       </section>
 
-      <section aria-labelledby="audit-entries" class="history">
+      <section aria-labelledby="audit-entries" class="flag-audit">
         <h2 id="audit-entries" class="text-xl">
           Audit entries
         </h2>
         <AuditEntries
-          entries={history.entries}
+          entries={auditEntries.entries}
           flags={flagVariations([flag])}
-          olderHref={history.nextCursor === null ? undefined : routes.audit(project.key, { flag: flag.key, cursor: history.nextCursor })}
+          olderHref={auditEntries.nextCursor === null ? undefined : routes.audit(project.key, { flag: flag.key, cursor: auditEntries.nextCursor })}
           empty="No changes yet."
         />
       </section>
@@ -221,7 +220,7 @@ const unplacedMessages = unplaced
 <style>
   .flag-summary,
   .targeting,
-  .history {
+  .flag-audit {
     display: grid;
     gap: var(--space-xs);
   }

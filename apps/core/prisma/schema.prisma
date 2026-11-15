@@ -104,7 +104,8 @@ enum AuditAction {
 /// A record of one change to a project, environment, flag or targeting: who made it, when, and what changed.
 /// Entries outlive what they are about, so the ids and keys are copied in, not foreign keys.
 model AuditEntry {
-  /// Increases with every entry, so it orders entries newest first and serves as the pagination cursor.
+  /// Increases with every entry, in the order entries are committed (see recordAudit), so it orders entries
+  /// newest first and serves as the pagination cursor.
   id             Int             @id @default(autoincrement())
   projectId      String          @map("project_id") @db.Uuid
   projectKey     String          @map("project_key")
@@ -121,9 +122,10 @@ model AuditEntry {
   /// The target as it was before the change (null for a create) and after it (null for a delete).
   before         Json?
   after          Json?
-  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// When the entry was recorded: the clock time, not the transaction's start, so it follows the id's order.
+  createdAt      DateTime        @default(dbgenerated("clock_timestamp()")) @map("created_at") @db.Timestamptz(3)
 
-  @@index([projectId, id])
-  @@index([flagId, id])
+  @@index([projectKey, id])
+  @@index([projectKey, flagKey, id])
   @@map("audit_entries")
 }

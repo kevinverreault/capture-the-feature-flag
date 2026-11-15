@@ -22,15 +22,20 @@ export interface AuditChange {
   after?: AuditState | undefined;
 }
 
+/** The transaction-level advisory lock that makes audit entries commit one at a time, in the order of their ids. */
+const auditOrderLockId = 4_281_662;
+
 /**
  * Records the audit entry of one change, in the transaction that makes the change, so a change is never saved
- * without its entry (or the other way round).
+ * without its entry (or the other way round). Call it last in the transaction: it holds a lock until the commit,
+ * so entries commit in the order of their ids, and a reader paging by id never skips one that commits late.
  */
 export async function recordAudit(
   tx: Prisma.TransactionClient,
   target: AuditTarget,
   change: AuditChange,
 ): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${auditOrderLockId}::bigint)`;
   await tx.auditEntry.create({
     data: {
       projectId: target.project.id,
