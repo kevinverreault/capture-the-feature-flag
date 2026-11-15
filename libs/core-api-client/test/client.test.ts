@@ -8,7 +8,12 @@ const responses: Record<string, { status: number; body?: unknown }> = {
   'GET /api/v1/projects': { status: 200, body: [{ key: 'birdwatch', name: 'Birdwatch' }] },
   'POST /api/v1/projects': {
     status: 400,
-    body: { statusCode: 400, message: ['project key must be lowercase kebab-case'], error: 'Bad Request' },
+    body: {
+      statusCode: 400,
+      message: ['project key must be lowercase kebab-case'],
+      error: 'Bad Request',
+      fields: { key: ['project key must be lowercase kebab-case'] },
+    },
   },
   'GET /api/v1/projects/gone': { status: 404, body: { statusCode: 404, message: 'Project gone not found' } },
   'DELETE /api/v1/projects/birdwatch': { status: 204 },
@@ -44,13 +49,21 @@ describe('core-api-client', () => {
     const core = createCoreApiClient({ baseUrl });
     const error = await unwrap(core.POST('/api/v1/projects', { body: { key: 'Bad Key', name: 'x' } })).catch((e) => e);
     expect(error).toBeInstanceOf(CoreApiError);
-    expect(error).toMatchObject({ status: 400, messages: ['project key must be lowercase kebab-case'] });
+    expect(error).toMatchObject({
+      status: 400,
+      messages: ['project key must be lowercase kebab-case'],
+      fields: { key: ['project key must be lowercase kebab-case'] },
+    });
   });
 
   it('turns a single error message into a list of one', async () => {
     const core = createCoreApiClient({ baseUrl });
     const request = core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey: 'gone' } } });
-    await expect(unwrap(request)).rejects.toMatchObject({ status: 404, messages: ['Project gone not found'] });
+    await expect(unwrap(request)).rejects.toMatchObject({
+      status: 404,
+      messages: ['Project gone not found'],
+      fields: {},
+    });
   });
 
   it('describes an error response without a body by its status', async () => {

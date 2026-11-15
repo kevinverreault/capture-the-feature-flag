@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { apiClient, uniqueKey } from './support/api.js';
 import { startCore, type RunningCore } from './support/core.js';
 
@@ -110,6 +110,28 @@ describe('admin app inside Core', () => {
     expect(response.status).toBe(403);
   });
 
+  it('refuses a form post that says nothing about where it comes from', async () => {
+    const response = await fetch(`${core.baseUrl}/projects`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ key: uniqueKey('no-origin'), name: 'No origin' }).toString(),
+    });
+    expect(response.status).toBe(403);
+  });
+
+  it('logs its requests as JSON, with Core', async () => {
+    await admin.get('/projects?logged=yes');
+    // The line is written once the response has finished.
+    await vi.waitFor(() =>
+      expect(core.logs).toContainEqual(
+        expect.objectContaining({
+          msg: 'request completed',
+          req: expect.objectContaining({ url: '/projects?logged=yes' }),
+        }),
+      ),
+    );
+  });
+
   it('renames and deletes a project', async () => {
     const key = uniqueKey('renamed');
     await api.post('/projects', { key, name: 'Before' });
@@ -167,6 +189,26 @@ describe('Core without the admin app', () => {
     expect(page.status).toBe(404);
     expect(page.headers.get('content-type')).toMatch(/application\/json/);
     expect((await fetch(`${core.baseUrl}/api/v1/projects`)).status).toBe(200);
+  });
+});
+
+describe('admin app when Core cannot be reached', () => {
+  let core: RunningCore;
+  beforeAll(async () => {
+    // Nothing listens on port 1.
+    core = await startCore({ env: { ADMIN_CORE_URL: 'http://127.0.0.1:1' } });
+  });
+  afterAll(() => core?.stop());
+
+  it('answers with its error page and logs the failure as JSON', async () => {
+    const response = await fetch(`${core.baseUrl}/projects`);
+    expect(response.status).toBe(500);
+    expect(response.headers.get('content-type')).toMatch(/text\/html/);
+    expect(await response.text()).toContain('Something went wrong');
+    expect(core.logs).toContainEqual(
+      expect.objectContaining({ level: 50, msg: 'Admin page failed', url: '/projects' }),
+    );
+    expect(core.logs.filter((entry) => 'unparsed' in entry)).toEqual([]);
   });
 });
 

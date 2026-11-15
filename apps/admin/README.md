@@ -13,16 +13,18 @@ It talks to Core only through [`@ctff/core-api-client`](../../libs/core-api-clie
 | `/projects/{project}/environments/{env}` | Shows and copies the SDK key; renames or deletes the environment |
 | `/projects/{project}/settings`           | Renames or deletes the project                                   |
 
-The header's project switcher lists every project. Forms are plain server-rendered posts: on success the page redirects (`303`) and shows a confirmation once; when Core rejects the submission, the form is rendered again with Core's status and its validation messages on the fields they name. Deleting asks for confirmation in a dialog (or, without scripts, through a plain submit button).
+The header's project switcher lists every project. Forms are plain server-rendered posts: on success the page redirects (`303`) and shows a confirmation once; when Core rejects the submission, the form is rendered again with Core's status, and each validation message next to the input for the property Core names (messages about other properties show above the form). Deleting asks for confirmation in a dialog (or, without scripts, through a plain submit button). Each page's actions go through `handlePost` ([src/lib/forms.ts](src/lib/forms.ts)), and page addresses come from [src/lib/routes.ts](src/lib/routes.ts).
+
+A form post must come from the admin app's own pages: Astro checks its `Origin` (or `Sec-Fetch-Site`), and one carrying neither is refused. When a page fails (Core unreachable, or answering `5xx`), the admin app logs it and answers with its 500 page, which doesn't call Core.
 
 ## Hosting it
 
-`@ctff/admin` exports `createAdminMiddleware({ coreBaseUrl })` ([host.js](host.js)): a Connect/Express middleware that serves the built assets in `dist/client`, then renders the pages. It answers every request it gets (with its own 404 page when no page matches), so the host mounts it on the paths it doesn't own. Core mounts it on everything outside `/api` and `/health`.
+`@ctff/admin` exports `createAdminMiddleware({ coreBaseUrl, logger })` ([host.js](host.js)): a Connect/Express middleware that serves the built assets in `dist/client`, then renders the pages. It answers every request it gets (with its own 404 page when no page matches), so the host mounts it on the paths it doesn't own. Given a pino `logger`, it logs each request and every failed page as JSON. Core mounts it on everything outside `/api` and `/health`, with Core's logger.
 
 | Host                            | Core base URL                                                       |
 | :------------------------------ | :------------------------------------------------------------------ |
 | Core                            | Core's `ADMIN_CORE_URL`, or by default Core itself through loopback |
-| `node standalone.js`            | `CORE_URL` (required); `PORT` (default `4321`) and `HOST`           |
+| `node standalone.js`            | `CORE_URL` (required); `PORT` (default `4321`), `HOST`, `LOG_LEVEL` |
 | `pnpm --filter @ctff/admin dev` | `CORE_URL`                                                          |
 
 ## Targets

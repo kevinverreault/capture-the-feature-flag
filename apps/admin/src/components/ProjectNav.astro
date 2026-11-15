@@ -1,5 +1,6 @@
 ---
 import type { Project } from '@ctff/core-api-client';
+import { routes } from '../lib/routes';
 
 interface Props {
   project: Project;
@@ -8,8 +9,8 @@ interface Props {
 
 const { project, current } = Astro.props;
 const sections = [
-  { id: 'environments', text: 'Environments', path: `/projects/${project.key}/environments` },
-  { id: 'settings', text: 'Settings', path: `/projects/${project.key}/settings` },
+  { id: 'environments', text: 'Environments', path: routes.environments(project.key) },
+  { id: 'settings', text: 'Settings', path: routes.settings(project.key) },
 ] as const;
 ---
 

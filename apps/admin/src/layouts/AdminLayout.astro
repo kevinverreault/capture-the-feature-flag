@@ -8,6 +8,7 @@ import DropdownMenu from '@ds/components/overlay/DropdownMenu.astro';
 import Button from '@ds/components/ui/Button.astro';
 import ThemeToggle from '@ds/components/ui/ThemeToggle.astro';
 import { takeFlash } from '../lib/flash';
+import { routes } from '../lib/routes';
 
 interface Props {
   title: string;
@@ -21,8 +22,8 @@ const { title, projects, project } = Astro.props;
 const flash = takeFlash(Astro.cookies);
 
 const switcherItems = [
-  ...projects.map((each) => ({ text: each.name, path: `/projects/${each.key}` })),
-  { text: 'All projects', path: '/projects' },
+  ...projects.map((listed) => ({ text: listed.name, path: routes.project(listed.key) })),
+  { text: 'All projects', path: routes.projects() },
 ];
 ---
 
@@ -35,7 +36,7 @@ const switcherItems = [
   </head>
   <body class="ff-sans-normal">
     <header class="app-header">
-      <a href="/projects" class="brand ff-serif text-xl">Capture The Feature Flag</a>
+      <a href={routes.projects()} class="brand ff-serif text-xl">Capture The Feature Flag</a>
       <div class="header-actions">
         <DropdownMenu label="Switch project" items={switcherItems}>
           <Button slot="trigger" variant="muted" size="small">

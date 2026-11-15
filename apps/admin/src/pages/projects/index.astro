@@ -7,27 +7,23 @@ import Card from '@ds/components/ui/Card.astro';
 import FormAlert from '../../components/FormAlert.astro';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { coreApi } from '../../lib/core';
-import { setFlash } from '../../lib/flash';
-import { noFormErrors } from '../../lib/form-errors';
-import { submit, textField } from '../../lib/forms';
+import { handlePost, textField } from '../../lib/forms';
+import { routes } from '../../lib/routes';
 
 const core = coreApi(Astro.locals);
-let values = { key: '', name: '' };
-let errors = noFormErrors;
-
-if (Astro.request.method === 'POST') {
-  const form = await Astro.request.formData();
-  values = { key: textField(form, 'key'), name: textField(form, 'name') };
-  const created = await submit(() => unwrap(core.POST('/api/v1/projects', { body: values })), ['key', 'name'], {
+const post = await handlePost(Astro, {
+  create: {
+    fields: ['key', 'name'],
     conflictField: 'key',
-  });
-  if (created.ok) {
-    setFlash(Astro.cookies, `Project ${created.value.name} created`);
-    return Astro.redirect(`/projects/${created.value.key}`, 303);
-  }
-  errors = created.errors;
-  Astro.response.status = created.status;
-}
+    send: async (form) => {
+      const body = { key: textField(form, 'key'), name: textField(form, 'name') };
+      const project = await unwrap(core.POST('/api/v1/projects', { body }));
+      return { location: routes.project(project.key), flash: `Project ${project.name} created` };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
 
 const projects = await unwrap(core.GET('/api/v1/projects'));
 ---
@@ -44,7 +40,7 @@ const projects = await unwrap(core.GET('/api/v1/projects'));
         <ul class="cards">
           {projects.map((project) => (
             <li>
-              <Card href={`/projects/${project.key}`}>
+              <Card href={routes.project(project.key)}>
                 <strong slot="header">{project.name}</strong>
                 <code>{project.key}</code>
               </Card>
@@ -60,14 +56,14 @@ const projects = await unwrap(core.GET('/api/v1/projects'));
     <form method="post" class="stack">
       <FormAlert messages={errors.form} />
       <FormField label="Name" error={errors.fields['name']}>
-        <Input name="name" value={values.name} required />
+        <Input name="name" value={post.value('name') ?? ''} required />
       </FormField>
       <FormField
         label="Key"
         hint="Lowercase kebab-case, such as birdwatch. It cannot be changed later."
         error={errors.fields['key']}
       >
-        <Input name="key" value={values.key} required />
+        <Input name="key" value={post.value('key') ?? ''} required />
       </FormField>
       <Button type="submit" variant="primary">Create project</Button>
     </form>

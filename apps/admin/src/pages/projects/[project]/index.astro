@@ -1,4 +1,6 @@
 ---
+import { routes } from '../../../lib/routes';
+
 // A project opens on its environments (its flags join them with #9).
-return Astro.redirect(`/projects/${encodeURIComponent(Astro.params.project ?? '')}/environments`);
+return Astro.redirect(routes.environments(Astro.params.project ?? ''));
 ---

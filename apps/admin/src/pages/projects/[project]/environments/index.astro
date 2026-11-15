@@ -11,31 +11,25 @@ import ProjectNav from '../../../../components/ProjectNav.astro';
 import SdkKey from '../../../../components/SdkKey.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { coreApi } from '../../../../lib/core';
-import { setFlash } from '../../../../lib/flash';
-import { noFormErrors } from '../../../../lib/form-errors';
-import { orNotFound, submit, textField } from '../../../../lib/forms';
+import { handlePost, orNotFound, textField } from '../../../../lib/forms';
+import { routes } from '../../../../lib/routes';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
 const params = { path: { projectKey } };
-let values = { key: '', name: '' };
-let errors = noFormErrors;
-
-if (Astro.request.method === 'POST') {
-  const form = await Astro.request.formData();
-  values = { key: textField(form, 'key'), name: textField(form, 'name') };
-  const created = await submit(
-    () => unwrap(core.POST('/api/v1/projects/{projectKey}/environments', { params, body: values })),
-    ['key', 'name'],
-    { conflictField: 'key' },
-  );
-  if (created.ok) {
-    setFlash(Astro.cookies, `Environment ${created.value.name} created`);
-    return Astro.redirect(`/projects/${created.value.projectKey}/environments`, 303);
-  }
-  errors = created.errors;
-  Astro.response.status = created.status;
-}
+const post = await handlePost(Astro, {
+  create: {
+    fields: ['key', 'name'],
+    conflictField: 'key',
+    send: async (form) => {
+      const body = { key: textField(form, 'key'), name: textField(form, 'name') };
+      const environment = await unwrap(core.POST('/api/v1/projects/{projectKey}/environments', { params, body }));
+      return { location: routes.environments(environment.projectKey), flash: `Environment ${environment.name} created` };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
 
 const [projects, project, environments] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
@@ -68,7 +62,7 @@ if (!project || !environments) Astro.response.status = 404;
                   <SdkKey sdkKey={environment.sdkKey} environmentName={environment.name} />
                   <Button
                     slot="footer"
-                    href={`/projects/${project.key}/environments/${environment.key}`}
+                    href={routes.environment(project.key, environment.key)}
                     variant="muted"
                     size="small"
                     aria-label={`Edit ${environment.name}`}
@@ -89,14 +83,14 @@ if (!project || !environments) Astro.response.status = 404;
         <form method="post" class="stack">
           <FormAlert messages={errors.form} />
           <FormField label="Name" error={errors.fields['name']}>
-            <Input name="name" value={values.name} required />
+            <Input name="name" value={post.value('name') ?? ''} required />
           </FormField>
           <FormField
             label="Key"
             hint="Lowercase kebab-case, such as production. It cannot be changed later."
             error={errors.fields['key']}
           >
-            <Input name="key" value={values.key} required />
+            <Input name="key" value={post.value('key') ?? ''} required />
           </FormField>
           <Button type="submit" variant="primary">
             Create environment

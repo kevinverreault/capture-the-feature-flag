@@ -11,12 +11,12 @@
   ],
   "scripts": {
     "generate": "prisma generate",
-    "build": "tsc -p tsconfig.app.json",
+    "build": "tsc -p tsconfig.app.json && node dist/export-openapi.js --check ../../libs/core-api-client/openapi.json",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
     "start": "node dist/main.js",
-    "openapi": "node dist/export-openapi.js ../../libs/core-api-client/openapi.json",
+    "openapi": "tsc -p tsconfig.app.json && node dist/export-openapi.js ../../libs/core-api-client/openapi.json",
     "docker-build": "docker build -f Dockerfile -t ctff-core:local ../.."
   },
   "nx": {
@@ -42,6 +42,11 @@
         ]
       },
       "build": {
+        "inputs": [
+          "production",
+          "^production",
+          "{workspaceRoot}/libs/core-api-client/openapi.json"
+        ],
         "dependsOn": [
           "generate",
           "^build"
@@ -50,7 +55,8 @@
       "openapi": {
         "cache": false,
         "dependsOn": [
-          "build"
+          "generate",
+          "^build"
         ]
       },
       "test": {

@@ -1,5 +1,6 @@
 import { sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { pinoHttp } from 'pino-http';
 import serveStatic from 'serve-static';
 import { handler } from './dist/server/entry.mjs';
 
@@ -8,13 +9,14 @@ const clientDir = fileURLToPath(new URL('./dist/client/', import.meta.url));
 /**
  * The admin app as a Connect/Express middleware: the built client assets, then the server-rendered pages. It
  * answers every request it gets, with the admin's 404 page when nothing matches, so the host mounts it after (or
- * outside of) its own routes.
+ * outside of) its own routes. With a pino `logger`, it logs each request and every page that fails as JSON.
  *
  * @param {import('./host.d.ts').AdminMiddlewareOptions} options
  * @returns {import('./host.d.ts').AdminMiddleware}
  */
-export function createAdminMiddleware({ coreBaseUrl }) {
+export function createAdminMiddleware({ coreBaseUrl, logger }) {
   const resolveCoreBaseUrl = typeof coreBaseUrl === 'function' ? coreBaseUrl : () => coreBaseUrl;
+  const logRequest = logger ? pinoHttp({ logger }) : (_req, _res, next) => next();
   const assets = serveStatic(clientDir, {
     index: false,
     // Astro fingerprints everything under /_astro/, so those files never change.
@@ -23,10 +25,12 @@ export function createAdminMiddleware({ coreBaseUrl }) {
     },
   });
   return (req, res, next) => {
-    assets(req, res, (error) => {
-      if (error) return next(error);
-      // Without `next`, Astro renders its 404 page for a path no page matches.
-      return handler(req, res, undefined, { coreBaseUrl: resolveCoreBaseUrl() });
-    });
+    logRequest(req, res, () =>
+      assets(req, res, (error) => {
+        if (error) return next(error);
+        // Without `next`, Astro renders its 404 page for a path no page matches.
+        return handler(req, res, undefined, { coreBaseUrl: resolveCoreBaseUrl(), logger });
+      }),
+    );
   };
 }

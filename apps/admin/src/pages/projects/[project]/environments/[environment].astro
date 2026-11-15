@@ -10,51 +10,35 @@ import ProjectNav from '../../../../components/ProjectNav.astro';
 import SdkKey from '../../../../components/SdkKey.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { coreApi } from '../../../../lib/core';
-import { setFlash } from '../../../../lib/flash';
-import { noFormErrors } from '../../../../lib/form-errors';
-import { orNotFound, submit, textField } from '../../../../lib/forms';
+import { handlePost, orNotFound, textField } from '../../../../lib/forms';
+import { routes } from '../../../../lib/routes';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
 const environmentKey = Astro.params.environment ?? '';
 const params = { path: { projectKey, environmentKey } };
-const environmentsPage = `/projects/${encodeURIComponent(projectKey)}/environments`;
-let name: string | undefined;
-let errors = noFormErrors;
-
-if (Astro.request.method === 'POST') {
-  const form = await Astro.request.formData();
-  if (textField(form, '_action') === 'delete') {
-    const deleted = await submit(
-      () => unwrap(core.DELETE('/api/v1/projects/{projectKey}/environments/{environmentKey}', { params })),
-      [],
-    );
-    if (deleted.ok) {
-      setFlash(Astro.cookies, `Environment ${environmentKey} deleted`);
-      return Astro.redirect(environmentsPage, 303);
-    }
-    errors = deleted.errors;
-    Astro.response.status = deleted.status;
-  } else {
-    name = textField(form, 'name');
-    const renamed = await submit(
-      () =>
-        unwrap(
-          core.PATCH('/api/v1/projects/{projectKey}/environments/{environmentKey}', {
-            params,
-            body: { name },
-          }),
-        ),
-      ['name'],
-    );
-    if (renamed.ok) {
-      setFlash(Astro.cookies, `Environment renamed to ${renamed.value.name}`);
-      return Astro.redirect(environmentsPage, 303);
-    }
-    errors = renamed.errors;
-    Astro.response.status = renamed.status;
-  }
-}
+const environmentsPage = routes.environments(projectKey);
+const post = await handlePost(Astro, {
+  rename: {
+    fields: ['name'],
+    send: async (form) => {
+      const body = { name: textField(form, 'name') };
+      const environment = await unwrap(
+        core.PATCH('/api/v1/projects/{projectKey}/environments/{environmentKey}', { params, body }),
+      );
+      return { location: environmentsPage, flash: `Environment renamed to ${environment.name}` };
+    },
+  },
+  delete: {
+    fields: [],
+    send: async () => {
+      await unwrap(core.DELETE('/api/v1/projects/{projectKey}/environments/{environmentKey}', { params }));
+      return { location: environmentsPage, flash: `Environment ${environmentKey} deleted` };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
 
 const [projects, project, environment] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
@@ -89,7 +73,7 @@ if (!project || !environment) Astro.response.status = 404;
           <input type="hidden" name="_action" value="rename" />
           <FormAlert messages={errors.form} />
           <FormField label="Name" error={errors.fields['name']}>
-            <Input name="name" value={name ?? environment.name} required />
+            <Input name="name" value={post.value('name') ?? environment.name} required />
           </FormField>
           <Button type="submit" variant="primary">
             Save

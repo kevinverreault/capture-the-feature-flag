@@ -1,6 +1,7 @@
 import { createAdminMiddleware } from '@ctff/admin';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
+import type { Logger } from 'pino';
 import type { CoreConfig } from './config.js';
 
 /** Path prefixes Core answers itself; the admin app gets every other path. */
@@ -25,10 +26,12 @@ export function loopbackUrl(host: string, port: number): string {
  * router and body parsers, so the forms it receives reach it unread. The admin app calls Core's API over HTTP:
  * by default this Core's own, through loopback, or the one ADMIN_CORE_URL names.
  */
-export function mountAdmin(app: NestExpressApplication, config: CoreConfig): void {
+export function mountAdmin(app: NestExpressApplication, config: CoreConfig, logger: Logger): void {
   if (!config.adminEnabled) return;
   const admin = createAdminMiddleware({
     coreBaseUrl: () => config.adminCoreUrl ?? loopbackUrl(config.host, listeningPort(app)),
+    // Nest's request logging doesn't reach the admin app's paths, so it logs them itself, with Core's logger.
+    logger,
   });
   app.use((req: Request, res: Response, next: NextFunction) =>
     isCoreRoute(req.path) ? next() : admin(req, res, next),

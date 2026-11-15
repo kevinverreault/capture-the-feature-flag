@@ -7,6 +7,7 @@ import { Logger as NestPinoLogger } from 'nestjs-pino';
 import type { Logger } from 'pino';
 import { mountAdmin } from './admin.js';
 import { AppModule } from './app.module.js';
+import { validationFailed } from './common/validation.js';
 import type { CoreConfig } from './config.js';
 
 export const apiPrefix = 'api/v1';
@@ -19,9 +20,16 @@ export async function createApp(config: CoreConfig, logger: Logger): Promise<INe
   // ETags are set deliberately where they mean something (the snapshot endpoint), not on every response.
   app.set('etag', false);
   app.disable('x-powered-by');
-  mountAdmin(app, config);
+  mountAdmin(app, config, logger);
   configureRoutes(app);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      exceptionFactory: validationFailed,
+    }),
+  );
   app.enableShutdownHooks();
 
   // The OpenAPI document is generated from the controllers; the core-api-client is generated from it.

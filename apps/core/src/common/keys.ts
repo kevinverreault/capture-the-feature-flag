@@ -1,6 +1,7 @@
-import { applyDecorators, BadRequestException } from '@nestjs/common';
+import { applyDecorators } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
+import { invalidBody } from './validation.js';
 
 /** Lowercase kebab-case: lowercase letters and digits in groups joined by single hyphens, starting with a letter. */
 export const keyPattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -33,10 +34,15 @@ export function ImmutableKey(what: string): PropertyDecorator {
   );
 }
 
-/** Fails with 400 when an update body tries to change an immutable key. */
-export function assertKeyUnchanged(what: string, current: string, sent: string | undefined): void {
+/** Fails with 400 when an update body tries to change an immutable key (the body's `property`). */
+export function assertKeyUnchanged(
+  what: string,
+  current: string,
+  sent: string | undefined,
+  property = 'key',
+): void {
   if (sent !== undefined && sent !== current) {
-    throw new BadRequestException([`${what} key is immutable and cannot be changed`]);
+    throw invalidBody({ [property]: [`${what} key is immutable and cannot be changed`] });
   }
 }
 
