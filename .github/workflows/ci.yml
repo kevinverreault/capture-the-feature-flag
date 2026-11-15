@@ -107,7 +107,8 @@ jobs:
           # Exited, not still running (an ExitCode of 0 alone would also match a running container).
           test "$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$container")" = 'exited 0'
       - run: docker compose up --detach --wait --wait-timeout 300
-      # Core's demo seed creates the project first (actor seed); Terraform adopts it and applies the example over it.
+      # Core's demo seed creates the project first (actor seed), with the same targeting as the example; Terraform
+      # adopts it and takes its flags over, so only the flags change on the first apply.
       - name: Core holds the example configuration, managed by and attributed to terraform
         run: |
           curl --fail --silent --show-error http://localhost:3000/api/v1/projects/birdwatch/flags/rare-bird-alerts/targeting/production \
@@ -116,7 +117,8 @@ jobs:
             | jq --exit-status 'length == 3 and all(.[]; .managedBy == "terraform")'
           curl --fail --silent --show-error 'http://localhost:3000/api/v1/audit-entries?projectKey=birdwatch&limit=200' \
             | jq --exit-status 'all(.entries[]; .actor == "seed" or .actor == "terraform")
-                and any(.entries[]; .actor == "terraform" and .targetType == "targeting")'
+                and any(.entries[]; .actor == "terraform" and .targetType == "flag")'
+      # The restore is a targeting change, so its audit entry, the flag's latest, is attributed to terraform.
       - name: Applying again restores targeting edited in the admin app
         run: |
           url=http://localhost:3000/api/v1/projects/birdwatch/flags/new-sighting-form/targeting/production
@@ -125,6 +127,9 @@ jobs:
             -d "{\"version\": $version, \"on\": false}" > /dev/null
           docker compose --profile terraform run --rm terraform
           curl --fail --silent --show-error "$url" | jq --exit-status '.on == true'
+          curl --fail --silent --show-error 'http://localhost:3000/api/v1/audit-entries?projectKey=birdwatch&flagKey=new-sighting-form&limit=1' \
+            | jq --exit-status '.entries[0] | .actor == "terraform" and .targetType == "targeting"
+                and .environmentKey == "production"'
       - if: failure()
         run: docker compose --profile terraform logs
       - if: always()
