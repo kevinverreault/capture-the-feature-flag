@@ -1,0 +1,51 @@
+---
+import AlertDialog from '@ds/components/overlay/AlertDialog.astro';
+import Button from '@ds/components/ui/Button.astro';
+
+interface Props {
+  /** The dialog's question, e.g. "Delete the production environment?". */
+  title: string;
+  /** What deleting takes with it. */
+  description: string;
+  /** Text of the button that opens the dialog and of the one that confirms. */
+  actionLabel: string;
+}
+
+const { title, description, actionLabel } = Astro.props;
+
+// A server-rendered delete form (a post with _action=delete), confirmed in an AlertDialog. The dialog's buttons
+// close it in place, so a script submits the form once it closes on the confirm button. Without scripts, the
+// form shows its own submit button instead.
+---
+
+<confirm-delete>
+  <form method="post">
+    <input type="hidden" name="_action" value="delete" />
+    <noscript><Button type="submit" variant="danger">{actionLabel}</Button></noscript>
+  </form>
+  <AlertDialog title={title} description={description} actionLabel={actionLabel}>
+    <Button slot="trigger" type="button" variant="danger">{actionLabel}</Button>
+  </AlertDialog>
+</confirm-delete>
+
+<script>
+  class ConfirmDelete extends HTMLElement {
+    connectedCallback() {
+      const form = this.querySelector('form');
+      const dialog = this.querySelector('dialog');
+      if (!form || !dialog) return;
+      dialog.addEventListener('close', () => {
+        if (dialog.returnValue === 'confirm') form.requestSubmit();
+      });
+    }
+  }
+  customElements.define('confirm-delete', ConfirmDelete);
+</script>
+
+<noscript>
+  <style is:inline>
+    confirm-delete [aria-haspopup='dialog'] {
+      display: none;
+    }
+  </style>
+</noscript>

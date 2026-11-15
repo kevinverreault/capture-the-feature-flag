@@ -1,0 +1,11 @@
+---
+import NotFound from '../components/NotFound.astro';
+import AdminLayout from '../layouts/AdminLayout.astro';
+
+// Astro renders this page for a path no page matches without the host's locals, so it can't call Core: its
+// project switcher only offers the list of projects.
+---
+
+<AdminLayout title="Not found" projects={[]}>
+  <NotFound>There is no page at this address.</NotFound>
+</AdminLayout>

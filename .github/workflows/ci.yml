@@ -64,6 +64,8 @@ jobs:
           curl --fail --silent --show-error http://localhost:3000/api/v1/openapi.json > /dev/null
           curl --fail --silent --show-error -X POST http://localhost:3000/api/v1/projects \
             -H 'content-type: application/json' -d '{"key":"smoke-test","name":"Smoke test"}'
+      - name: Core serves the admin app, which reads the API
+        run: curl --fail --silent --show-error http://localhost:3000/projects | grep --quiet 'Smoke test'
       - if: failure()
         run: docker compose logs
       - if: always()

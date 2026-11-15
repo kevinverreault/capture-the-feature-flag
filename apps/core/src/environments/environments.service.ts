@@ -64,7 +64,7 @@ export class EnvironmentsService {
     const project = await this.projects.find(projectKey);
     const environment = await this.find(project, key);
     assertKeyUnchanged('environment', environment.key, input.key);
-    assertKeyUnchanged('SDK', environment.sdkKey, input.sdkKey);
+    assertKeyUnchanged('SDK', environment.sdkKey, input.sdkKey, 'sdkKey');
     const updated = await this.prisma.environment.update({
       where: { id: environment.id },
       data: { name: input.name },

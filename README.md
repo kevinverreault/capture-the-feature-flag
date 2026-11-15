@@ -23,7 +23,7 @@ pnpm nx run-many -t lint typecheck test build
 docker compose up
 ```
 
-This starts PostgreSQL 17 and [Core](apps/core/README.md) on <http://localhost:3000>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>.
+This starts PostgreSQL 17 and [Core](apps/core/README.md) on <http://localhost:3000>, where the [admin app](apps/admin/README.md) opens. The API's OpenAPI UI is at <http://localhost:3000/api/docs>.
 
 ## Layout
 
@@ -64,7 +64,7 @@ Each project's `package.json` declares exactly one `type:*` tag and one `scope:*
 
 The one recorded exception is the Go Terraform provider. It declares an Nx `implicitDependencies` on `core`, so its acceptance tests run against Core's build and re-run when Core changes. It still calls Core only over HTTP.
 
-The rules cover `.astro` files too (through `eslint-plugin-astro`). The Prisma ban only applies to packages Nx knows from the lockfile, so it starts working once Prisma is installed (by `core`). Before that, a Prisma import passes `lint` and only `typecheck` catches it, so test the rule in a workspace where Prisma is installed.
+The rules cover `.astro` files too (through `eslint-plugin-astro`). Nx maps an import such as `@ctff/core` to its project through the package's `exports` (or `main`), so every project's `package.json` needs one, apps included; without it the import is not seen as a dependency and escapes the rules. [tools/workspace/test/module-boundaries.test.ts](tools/workspace/test/module-boundaries.test.ts) checks that importing Core or Prisma from outside Core fails `lint`. The Prisma ban only applies to packages Nx knows from the lockfile, so it starts working once Prisma is installed (by `core`). Before that, a Prisma import passes `lint` and only `typecheck` catches it, so test the rule in a workspace where Prisma is installed.
 
 The `@ctff/workspace` tests fail if a project is missing either tag, because an untagged project would escape these rules.
 

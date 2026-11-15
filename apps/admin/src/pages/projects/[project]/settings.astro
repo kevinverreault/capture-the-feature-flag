@@ -1,0 +1,86 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Button from '@ds/components/ui/Button.astro';
+import ConfirmDelete from '../../../components/ConfirmDelete.astro';
+import FormAlert from '../../../components/FormAlert.astro';
+import NotFound from '../../../components/NotFound.astro';
+import ProjectNav from '../../../components/ProjectNav.astro';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../lib/core';
+import { handlePost, orNotFound, textField } from '../../../lib/forms';
+import { routes } from '../../../lib/routes';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const params = { path: { projectKey } };
+const post = await handlePost(Astro, {
+  rename: {
+    fields: ['name'],
+    send: async (form) => {
+      const body = { name: textField(form, 'name') };
+      const project = await unwrap(core.PATCH('/api/v1/projects/{projectKey}', { params, body }));
+      return { location: routes.settings(project.key), flash: `Project renamed to ${project.name}` };
+    },
+  },
+  delete: {
+    fields: [],
+    send: async () => {
+      await unwrap(core.DELETE('/api/v1/projects/{projectKey}', { params }));
+      return { location: routes.projects(), flash: `Project ${projectKey} deleted` };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
+
+const [projects, project] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
+]);
+if (!project) Astro.response.status = 404;
+---
+
+{
+  project ? (
+    <AdminLayout title={`Settings · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="settings" />
+
+      <section aria-labelledby="rename-project">
+        <h2 id="rename-project" class="text-xl">
+          Rename
+        </h2>
+        <form method="post" class="stack">
+          <input type="hidden" name="_action" value="rename" />
+          <FormAlert messages={errors.form} />
+          <FormField label="Name" error={errors.fields['name']}>
+            <Input name="name" value={post.value('name') ?? project.name} required />
+          </FormField>
+          <FormField label="Key" hint="A project's key cannot be changed.">
+            <Input value={project.key} readonly disabled />
+          </FormField>
+          <Button type="submit" variant="primary">
+            Save
+          </Button>
+        </form>
+      </section>
+
+      <section aria-labelledby="delete-project" class="danger-zone">
+        <h2 id="delete-project" class="text-xl">
+          Delete this project
+        </h2>
+        <p>Deletes its environments, their SDK keys, its flags and all their targeting.</p>
+        <ConfirmDelete
+          title={`Delete the ${project.name} project?`}
+          description="Its environments, their SDK keys, its flags and all their targeting are deleted with it. This cannot be undone."
+          actionLabel="Delete project"
+        />
+      </section>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Project not found" projects={projects}>
+      <NotFound>There is no project {projectKey}.</NotFound>
+    </AdminLayout>
+  )
+}
