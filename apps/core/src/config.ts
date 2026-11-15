@@ -4,6 +4,8 @@ export interface CoreConfig {
   host: string;
   port: number;
   logLevel: string;
+  /** The Core the admin app calls; unset means this one. */
+  adminCoreUrl?: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
@@ -20,5 +22,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
     host: env['HOST'] ?? '0.0.0.0',
     port,
     logLevel: env['LOG_LEVEL'] ?? 'info',
+    adminCoreUrl: env['ADMIN_CORE_URL']?.trim() || undefined,
   };
 }

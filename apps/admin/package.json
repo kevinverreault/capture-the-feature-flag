@@ -1,0 +1,47 @@
+{
+  "name": "@ctff/admin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The admin app: server-rendered Astro, mounted in Core (ADR 0003). It calls Core only through @ctff/core-api-client.",
+  "exports": {
+    ".": {
+      "types": "./host.d.ts",
+      "default": "./host.js"
+    }
+  },
+  "files": [
+    "dist",
+    "host.js",
+    "host.d.ts",
+    "standalone.js"
+  ],
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "typecheck": "astro check",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "start": "node standalone.js"
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:admin"
+    ]
+  },
+  "dependencies": {
+    "@astrojs/node": "^11.1.13",
+    "@ctff/core-api-client": "workspace:*",
+    "astro": "^7.4.12",
+    "cva": "npm:class-variance-authority@^0.7.1",
+    "node-html-parser": "^6.1.13",
+    "serve-static": "^2.2.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@ctff/design-system-host": "workspace:*",
+    "@types/serve-static": "^2.2.0",
+    "typescript": "~6.0.3"
+  }
+}

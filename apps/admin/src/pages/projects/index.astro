@@ -1,0 +1,76 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Button from '@ds/components/ui/Button.astro';
+import Card from '@ds/components/ui/Card.astro';
+import FormAlert from '../../components/FormAlert.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { coreApi } from '../../lib/core';
+import { setFlash } from '../../lib/flash';
+import { noFormErrors } from '../../lib/form-errors';
+import { submit, textField } from '../../lib/forms';
+
+const core = coreApi(Astro.locals);
+let values = { key: '', name: '' };
+let errors = noFormErrors;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  values = { key: textField(form, 'key'), name: textField(form, 'name') };
+  const created = await submit(() => unwrap(core.POST('/api/v1/projects', { body: values })), ['key', 'name'], {
+    conflictField: 'key',
+  });
+  if (created.ok) {
+    setFlash(Astro.cookies, `Project ${created.value.name} created`);
+    return Astro.redirect(`/projects/${created.value.key}`, 303);
+  }
+  errors = created.errors;
+  Astro.response.status = created.status;
+}
+
+const projects = await unwrap(core.GET('/api/v1/projects'));
+---
+
+<AdminLayout title="Projects" projects={projects}>
+  <h1 class="ff-serif text-2xl">Projects</h1>
+
+  <section aria-labelledby="project-list">
+    <h2 id="project-list" class="text-xl">All projects</h2>
+    {
+      projects.length === 0 ? (
+        <p>No projects yet. Create the first one below.</p>
+      ) : (
+        <ul class="cards">
+          {projects.map((project) => (
+            <li>
+              <Card href={`/projects/${project.key}`}>
+                <strong slot="header">{project.name}</strong>
+                <code>{project.key}</code>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </section>
+
+  <section aria-labelledby="create-project">
+    <h2 id="create-project" class="text-xl">Create a project</h2>
+    <form method="post" class="stack">
+      <FormAlert messages={errors.form} />
+      <FormField label="Name" error={errors.fields['name']}>
+        <Input name="name" value={values.name} required />
+      </FormField>
+      <FormField
+        label="Key"
+        hint="Lowercase kebab-case, such as birdwatch. It cannot be changed later."
+        error={errors.fields['key']}
+      >
+        <Input name="key" value={values.key} required />
+      </FormField>
+      <Button type="submit" variant="primary">Create project</Button>
+    </form>
+  </section>
+</AdminLayout>
+

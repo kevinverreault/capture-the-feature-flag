@@ -1,0 +1,1238 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/projects": {
+      "get": {
+        "operationId": "ProjectsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      },
+      "post": {
+        "operationId": "ProjectsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}": {
+      "get": {
+        "operationId": "ProjectsController_get",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      },
+      "patch": {
+        "operationId": "ProjectsController_update",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      },
+      "delete": {
+        "operationId": "ProjectsController_delete",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted, with its environments, flags and targeting."
+          }
+        },
+        "tags": [
+          "projects"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/environments": {
+      "get": {
+        "operationId": "EnvironmentsController_list",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EnvironmentDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "environments"
+        ]
+      },
+      "post": {
+        "operationId": "EnvironmentsController_create",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEnvironmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created with a generated SDK key, and with off-state targeting for every existing flag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "environments"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/environments/{environmentKey}": {
+      "get": {
+        "operationId": "EnvironmentsController_get",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environmentKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "environments"
+        ]
+      },
+      "patch": {
+        "operationId": "EnvironmentsController_update",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environmentKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEnvironmentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "environments"
+        ]
+      },
+      "delete": {
+        "operationId": "EnvironmentsController_delete",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environmentKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted, with the targeting of every flag in it."
+          }
+        },
+        "tags": [
+          "environments"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/flags": {
+      "get": {
+        "operationId": "FlagsController_list",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FlagDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flags"
+        ]
+      },
+      "post": {
+        "operationId": "FlagsController_create",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFlagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created with off-state targeting in every environment: targeting off, off variation false, default variation true.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The flag key is already used in this project."
+          }
+        },
+        "tags": [
+          "flags"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/flags/{flagKey}": {
+      "get": {
+        "operationId": "FlagsController_get",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "flags"
+        ]
+      },
+      "patch": {
+        "operationId": "FlagsController_update",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFlagDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlagDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The flag changed since the version the edit is based on."
+          }
+        },
+        "tags": [
+          "flags"
+        ]
+      },
+      "delete": {
+        "operationId": "FlagsController_delete",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted, with its targeting in every environment."
+          }
+        },
+        "tags": [
+          "flags"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/flags/{flagKey}/targeting": {
+      "get": {
+        "operationId": "TargetingController_list",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The flag's targeting in every environment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TargetingDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "targeting"
+        ]
+      }
+    },
+    "/api/v1/projects/{projectKey}/flags/{flagKey}/targeting/{environmentKey}": {
+      "get": {
+        "operationId": "TargetingController_get",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environmentKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetingDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "targeting"
+        ]
+      },
+      "patch": {
+        "operationId": "TargetingController_update",
+        "parameters": [
+          {
+            "name": "projectKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "flagKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environmentKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTargetingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetingDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The targeting changed since the version the change is based on."
+          }
+        },
+        "tags": [
+          "targeting"
+        ]
+      }
+    },
+    "/api/v1/evaluator/snapshot": {
+      "get": {
+        "operationId": "EvaluatorController_snapshot",
+        "parameters": [
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "description": "The ETag of the snapshot already held.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-ctff-sdk-key",
+            "in": "header",
+            "description": "The SDK key of the environment.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The targeting of every flag in the SDK key's environment, with an ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentSnapshotDto"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The snapshot has not changed since the ETag in If-None-Match."
+          },
+          "400": {
+            "description": "No x-ctff-sdk-key header."
+          },
+          "404": {
+            "description": "Unknown SDK key."
+          }
+        },
+        "tags": [
+          "evaluator"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Capture The Feature Flag Core API",
+    "description": "Projects, environments, flags and targeting, and the endpoints Evaluators poll.",
+    "version": "v1",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "ProjectDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "example": "birdwatch"
+          },
+          "name": {
+            "type": "string",
+            "example": "Birdwatch"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateProjectDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The project key: lowercase kebab-case, immutable after creation.",
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "maxLength": 64,
+            "example": "rare-bird-alerts"
+          },
+          "name": {
+            "type": "string",
+            "description": "The project's display name.",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "UpdateProjectDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The current project key, if sent. It cannot be changed."
+          },
+          "name": {
+            "type": "string",
+            "description": "The project's display name.",
+            "maxLength": 200
+          }
+        }
+      },
+      "EnvironmentDto": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "example": "birdwatch"
+          },
+          "key": {
+            "type": "string",
+            "example": "production"
+          },
+          "name": {
+            "type": "string",
+            "example": "Production"
+          },
+          "sdkKey": {
+            "type": "string",
+            "description": "The opaque, generated key an SDK uses to say which environment it evaluates in.",
+            "example": "ctff-env-3q2xJ0bS9yqgk1WkR7cN5hTzL0aV"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectKey",
+          "key",
+          "name",
+          "sdkKey",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateEnvironmentDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The environment key: lowercase kebab-case, immutable after creation.",
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "maxLength": 64,
+            "example": "rare-bird-alerts"
+          },
+          "name": {
+            "type": "string",
+            "description": "The environment's display name.",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "UpdateEnvironmentDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The current environment key, if sent. It cannot be changed."
+          },
+          "sdkKey": {
+            "type": "string",
+            "description": "The current SDK key, if sent. It cannot be changed."
+          },
+          "name": {
+            "type": "string",
+            "description": "The environment's display name.",
+            "maxLength": 200
+          }
+        }
+      },
+      "FlagDto": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string",
+            "example": "birdwatch"
+          },
+          "key": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "name": {
+            "type": "string",
+            "example": "Rare bird alerts"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "variations": {
+            "example": [
+              true,
+              false
+            ],
+            "description": "The ordered variations; targeting refers to them by index. Boolean flags are always [true, false].",
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "version": {
+            "type": "number",
+            "description": "Incremented on every edit; send it back with the next edit."
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectKey",
+          "key",
+          "name",
+          "description",
+          "tags",
+          "variations",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateFlagDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "The flag key: lowercase kebab-case, immutable after creation.",
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "maxLength": 64,
+            "example": "rare-bird-alerts"
+          },
+          "name": {
+            "type": "string",
+            "description": "The flag's display name.",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "What the flag controls."
+          },
+          "tags": {
+            "example": [
+              "alerts"
+            ],
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "key",
+          "name"
+        ]
+      },
+      "UpdateFlagDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "description": "The version this edit is based on. An outdated version is rejected with 409."
+          },
+          "key": {
+            "type": "string",
+            "description": "The current flag key, if sent. It cannot be changed."
+          },
+          "name": {
+            "type": "string",
+            "description": "The flag's display name.",
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "What the flag controls."
+          },
+          "tags": {
+            "example": [
+              "alerts"
+            ],
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "IndividualTargetDto": {
+        "type": "object",
+        "properties": {
+          "variation": {
+            "type": "number",
+            "description": "Index into the flag variations."
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "variation",
+          "userIds"
+        ]
+      },
+      "RuleDto": {
+        "type": "object",
+        "properties": {
+          "attribute": {
+            "type": "string",
+            "enum": [
+              "user_id",
+              "country"
+            ]
+          },
+          "operator": {
+            "type": "string",
+            "enum": [
+              "in",
+              "not_in"
+            ]
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "variation": {
+            "type": "number",
+            "description": "Index into the flag variations."
+          }
+        },
+        "required": [
+          "attribute",
+          "operator",
+          "values",
+          "variation"
+        ]
+      },
+      "TargetingDto": {
+        "type": "object",
+        "properties": {
+          "flagKey": {
+            "type": "string",
+            "example": "rare-bird-alerts"
+          },
+          "environmentKey": {
+            "type": "string",
+            "example": "production"
+          },
+          "on": {
+            "type": "boolean",
+            "description": "Targeting on or off. While off, every context gets the off variation."
+          },
+          "offVariation": {
+            "type": "number",
+            "description": "Index into the flag variations served while targeting is off."
+          },
+          "defaultVariation": {
+            "type": "number",
+            "description": "Index into the flag variations served when no individual target or rule matches."
+          },
+          "individualTargets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndividualTargetDto"
+            }
+          },
+          "rules": {
+            "description": "Ordered; the first rule that matches wins.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleDto"
+            }
+          },
+          "version": {
+            "type": "number",
+            "description": "Incremented on every change; send it back with the next change."
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "flagKey",
+          "environmentKey",
+          "on",
+          "offVariation",
+          "defaultVariation",
+          "individualTargets",
+          "rules",
+          "version",
+          "updatedAt"
+        ]
+      },
+      "UpdateTargetingDto": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "description": "The version this change is based on. An outdated version is rejected with 409."
+          },
+          "on": {
+            "type": "boolean",
+            "description": "Switch targeting on or off."
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "TargetingSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          },
+          "offVariation": {
+            "type": "number"
+          },
+          "defaultVariation": {
+            "type": "number"
+          },
+          "individualTargets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndividualTargetDto"
+            }
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleDto"
+            }
+          },
+          "version": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "on",
+          "offVariation",
+          "defaultVariation",
+          "individualTargets",
+          "rules",
+          "version"
+        ]
+      },
+      "FlagSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "variations": {
+            "type": "array",
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "version": {
+            "type": "number"
+          },
+          "targeting": {
+            "$ref": "#/components/schemas/TargetingSnapshotDto"
+          }
+        },
+        "required": [
+          "key",
+          "variations",
+          "version",
+          "targeting"
+        ]
+      },
+      "EnvironmentSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "projectKey": {
+            "type": "string"
+          },
+          "environmentKey": {
+            "type": "string"
+          },
+          "flags": {
+            "description": "Every flag of the project, ordered by flag key.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FlagSnapshotDto"
+            }
+          }
+        },
+        "required": [
+          "projectKey",
+          "environmentKey",
+          "flags"
+        ]
+      }
+    }
+  }
+}

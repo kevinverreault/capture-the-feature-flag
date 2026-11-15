@@ -1,0 +1,4 @@
+---
+// A project opens on its environments (its flags join them with #9).
+return Astro.redirect(`/projects/${encodeURIComponent(Astro.params.project ?? '')}/environments`);
+---

@@ -1,0 +1,63 @@
+---
+import type { Project } from '@ctff/core-api-client';
+
+interface Props {
+  project: Project;
+  current: 'environments' | 'settings';
+}
+
+const { project, current } = Astro.props;
+const sections = [
+  { id: 'environments', text: 'Environments', path: `/projects/${project.key}/environments` },
+  { id: 'settings', text: 'Settings', path: `/projects/${project.key}/settings` },
+] as const;
+---
+
+<div class="project-heading">
+  <h1 class="ff-serif text-2xl">{project.name}</h1>
+  <nav aria-label="Project">
+    <ul>
+      {
+        sections.map((section) => (
+          <li>
+            <a href={section.path} aria-current={section.id === current ? 'page' : undefined}>
+              {section.text}
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</div>
+
+<style>
+  h1 {
+    margin: 0 0 var(--space-xs);
+  }
+
+  ul {
+    display: flex;
+    gap: var(--space-sm);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.15);
+  }
+
+  a {
+    display: inline-block;
+    padding: var(--space-xs) 0;
+    color: inherit;
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+  }
+
+  a:hover,
+  a[aria-current='page'] {
+    border-bottom-color: hsl(var(--color-primary));
+  }
+
+  a[aria-current='page'] {
+    font-weight: 700;
+  }
+</style>

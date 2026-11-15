@@ -32,10 +32,19 @@ export async function createDatabase(): Promise<string> {
 }
 
 /** Starts the built Core as its own process, configured only through environment variables. */
-export async function startCore(options: { databaseUrl?: string } = {}): Promise<RunningCore> {
+export async function startCore(
+  options: { databaseUrl?: string; env?: Record<string, string> } = {},
+): Promise<RunningCore> {
   const databaseUrl = options.databaseUrl ?? (await createDatabase());
   const child = spawn(process.execPath, [mainJs], {
-    env: { PATH: process.env['PATH'], DATABASE_URL: databaseUrl, PORT: '0', HOST: '127.0.0.1', LOG_LEVEL: 'info' },
+    env: {
+      PATH: process.env['PATH'],
+      DATABASE_URL: databaseUrl,
+      PORT: '0',
+      HOST: '127.0.0.1',
+      LOG_LEVEL: 'info',
+      ...options.env,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const logs: Record<string, unknown>[] = [];

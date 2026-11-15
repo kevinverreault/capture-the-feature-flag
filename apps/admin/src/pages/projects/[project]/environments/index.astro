@@ -1,0 +1,122 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Badge from '@ds/components/ui/Badge.astro';
+import Button from '@ds/components/ui/Button.astro';
+import Card from '@ds/components/ui/Card.astro';
+import FormAlert from '../../../../components/FormAlert.astro';
+import NotFound from '../../../../components/NotFound.astro';
+import ProjectNav from '../../../../components/ProjectNav.astro';
+import SdkKey from '../../../../components/SdkKey.astro';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../../lib/core';
+import { setFlash } from '../../../../lib/flash';
+import { noFormErrors } from '../../../../lib/form-errors';
+import { orNotFound, submit, textField } from '../../../../lib/forms';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const path = { path: { projectKey } };
+let values = { key: '', name: '' };
+let errors = noFormErrors;
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  values = { key: textField(form, 'key'), name: textField(form, 'name') };
+  const created = await submit(
+    () => unwrap(core.POST('/api/v1/projects/{projectKey}/environments', { params: path, body: values })),
+    ['key', 'name'],
+    { conflictField: 'key' },
+  );
+  if (created.ok) {
+    setFlash(Astro.cookies, `Environment ${created.value.name} created`);
+    return Astro.redirect(`/projects/${created.value.projectKey}/environments`, 303);
+  }
+  errors = created.errors;
+  Astro.response.status = created.status;
+}
+
+const [projects, project, environments] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: path }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params: path }))),
+]);
+if (!project || !environments) Astro.response.status = 404;
+---
+
+{
+  project && environments ? (
+    <AdminLayout title={`Environments · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="environments" />
+
+      <section aria-labelledby="environment-list">
+        <h2 id="environment-list" class="text-xl">
+          Environments
+        </h2>
+        {environments.length === 0 ? (
+          <p>This project has no environments yet. Create one below to get its SDK key.</p>
+        ) : (
+          <ul class="cards">
+            {environments.map((environment) => (
+              <li>
+                <Card data-environment={environment.key}>
+                  <div slot="header" class="environment-header">
+                    <strong>{environment.name}</strong>
+                    <Badge variant="outline">{environment.key}</Badge>
+                  </div>
+                  <SdkKey sdkKey={environment.sdkKey} environmentName={environment.name} />
+                  <Button
+                    slot="footer"
+                    href={`/projects/${project.key}/environments/${environment.key}`}
+                    variant="muted"
+                    size="small"
+                    aria-label={`Edit ${environment.name}`}
+                  >
+                    Edit
+                  </Button>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="create-environment">
+        <h2 id="create-environment" class="text-xl">
+          Create an environment
+        </h2>
+        <form method="post" class="stack">
+          <FormAlert messages={errors.form} />
+          <FormField label="Name" error={errors.fields['name']}>
+            <Input name="name" value={values.name} required />
+          </FormField>
+          <FormField
+            label="Key"
+            hint="Lowercase kebab-case, such as production. It cannot be changed later."
+            error={errors.fields['key']}
+          >
+            <Input name="key" value={values.key} required />
+          </FormField>
+          <Button type="submit" variant="primary">
+            Create environment
+          </Button>
+        </form>
+      </section>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Project not found" projects={projects}>
+      <NotFound>There is no project {projectKey}.</NotFound>
+    </AdminLayout>
+  )
+}
+
+<style>
+  .environment-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    align-items: center;
+    justify-content: space-between;
+  }
+</style>
