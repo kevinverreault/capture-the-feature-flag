@@ -1,13 +1,18 @@
-# Core (the admin app joins it later). Build from the repository root:
+# Core, with the admin app mounted in it (ADR 0003). Build from the repository root, with the design system
+# submodule checked out (the admin app compiles it from source):
 #   docker build -f apps/core/Dockerfile -t ctff-core .
-# All configuration comes from environment variables: DATABASE_URL (required), PORT, HOST, LOG_LEVEL.
+# All configuration comes from environment variables: DATABASE_URL (required), PORT, HOST, LOG_LEVEL,
+# ADMIN_ENABLED, ADMIN_CORE_URL.
 
 FROM node:24-slim AS build
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    ASTRO_TELEMETRY_DISABLED=1
 RUN corepack enable
 WORKDIR /repo
 COPY . .
 RUN pnpm install --frozen-lockfile --filter "@ctff/core..."
+# Builds Core's dependencies first: the core-api-client (generated from its copy of the OpenAPI document), then
+# the admin app, then Core.
 RUN pnpm --filter @ctff/core run generate \
  && pnpm --filter "@ctff/core..." run build \
  && pnpm --filter @ctff/core deploy --prod /out

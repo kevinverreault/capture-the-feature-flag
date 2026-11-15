@@ -1,0 +1,5 @@
+{
+  "extends": "@ctff/design-system-host/tsconfig.json",
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist"]
+}

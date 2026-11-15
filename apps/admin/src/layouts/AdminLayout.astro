@@ -1,0 +1,99 @@
+---
+import '@styles/global.css';
+import '../styles/admin.css';
+import type { Project } from '@ctff/core-api-client';
+import Alert from '@ds/components/feedback/Alert.astro';
+import Toast from '@ds/components/feedback/Toast.astro';
+import DropdownMenu from '@ds/components/overlay/DropdownMenu.astro';
+import Button from '@ds/components/ui/Button.astro';
+import ThemeToggle from '@ds/components/ui/ThemeToggle.astro';
+import { takeFlash } from '../lib/flash';
+import { routes } from '../lib/routes';
+
+interface Props {
+  title: string;
+  /** Every project, for the project switcher. */
+  projects: readonly Project[];
+  /** The project the page is about, if any. */
+  project?: Project | undefined;
+}
+
+const { title, projects, project } = Astro.props;
+const flash = takeFlash(Astro.cookies);
+
+const switcherItems = [
+  ...projects.map((listed) => ({ text: listed.name, path: routes.project(listed.key) })),
+  { text: 'All projects', path: routes.projects() },
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} · Capture The Feature Flag</title>
+  </head>
+  <body class="ff-sans-normal">
+    <header class="app-header">
+      <a href={routes.projects()} class="brand ff-serif text-xl">Capture The Feature Flag</a>
+      <div class="header-actions">
+        <DropdownMenu label="Switch project" items={switcherItems}>
+          <Button slot="trigger" variant="muted" size="small">
+            {project ? `Project: ${project.name}` : 'Choose a project'}
+          </Button>
+        </DropdownMenu>
+        <ThemeToggle />
+      </div>
+    </header>
+    <main class="app-main">
+      {
+        flash && (
+          <Alert variant="success" icon="circle-check" class="flash">
+            {flash}
+          </Alert>
+        )
+      }
+      <slot />
+    </main>
+    <Toast />
+  </body>
+</html>
+
+<style>
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: hsl(var(--color-background));
+    color: hsl(var(--color-on-background));
+  }
+
+  .app-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.15);
+  }
+
+  .brand {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+  }
+
+  .app-main {
+    display: grid;
+    gap: var(--space-md);
+    max-width: var(--container-max-width);
+    margin-inline: auto;
+    padding: var(--space-md);
+  }
+</style>

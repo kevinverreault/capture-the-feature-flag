@@ -1,0 +1,107 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Button from '@ds/components/ui/Button.astro';
+import ConfirmDelete from '../../../../components/ConfirmDelete.astro';
+import FormAlert from '../../../../components/FormAlert.astro';
+import NotFound from '../../../../components/NotFound.astro';
+import ProjectNav from '../../../../components/ProjectNav.astro';
+import SdkKey from '../../../../components/SdkKey.astro';
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { coreApi } from '../../../../lib/core';
+import { handlePost, orNotFound, textField } from '../../../../lib/forms';
+import { routes } from '../../../../lib/routes';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const environmentKey = Astro.params.environment ?? '';
+const params = { path: { projectKey, environmentKey } };
+const environmentsPage = routes.environments(projectKey);
+const post = await handlePost(Astro, {
+  rename: {
+    fields: ['name'],
+    send: async (form) => {
+      const body = { name: textField(form, 'name') };
+      const environment = await unwrap(
+        core.PATCH('/api/v1/projects/{projectKey}/environments/{environmentKey}', { params, body }),
+      );
+      return { location: environmentsPage, flash: `Environment renamed to ${environment.name}` };
+    },
+  },
+  delete: {
+    fields: [],
+    send: async () => {
+      await unwrap(core.DELETE('/api/v1/projects/{projectKey}/environments/{environmentKey}', { params }));
+      return { location: environmentsPage, flash: `Environment ${environmentKey} deleted` };
+    },
+  },
+});
+if (post.redirect) return post.redirect;
+const errors = post.errors;
+
+const [projects, project, environment] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey } } }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments/{environmentKey}', { params }))),
+]);
+if (!project || !environment) Astro.response.status = 404;
+---
+
+{
+  project && environment ? (
+    <AdminLayout title={`${environment.name} · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="environments" />
+
+      <section aria-labelledby="environment-heading" class="stack">
+        <h2 id="environment-heading" class="text-xl">
+          Environment {environment.name}
+        </h2>
+        <p>
+          Key <code>{environment.key}</code>
+        </p>
+        <FormField label="SDK key" hint="Give it to the SDK of each service that evaluates flags in this environment.">
+          <SdkKey sdkKey={environment.sdkKey} environmentName={environment.name} />
+        </FormField>
+      </section>
+
+      <section aria-labelledby="rename-environment">
+        <h2 id="rename-environment" class="text-xl">
+          Rename
+        </h2>
+        <form method="post" class="stack">
+          <input type="hidden" name="_action" value="rename" />
+          <FormAlert messages={errors.form} />
+          <FormField label="Name" error={errors.fields['name']}>
+            <Input name="name" value={post.value('name') ?? environment.name} required />
+          </FormField>
+          <Button type="submit" variant="primary">
+            Save
+          </Button>
+        </form>
+      </section>
+
+      <section aria-labelledby="delete-environment" class="danger-zone">
+        <h2 id="delete-environment" class="text-xl">
+          Delete this environment
+        </h2>
+        <p>Its SDK key stops working, and the targeting of every flag in it is deleted.</p>
+        <ConfirmDelete
+          title={`Delete the ${environment.name} environment?`}
+          description="Its SDK key stops working, and the targeting of every flag in it is deleted. This cannot be undone."
+          actionLabel="Delete environment"
+        />
+      </section>
+
+      <Button href={environmentsPage} variant="muted" decoration="ghost">
+        Back to environments
+      </Button>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Environment not found" projects={projects} project={project}>
+      <NotFound>
+        There is no environment {environmentKey} in project {project?.name ?? projectKey}.
+      </NotFound>
+    </AdminLayout>
+  )
+}

@@ -16,6 +16,7 @@ services:
       timeout: 3s
       retries: 10
 
+  # Core, with the admin app on the same origin: http://localhost:3000
   core:
     build:
       context: .

@@ -1,0 +1,65 @@
+{
+  "name": "@ctff/core-api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The typed HTTP client for Core's /api/v1, generated from Core's OpenAPI document. The admin app talks to Core only through it.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "generate": "openapi-typescript openapi.json --output src/generated/schema.ts",
+    "build": "pnpm run generate && tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "nx": {
+    "tags": [
+      "type:lib",
+      "scope:shared"
+    ],
+    "targets": {
+      "generate": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/openapi.json"
+        ],
+        "outputs": [
+          "{projectRoot}/src/generated"
+        ]
+      },
+      "build": {
+        "outputs": [
+          "{projectRoot}/dist",
+          "{projectRoot}/src/generated"
+        ]
+      },
+      "typecheck": {
+        "dependsOn": [
+          "generate",
+          "^build"
+        ]
+      },
+      "test": {
+        "dependsOn": [
+          "generate",
+          "^build"
+        ]
+      }
+    }
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "~6.0.3"
+  }
+}
