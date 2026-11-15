@@ -13,28 +13,32 @@ import { RequestFlags } from './request-flags.js';
 
 const CTFF_CLIENT_OPTIONS = Symbol('CTFF_CLIENT_OPTIONS');
 
-/** The SDK's options, and the app's context resolver for `@Flags()` and `@RequireFlag`. */
-export interface CtffModuleOptions extends ClientOptions {
+/** The app's context resolver, and the modules whose exported providers it (or a factory) injects. */
+interface CtffResolverOptions extends Pick<ModuleMetadata, 'imports'> {
+  /** The app's `CtffContextResolver` class, for `@Flags()` and `@RequireFlag`. */
   contextResolver: Type<CtffContextResolver>;
 }
 
+/** The SDK's options, and the app's context resolver. */
+export interface CtffModuleOptions extends ClientOptions, CtffResolverOptions {}
+
 /** The SDK's options from a factory that can inject providers (such as the app's configuration). */
-export interface CtffModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'> {
+export interface CtffModuleAsyncOptions extends CtffResolverOptions {
   inject?: FactoryProvider['inject'];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the factory's parameters are what `inject` names.
   useFactory: (...args: any[]) => ClientOptions | Promise<ClientOptions>;
-  contextResolver: Type<CtffContextResolver>;
 }
 
 /**
  * Configures the SDK once for the whole app: the module is global, so `CtffClient`, `@Flags()` and `@RequireFlag`
- * work in every module. A configuration mistake (no Evaluator URL or SDK key) fails the app at startup.
+ * work in every module. A configuration mistake (no Evaluator URL or SDK key) fails the app at startup. The context
+ * resolver is created inside this module, so it can inject global providers and those of the modules in `imports`.
  */
 @Module({})
 export class CtffModule {
   static forRoot(options: CtffModuleOptions): DynamicModule {
-    const { contextResolver, ...clientOptions } = options;
-    return CtffModule.create({ provide: CTFF_CLIENT_OPTIONS, useValue: clientOptions }, contextResolver);
+    const { contextResolver, imports, ...clientOptions } = options;
+    return CtffModule.create({ provide: CTFF_CLIENT_OPTIONS, useValue: clientOptions }, contextResolver, imports);
   }
 
   static forRootAsync(options: CtffModuleAsyncOptions): DynamicModule {

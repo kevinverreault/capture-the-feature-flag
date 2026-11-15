@@ -4,7 +4,7 @@ The NestJS module for Capture The Feature Flag. It configures [`@ctff/sdk`](../s
 
 ## Setup
 
-Implement a `CtffContextResolver`, which builds the context to evaluate flags for from a request. It is an ordinary provider, so it can inject what it needs, such as the app's JWT service:
+Implement a `CtffContextResolver`, which builds the context to evaluate flags for from a request. It is created inside `CtffModule`, so it can inject global providers and those exported by the modules you pass in `imports` (in `forRoot()` and `forRootAsync()` alike), such as the app's JWT service:
 
 ```ts
 import type { Context, CtffContextResolver } from '@ctff/nestjs';
@@ -86,6 +86,6 @@ export class SightingController {
 - **`@Flags()`** injects the result of `allFlags` for the context the resolver builds from the request (see [`allFlags`](../sdk/README.md#allflags)). However many times `@Flags()` and `@RequireFlag` are used for a request, it makes one Evaluator call. Nothing is cached across requests. It never fails a request: when the Evaluator can't be asked, `values` is empty and `error` says why, so look flags up with a fallback value.
 - **`@RequireFlag(flagKey)`**, on a route or a controller, answers `404 Not Found` unless the flag serves `true`. A flag that serves no variation (unknown, archived, or the Evaluator unreachable) counts as `false`. When it is applied several times, every flag must serve `true`.
 
-An exception thrown by the resolver fails the request, like one thrown by any guard.
+The resolver runs once per request, the first time `@RequireFlag` or `@Flags()` needs the flags, and its context is kept for the rest of the request. Whatever it reads, such as `request.user`, must be set by then: by middleware, a global guard, or a route guard written below `@RequireFlag`. Decorators apply from the bottom up, so in `@RequireFlag('photo-id-beta') @UseGuards(AuthGuard)` the auth guard runs first. An exception thrown by the resolver fails the request, like one thrown by any guard. The module works with HTTP requests only.
 
 The module is tested through the Evaluator's S3 suite ([apps/evaluator/test/nestjs.test.ts](../../apps/evaluator/test/nestjs.test.ts)).

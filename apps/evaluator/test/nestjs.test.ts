@@ -8,7 +8,17 @@ import {
   Flags,
   RequireFlag,
 } from '@ctff/nestjs';
-import { Controller, Get, Inject, type INestApplication, Injectable, Module } from '@nestjs/common';
+import {
+  type CanActivate,
+  Controller,
+  type ExecutionContext,
+  Get,
+  Inject,
+  type INestApplication,
+  Injectable,
+  Module,
+  UseGuards,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Request } from 'express';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -66,9 +76,56 @@ class SightingController {
   }
 }
 
+/** A stand-in for the app's authentication: a provider of a non-global module, which the resolver below injects. */
+@Injectable()
+class Birders {
+  private readonly countries = new Map([['carol', 'BR']]);
+  countryOf(userId: string): string | undefined {
+    return this.countries.get(userId);
+  }
+}
+
+@Module({ providers: [Birders], exports: [Birders] })
+class BirdersModule {}
+
+type AuthenticatedRequest = Request & { birder?: string };
+
+/** Sets `request.birder` from a header, the way an authentication guard sets the user from a JWT. */
+@Injectable()
+class AuthGuard implements CanActivate {
+  canActivate(context: ExecutionContext): boolean {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    request.birder = request.header('x-token')?.replace(/^token-/, '');
+    return true;
+  }
+}
+
+@Injectable()
+class AuthenticatedContextResolver implements CtffContextResolver<AuthenticatedRequest> {
+  constructor(@Inject(Birders) private readonly birders: Birders) {}
+
+  resolve(request: AuthenticatedRequest): Context {
+    return request.birder ? { user_id: request.birder, country: this.birders.countryOf(request.birder) } : {};
+  }
+}
+
+@Controller('feature')
+class FeatureController {
+  @Get('photo-id')
+  @RequireFlag('photo-id-beta')
+  @UseGuards(AuthGuard)
+  photoId(@Flags() flags: AllFlags): AllFlags {
+    return flags;
+  }
+}
+
+/** A feature module: it doesn't import CtffModule, which is global. */
+@Module({ controllers: [FeatureController] })
+class FeatureModule {}
+
 async function startApp(ctff: ReturnType<typeof CtffModule.forRoot>): Promise<{ app: INestApplication; url: string }> {
   const moduleRef = await Test.createTestingModule({
-    imports: [ctff],
+    imports: [ctff, FeatureModule],
     controllers: [SightingController],
     providers: [SightingService],
   }).compile();
@@ -239,5 +296,43 @@ describe('the NestJS module, configured with forRootAsync()', () => {
       flags: { values: {}, details: {}, error: 'UNKNOWN_SDK_KEY' },
       sameFlags: true,
     });
+  });
+});
+
+describe('the NestJS module, with a resolver that depends on the app’s authentication', () => {
+  let core: FakeCore;
+  let evaluator: RunningEvaluator;
+  let proxy: CountingProxy;
+  let app: INestApplication;
+  let url: string;
+  beforeAll(async () => {
+    core = await startFakeCore();
+    core.put('ctff-env-production', environment('production', [flag('photo-id-beta', { on: true })]));
+    evaluator = await startEvaluator(core.url);
+    await evaluator.waitUntilReady();
+    proxy = await startCountingProxy(evaluator.url);
+    ({ app, url } = await startApp(
+      CtffModule.forRoot({
+        evaluatorUrl: proxy.url,
+        sdkKey: 'ctff-env-production',
+        imports: [BirdersModule],
+        contextResolver: AuthenticatedContextResolver,
+      }),
+    ));
+  });
+  afterAll(async () => {
+    await app?.close();
+    await proxy?.stop();
+    await evaluator?.stop();
+    await core?.stop();
+  });
+
+  it('works in a feature module, and resolves the context after the guards written below @RequireFlag', async () => {
+    const response = await fetch(`${url}/feature/photo-id`, { headers: { 'x-token': 'token-carol' } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ values: { 'photo-id-beta': true }, error: null });
+    expect(proxy.requests).toEqual([
+      { method: 'POST', path: '/api/v1/evaluate', body: { context: { user_id: 'carol', country: 'BR' } } },
+    ]);
   });
 });

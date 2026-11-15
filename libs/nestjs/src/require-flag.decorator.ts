@@ -36,7 +36,9 @@ export class RequireFlagGuard implements CanActivate {
  * Hides a route, or every route of a controller, behind a flag: the request gets `404` unless the flag serves
  * `true` to the context the app's `CtffContextResolver` builds. A flag that serves no variation (unknown, archived,
  * or the Evaluator unreachable) counts as `false`. It shares its one Evaluator call per request with `@Flags()`.
- * It can be applied several times, and then every flag must serve `true`.
+ * It can be applied several times, and then every flag must serve `true`. Decorators apply from the bottom up, so
+ * the guard written closest to the route runs first: write `@RequireFlag` above the guards the resolver depends on,
+ * as in `@RequireFlag('photo-id-beta') @UseGuards(AuthGuard)`, so they run before it.
  */
 export function RequireFlag(flagKey: string): ClassDecorator & MethodDecorator {
   return (target: object, propertyKey?: string | symbol, descriptor?: PropertyDescriptor) => {
