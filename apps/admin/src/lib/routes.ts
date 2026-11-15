@@ -1,3 +1,5 @@
+import type { Context } from '@ctff/core-api-client';
+
 /** Every admin page's address in one place; each key is encoded as one path segment. */
 const segment = encodeURIComponent;
 
@@ -27,6 +29,24 @@ export const routes = {
     if (cursor !== undefined) query.set('cursor', String(cursor));
     const search = query.toString();
     return `/projects/${segment(project)}/audit${search ? `?${search}` : ''}`;
+  },
+  /** The context attributes, for every project. */
+  contextAttributes: () => '/context-attributes',
+  /**
+   * The Contexts explorer: the seen contexts of `environment` (whose user_id contains `search`), and what every
+   * flag serves `context`. The context is carried by its attributes, named as in contexts (`user_id`, `country`).
+   */
+  contexts: (
+    project: string,
+    { environment, search, context }: { environment?: string; search?: string; context?: Context } = {},
+  ) => {
+    const query = new URLSearchParams();
+    if (environment !== undefined) query.set('environment', environment);
+    if (search) query.set('search', search);
+    if (context?.user_id !== undefined) query.set('user_id', context.user_id);
+    if (context?.country !== undefined) query.set('country', context.country);
+    const queryString = query.toString();
+    return `/projects/${segment(project)}/contexts${queryString ? `?${queryString}` : ''}`;
   },
   /** The display-name setting, going back to `returnTo` once saved. */
   displayName: (returnTo?: string) =>

@@ -26,7 +26,7 @@ Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --fi
 Evaluators send what they added up to `POST /api/v1/evaluator/telemetry` about once a minute ([ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md)), as a `TelemetryBatch` from `@ctff/evaluation`: per SDK key, evaluation counts per flag, variation and minute, and seen contexts with their last-seen time. Core adds the counts to its 1-minute count buckets and records each seen context once per environment, keeping the later last-seen. It then keeps only the newest seen contexts up to the seen-context cap in each environment. Telemetry for an SDK key, flag or variation that no longer exists is skipped. A malformed batch gets `400` and none of it is stored.
 
 - `GET /api/v1/projects/{projectKey}/evaluation-counts` lists the count buckets, oldest first: the last 24 hours, or `from` (inclusive) to `to` (exclusive), at most 7 days apart, optionally for one `environment`.
-- `GET /api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts` lists the seen contexts, most recently seen first: the newest 100, or `limit` (up to 1,000).
+- `GET /api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts` lists the seen contexts, most recently seen first: the newest 100, or `limit` (up to 1,000). `userId` keeps only those whose `user_id` contains it, ignoring case.
 - `GET /api/v1/settings` and `PATCH /api/v1/settings` read and change the install-wide settings: `metricRetentionDays` (default 30), `seenContextRetentionDays` (30), `seenContextCap` (1,000 per environment) and `staleFlagThresholdDays` (7). The admin app's Settings page edits them.
 
 The admin app's dashboard reads the telemetry through endpoints of its own, which do the summing in the database:
@@ -38,6 +38,11 @@ The admin app's dashboard reads the telemetry through endpoints of its own, whic
 The retention job deletes count buckets older than the metric retention and seen contexts last seen before the seen-context retention, and trims each environment to the cap. It runs in the background when Core starts, every `RETENTION_INTERVAL_MS`, and whenever the settings change, so a change applies at once, without a redeploy (the `PATCH` answers once it has run).
 
 Several Evaluators and Core replicas can write telemetry at once. Each batch is stored in one transaction, which holds the environments and flags it names so none is deleted under it; one being deleted at that moment is skipped with its telemetry. Writes to an environment's seen contexts, by ingestion and by retention alike, take a per-environment lock in a fixed order, so they wait for each other instead of deadlocking.
+
+## Contexts
+
+- `GET /api/v1/context-attributes` lists the context attributes: their `key` (as in contexts and rules), `name`, `type` (`string`, or `country_code` for ISO 3166-1 alpha-2) and `description`. They are stored as data, so custom ones can be added later; V1 has only the built-in `user_id` and `country`, which the migration creates and which cannot be edited (`builtIn: true`): any other method on `/context-attributes` answers `405`.
+- `POST /api/v1/projects/{projectKey}/environments/{environmentKey}/evaluate`, with `{ "context": { "user_id": …, "country": … } }`, evaluates every flag of the project that is not archived for the context, ordered by flag key, with its name, variation, variation index and evaluation reason. Core builds the environment's snapshot as it serves it to Evaluators and runs the shared `evaluate()` of `@ctff/evaluation` on it, so the answers are the Evaluator's. A malformed context gets `400`. It changes nothing and records no telemetry. The admin app's Contexts explorer shows it.
 
 ## The admin app
 
@@ -75,6 +80,8 @@ Projects, environments and flags are addressed by their keys, which are lowercas
 | `/api/v1/projects/{project}/dashboard/evaluations`                    | `GET`                     |
 | `/api/v1/projects/{project}/dashboard/stale-flags`                    | `GET`                     |
 | `/api/v1/settings`                                                    | `GET`, `PATCH`            |
+| `/api/v1/context-attributes`                                          | `GET`                     |
+| `/api/v1/projects/{project}/environments/{environment}/evaluate`      | `POST`                    |
 
 - Each environment gets a generated SDK key (`ctff-env-…`).
 - The flag list (`GET /flags`) gives each flag's `targeting`: whether it is on or off in every environment, in the environments' order, for the admin app's flag list.

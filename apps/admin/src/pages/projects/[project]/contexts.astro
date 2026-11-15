@@ -1,0 +1,253 @@
+---
+import { type ContextEvaluation, CoreApiError, unwrap } from '@ctff/core-api-client';
+import Alert from '@ds/components/feedback/Alert.astro';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Select from '@ds/components/form/Select.astro';
+import Badge from '@ds/components/ui/Badge.astro';
+import Button from '@ds/components/ui/Button.astro';
+import NotFound from '../../../components/NotFound.astro';
+import ProjectNav from '../../../components/ProjectNav.astro';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { contextFromQuery, contextLabel, evaluationReasonText, sameContext } from '../../../lib/contexts';
+import { coreApi } from '../../../lib/core';
+import { orNotFound } from '../../../lib/forms';
+import { routes } from '../../../lib/routes';
+
+/** How many of the most recently seen contexts the explorer lists. */
+const seenContextsShown = 100;
+const when = new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'medium', timeZone: 'UTC' });
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const params = { path: { projectKey } };
+const query = Astro.url.searchParams;
+const environmentKey = query.get('environment') || undefined;
+const search = query.get('search')?.trim() ?? '';
+const selected = contextFromQuery(query);
+
+const [projects, project, environments] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params }))),
+]);
+// The environment asked for, or else the first one.
+const environment =
+  environmentKey === undefined ? environments?.[0] : environments?.find((listed) => listed.key === environmentKey);
+const unknownEnvironment = environments !== undefined && environmentKey !== undefined && environment === undefined;
+if (!project || !environments || unknownEnvironment) Astro.response.status = 404;
+
+const environmentParams = environment && { path: { projectKey, environmentKey: environment.key } };
+const seenContexts = environmentParams
+  ? await unwrap(
+      core.GET('/api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts', {
+        params: { ...environmentParams, query: { limit: seenContextsShown, userId: search || undefined } },
+      }),
+    )
+  : [];
+
+/** What every flag serves the selected context, or why Core could not work it out (a malformed context). */
+let evaluation: ContextEvaluation | undefined;
+let evaluationErrors: string[] = [];
+if (environmentParams && selected) {
+  try {
+    evaluation = await unwrap(
+      core.POST('/api/v1/projects/{projectKey}/environments/{environmentKey}/evaluate', {
+        params: environmentParams,
+        body: { context: selected },
+      }),
+    );
+  } catch (error) {
+    if (!(error instanceof CoreApiError) || error.status !== 400) throw error;
+    Astro.response.status = 400;
+    evaluationErrors = error.messages;
+  }
+}
+const contextHref = (context: typeof selected) =>
+  routes.contexts(projectKey, { environment: environment?.key, search, context });
+---
+
+{
+  project && environments && !unknownEnvironment ? (
+    <AdminLayout title={`Contexts · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="contexts" />
+
+      {environment === undefined ? (
+        <section aria-labelledby="contexts-heading" class="contexts">
+          <h2 id="contexts-heading" class="text-xl">
+            Contexts
+          </h2>
+          <p>
+            This project has no environments yet: <a href={routes.environments(project.key)}>create one</a>, then the
+            contexts its flags are evaluated for show up here.
+          </p>
+        </section>
+      ) : (
+        <>
+          <section aria-labelledby="contexts-heading" class="contexts">
+            <h2 id="contexts-heading" class="text-xl">
+              Seen contexts
+            </h2>
+            <p>
+              The contexts most recently evaluated in an environment. Pick one to see what every flag serves it now.
+              See the <a href={routes.contextAttributes()}>context attributes</a> they carry.
+            </p>
+            <form method="get" class="filters" role="search" aria-label="Find seen contexts">
+              <FormField label="Environment">
+                <Select name="environment">
+                  {environments.map((listed) => (
+                    <option value={listed.key} selected={listed.key === environment.key}>
+                      {listed.name}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField label="User ID">
+                <Input name="search" type="search" value={search} placeholder="Part of a user ID" />
+              </FormField>
+              <Button type="submit" variant="secondary">
+                Show
+              </Button>
+              {search !== '' && (
+                <Button href={routes.contexts(project.key, { environment: environment.key })} variant="muted" decoration="ghost">
+                  Clear
+                </Button>
+              )}
+            </form>
+
+            {seenContexts.length === 0 ? (
+              <p class="seen-contexts-empty">
+                {search === ''
+                  ? `No contexts have been evaluated in ${environment.name} recently.`
+                  : `No contexts seen in ${environment.name} have a user ID containing “${search}”.`}
+              </p>
+            ) : (
+              <div class="data-table-root">
+                <table class="data-table seen-contexts">
+                  <caption>
+                    {seenContexts.length === seenContextsShown
+                      ? `The ${seenContextsShown} contexts most recently seen in ${environment.name}`
+                      : `Contexts seen in ${environment.name}, most recent first`}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">User ID</th>
+                      <th scope="col">Country</th>
+                      <th scope="col">Last seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seenContexts.map(({ context, lastSeen }) => (
+                      <tr aria-current={sameContext(context, selected) ? 'true' : undefined}>
+                        <td>
+                          <a href={contextHref(context)} aria-label={`See what ${contextLabel(context)} is served`}>
+                            {context.user_id ?? '—'}
+                          </a>
+                        </td>
+                        <td>{context.country ?? '—'}</td>
+                        <td>
+                          <time datetime={lastSeen}>{when.format(new Date(lastSeen))} UTC</time>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          {selected && (
+            <section aria-labelledby="context-flags-heading" class="contexts">
+              <h2 id="context-flags-heading" class="text-xl">
+                What {contextLabel(selected)} is served in {environment.name}
+              </h2>
+              {evaluationErrors.length > 0 && (
+                <Alert variant="danger" icon="circle-alert" title="Core could not evaluate this context">
+                  <ul class="messages">
+                    {evaluationErrors.map((message) => (
+                      <li>{message}</li>
+                    ))}
+                  </ul>
+                </Alert>
+              )}
+              {evaluation &&
+                (evaluation.flags.length === 0 ? (
+                  <p>
+                    This project has no flags yet. <a href={routes.newFlag(project.key)}>Create one</a>.
+                  </p>
+                ) : (
+                  <div class="data-table-root">
+                    <table class="data-table context-flags">
+                      <caption>Every flag, evaluated against its current targeting in {environment.name}</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Flag</th>
+                          <th scope="col">Variation</th>
+                          <th scope="col">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {evaluation.flags.map((flag) => (
+                          <tr data-flag={flag.flagKey}>
+                            <th scope="row">
+                              <a href={routes.flag(project.key, flag.flagKey, environment.key)}>
+                                <strong>{flag.flagName}</strong>
+                              </a>
+                              <code>{flag.flagKey}</code>
+                            </th>
+                            <td>
+                              {flag.value === null ? (
+                                <Badge variant="danger">none</Badge>
+                              ) : (
+                                <Badge variant={flag.value ? 'primary' : 'muted'}>{String(flag.value)}</Badge>
+                              )}
+                            </td>
+                            <td>{evaluationReasonText(flag.reason)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ))}
+            </section>
+          )}
+        </>
+      )}
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Not found" projects={projects} project={project}>
+      <NotFound>
+        {project
+          ? `There is no environment ${environmentKey} in project ${project.name}.`
+          : `There is no project ${projectKey}.`}
+      </NotFound>
+    </AdminLayout>
+  )
+}
+
+<style>
+  .contexts {
+    display: grid;
+    gap: var(--space-sm);
+  }
+
+  .contexts p {
+    margin: 0;
+  }
+
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    align-items: end;
+  }
+
+  .messages {
+    margin: 0;
+    padding-inline-start: 1.25em;
+  }
+
+  .data-table th a {
+    color: inherit;
+  }
+</style>

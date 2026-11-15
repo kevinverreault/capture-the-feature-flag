@@ -159,6 +159,15 @@ export class SeenContextsQueryDto {
   @Min(1)
   @Max(maxSeenContextsListed)
   limit?: number;
+
+  @ApiProperty({
+    required: false,
+    description: 'Only the contexts whose `user_id` contains this text, ignoring case.',
+    example: 'alice',
+  })
+  @IsOptional()
+  @IsString()
+  userId?: string;
 }
 
 /** One stored seen context. */

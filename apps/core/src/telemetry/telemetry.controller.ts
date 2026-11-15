@@ -24,7 +24,7 @@ export class TelemetryController {
     return this.telemetry.counts(projectKey, query);
   }
 
-  /** The contexts recently evaluated in the environment, most recently seen first, up to `limit`. */
+  /** The contexts recently evaluated in the environment, most recently seen first, up to `limit`, optionally searched by `user_id`. */
   @Get('environments/:environmentKey/seen-contexts')
   @ApiOkResponse({ type: [StoredSeenContextDto] })
   seenContexts(
