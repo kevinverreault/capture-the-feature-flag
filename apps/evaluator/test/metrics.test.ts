@@ -125,7 +125,9 @@ describe('Prometheus metrics', () => {
         headers: { 'content-type': 'application/json', 'content-length': '100', [sdkKeyHeader]: 'ctff-env-production' },
       });
       abandoned.on('error', () => resolve());
-      abandoned.write('{"context":', () => setTimeout(() => abandoned.destroy(), 100));
+      // The Evaluator's clock starts once its event loop gets to the request, which under load (CI runs test files
+      // in parallel) can be a while after it was sent, so it hangs up well after the 100 ms the check below needs.
+      abandoned.write('{"context":', () => setTimeout(() => abandoned.destroy(), 300));
       abandoned.on('close', () => resolve());
     });
 
