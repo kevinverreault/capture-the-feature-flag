@@ -35,8 +35,6 @@
     "@ctff/core-api-client": "workspace:*",
     "@ctff/evaluation": "workspace:*",
     "astro": "^7.4.12",
-    "cva": "npm:class-variance-authority@^0.7.1",
-    "node-html-parser": "^6.1.13",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
     "serve-static": "^2.2.1"
