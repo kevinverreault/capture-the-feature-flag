@@ -1,7 +1,8 @@
 # birdwatch-web, the Birdwatch demo's website. Build from the repository root, with the design system submodule
 # checked out (the site compiles it from source):
 #   docker build -f apps/birdwatch-web/Dockerfile -t ctff-birdwatch-web .
-# All configuration comes from environment variables: BIRDWATCH_API_URL (required), PORT, HOST, LOG_LEVEL.
+# All configuration comes from environment variables: BIRDWATCH_API_URL (required), CTFF_ADMIN_URL, CTFF_PROJECT,
+# CTFF_ENVIRONMENT, PORT, HOST, LOG_LEVEL.
 
 FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
