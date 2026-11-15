@@ -117,4 +117,13 @@ describe('archived flags', () => {
     expect((await api.get(flag(key))).body).toMatchObject({ name: 'Flag', version: 3 });
     expect((await api.get(`${flag(key)}/targeting/production`)).body).toMatchObject({ on: false, version: 1 });
   });
+
+  it('says when a new flag takes the key of an archived flag, which must be restored or deleted first', async () => {
+    const key = await createFlag('taken');
+    await api.post(`${flag(key)}/archive`, {});
+    const created = await api.post(`/projects/${projectKey}/flags`, { key, name: 'Again' });
+    expect(created.status).toBe(409);
+    expect(created.body.message).toContain('archived');
+    expect(created.body.message).toContain('restore');
+  });
 });

@@ -10,7 +10,7 @@ import NotFound from '../../../../components/NotFound.astro';
 import ProjectNav from '../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import { coreApi } from '../../../../lib/core';
-import { filterFlags, flagListCaption, listedTags, sameTag } from '../../../../lib/flag-list';
+import { filterFlags, flagListCaption, listedFlags, listedTags, sameTag } from '../../../../lib/flag-list';
 import { orNotFound } from '../../../../lib/forms';
 import { routes } from '../../../../lib/routes';
 
@@ -19,7 +19,7 @@ const projectKey = Astro.params.project ?? '';
 const params = { path: { projectKey } };
 const search = Astro.url.searchParams.get('search') ?? '';
 const tag = Astro.url.searchParams.get('tag') ?? '';
-const showArchived = Astro.url.searchParams.has('archived');
+const includeArchived = Astro.url.searchParams.get('includeArchived') === 'true';
 
 const [projects, project, environments, flags] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
@@ -32,9 +32,9 @@ const [projects, project, environments, flags] = await Promise.all([
 ]);
 if (!project || !environments || !flags) Astro.response.status = 404;
 
-const listed = filterFlags(flags ?? [], { showArchived });
+const listed = listedFlags(flags ?? [], { includeArchived });
 const tags = listedTags(listed);
-const shown = filterFlags(flags ?? [], { search, tag, showArchived });
+const shown = filterFlags(listed, { search, tag });
 const filtered = search.trim() !== '' || tag !== '';
 const isOn = (flag: (typeof shown)[number], environmentKey: string) =>
   flag.targeting.some((state) => state.environmentKey === environmentKey && state.on);
@@ -76,7 +76,7 @@ const isOn = (flag: (typeof shown)[number], environmentKey: string) =>
                 </Select>
               </FormField>
               <label class="show-archived">
-                <Checkbox name="archived" checked={showArchived} />
+                <Checkbox name="includeArchived" value="true" checked={includeArchived} />
                 Show archived
               </label>
               <Button type="submit" variant="secondary">

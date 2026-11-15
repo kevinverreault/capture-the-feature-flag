@@ -44,16 +44,16 @@ describe('admin app: archived flags', () => {
     const flags = `/projects/${projectKey}/flags`;
 
     expect(await listed(flags)).toEqual([{ key: 'new-sighting-form', archived: false }]);
-    expect(await listed(`${flags}?archived=on`)).toEqual([
+    expect(await listed(`${flags}?includeArchived=true`)).toEqual([
       { key: 'new-sighting-form', archived: false },
       { key: 'old-feed', archived: true },
     ]);
-    expect(await listed(`${flags}?archived=on&search=old`)).toEqual([{ key: 'old-feed', archived: true }]);
+    expect(await listed(`${flags}?includeArchived=true&search=old`)).toEqual([{ key: 'old-feed', archived: true }]);
 
-    const shown = await page(await admin.get(`${flags}?archived=on`));
-    expect(shown.querySelector('input[name="archived"]')?.hasAttribute('checked')).toBe(true);
+    const shown = await page(await admin.get(`${flags}?includeArchived=true`));
+    expect(shown.querySelector('input[name="includeArchived"]')?.hasAttribute('checked')).toBe(true);
     const hidden = await page(await admin.get(flags));
-    expect(hidden.querySelector('input[name="archived"]')?.hasAttribute('checked')).toBe(false);
+    expect(hidden.querySelector('input[name="includeArchived"]')?.hasAttribute('checked')).toBe(false);
   });
 
   it('says so when every flag of the project is archived, offering to show them', async () => {
@@ -62,7 +62,7 @@ describe('admin app: archived flags', () => {
     const list = await page(await admin.get(`/projects/${projectKey}/flags`));
     expect(list.textContent).not.toContain('This project has no flags yet');
     expect(list.textContent).toContain('Every flag of this project is archived');
-    expect(list.querySelector('input[name="archived"]')).not.toBeNull();
+    expect(list.querySelector('input[name="includeArchived"]')).not.toBeNull();
   });
 
   it('archives a flag from its detail page, which then offers restore and delete instead', async () => {
@@ -138,5 +138,18 @@ describe('admin app: archived flags', () => {
       expect(await followed(response)).toContain('restore it before editing it');
     }
     expect((await api.get(flag)).body.name).toBe('kill-switch');
+  });
+
+  it('says why a targeting switch did not save when the flag was archived since the page was loaded', async () => {
+    const projectKey = await project('kill-switch');
+    const flag = `/projects/${projectKey}/flags/kill-switch`;
+    await api.post(`${flag}/archive`, {});
+
+    const refused = await admin.post(flag, { _action: 'targeting', environment: 'production', version: '1', on: 'on' });
+    expect(refused.status).toBe(409);
+    const shown = await page(refused);
+    expect(shown.textContent).toContain('This flag is archived');
+    expect(shown.textContent).toContain('archived since this page was loaded');
+    expect((await api.get(`${flag}/targeting/production`)).body.on).toBe(false);
   });
 });

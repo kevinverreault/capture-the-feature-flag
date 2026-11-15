@@ -13,13 +13,21 @@ import ProjectNav from '../../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
 import { coreApi } from '../../../../../lib/core';
 import { noFormErrors } from '../../../../../lib/form-errors';
-import { handlePost, orNotFound, textField } from '../../../../../lib/forms';
+import { type FormAction, handlePost, orNotFound, textField } from '../../../../../lib/forms';
 import { routes } from '../../../../../lib/routes';
 
 const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
 const flagKey = Astro.params.flag ?? '';
 const params = { path: { projectKey, flagKey } };
+/** A form that archives, restores or deletes the whole flag, then goes to `location` with `flash`. */
+const flagAction = (call: () => Promise<unknown>, location: string, flash: string): FormAction => ({
+  fields: [],
+  send: async () => {
+    await call();
+    return { location, flash };
+  },
+});
 const post = await handlePost(Astro, {
   targeting: {
     fields: ['on'],
@@ -44,27 +52,21 @@ const post = await handlePost(Astro, {
       };
     },
   },
-  archive: {
-    fields: [],
-    send: async () => {
-      await unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/archive', { params }));
-      return { location: routes.flag(projectKey, flagKey), flash: `Flag ${flagKey} archived` };
-    },
-  },
-  restore: {
-    fields: [],
-    send: async () => {
-      await unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/restore', { params }));
-      return { location: routes.flag(projectKey, flagKey), flash: `Flag ${flagKey} restored` };
-    },
-  },
-  delete: {
-    fields: [],
-    send: async () => {
-      await unwrap(core.DELETE('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }));
-      return { location: routes.flags(projectKey), flash: `Flag ${flagKey} deleted` };
-    },
-  },
+  archive: flagAction(
+    () => unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/archive', { params })),
+    routes.flag(projectKey, flagKey),
+    `Flag ${flagKey} archived`,
+  ),
+  restore: flagAction(
+    () => unwrap(core.POST('/api/v1/projects/{projectKey}/flags/{flagKey}/restore', { params })),
+    routes.flag(projectKey, flagKey),
+    `Flag ${flagKey} restored`,
+  ),
+  delete: flagAction(
+    () => unwrap(core.DELETE('/api/v1/projects/{projectKey}/flags/{flagKey}', { params })),
+    routes.flags(projectKey),
+    `Flag ${flagKey} deleted`,
+  ),
 });
 if (post.redirect) return post.redirect;
 
@@ -99,9 +101,17 @@ const unplaced = postedEnvironment !== undefined && !tabs?.some((tab) => tab.env
 const unplacedMessages = unplaced
   ? [...post.errors.form, ...Object.values(post.errors.fields).filter((message) => message !== undefined)]
   : [];
-/** Core's refusal of an archive, restore or delete, e.g. deleting a flag restored since the page was loaded. */
-const lifecycleActions: readonly (string | undefined)[] = ['archive', 'restore', 'delete'];
-const lifecycleMessages = lifecycleActions.includes(post.action) ? post.errors.form : [];
+/**
+ * Why a submission was rejected, shown above the flag's sections rather than in a targeting tab: Core's refusal
+ * to archive, restore or delete the flag (e.g. deleting a flag restored since the page was loaded), or a targeting
+ * switch flipped on a page loaded before the flag was archived (an archived flag shows no targeting tabs).
+ */
+const flagMessages =
+  post.action === 'targeting'
+    ? flag?.archived
+      ? ['This flag was archived since this page was loaded, so the targeting change was not saved.']
+      : []
+    : post.errors.form;
 ---
 
 {
@@ -135,7 +145,7 @@ const lifecycleMessages = lifecycleActions.includes(post.action) ? post.errors.f
         )}
       </section>
 
-      <FormAlert messages={lifecycleMessages} />
+      <FormAlert messages={flagMessages} />
 
       {flag.archived ? (
         <section aria-labelledby="archived-heading" class="danger-zone">

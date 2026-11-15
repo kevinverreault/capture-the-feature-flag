@@ -87,6 +87,8 @@ type Flag struct {
 	Tags        []string `json:"tags"`
 	Version     int64    `json:"version"`
 	ManagedBy   *string  `json:"managedBy"`
+	// Archived is set while the flag is archived: not served, and not changeable until it is restored.
+	Archived    bool     `json:"archived"`
 }
 
 // FlagInput is the editable part of a flag. The client always marks the flag as managed by Terraform.
@@ -193,7 +195,9 @@ func (c *Client) UpdateFlag(ctx context.Context, ref Ref, version int64, input F
 }
 
 // DeleteFlag permanently deletes the flag with its targeting in every environment. Core only deletes archived
-// flags, so it archives the flag first (archiving an archived flag changes nothing).
+// flags, so it archives the flag first (archiving an archived flag changes nothing). These are two calls: when the
+// delete fails after the archive succeeded, the flag is left archived (and no longer served) and the error is
+// returned, so the destroy fails and can be retried.
 func (c *Client) DeleteFlag(ctx context.Context, ref Ref) error {
 	if err := c.do(ctx, http.MethodPost, flagPath(ref)+"/archive", nil, nil); err != nil {
 		return err

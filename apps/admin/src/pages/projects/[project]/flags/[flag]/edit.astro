@@ -19,6 +19,15 @@ const core = coreApi(Astro.locals);
 const projectKey = Astro.params.project ?? '';
 const flagKey = Astro.params.flag ?? '';
 const params = { path: { projectKey, flagKey } };
+const getFlag = () => orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params })));
+// An archived flag is kept as it was archived (Core rejects edits to it), so it is restored on its page first.
+const backToArchivedFlag = () => {
+  setFlash(Astro.cookies, `Flag ${flagKey} is archived: restore it before editing it`);
+  return Astro.redirect(routes.flag(projectKey, flagKey), 303);
+};
+const loaded = await getFlag();
+if (loaded?.archived) return backToArchivedFlag();
+
 const post = await handlePost(Astro, {
   edit: {
     fields: ['name', 'description', 'tags'],
@@ -40,14 +49,11 @@ const errors = post.errors;
 const [projects, project, flag] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey } } }))),
-  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }))),
+  // After a rejected save, the flag as it is now (it may have been archived meanwhile).
+  post.action === undefined ? loaded : getFlag(),
 ]);
+if (flag?.archived) return backToArchivedFlag();
 if (!project || !flag) Astro.response.status = 404;
-// An archived flag is kept as it was archived (Core rejects edits to it), so it is restored on its page first.
-if (flag?.archived) {
-  setFlash(Astro.cookies, `Flag ${flagKey} is archived: restore it before editing it`);
-  return Astro.redirect(routes.flag(projectKey, flagKey), 303);
-}
 ---
 
 {

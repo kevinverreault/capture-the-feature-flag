@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterFlags, flagListCaption, listedTags } from '../src/lib/flag-list.js';
+import { filterFlags, flagListCaption, listedFlags, listedTags } from '../src/lib/flag-list.js';
 
 const flags = [
   { key: 'new-sighting-form', name: 'New sighting form', tags: ['birdwatch', 'kill-switch'] },
@@ -38,23 +38,25 @@ describe('filterFlags', () => {
   });
 });
 
-describe('filterFlags with archived flags', () => {
+describe('listedFlags', () => {
   const withArchived = [
     { key: 'new-sighting-form', name: 'New sighting form', tags: ['birdwatch'], archived: false },
     { key: 'old-feed', name: 'Old feed', tags: ['birdwatch'], archived: true },
+    { key: 'photo-id-beta', name: 'Photo ID (beta)', tags: [] },
   ];
 
-  it('hides archived flags unless they are asked for', () => {
-    expect(keys(filterFlags(withArchived, {}))).toEqual(['new-sighting-form']);
-    expect(keys(filterFlags(withArchived, { showArchived: false }))).toEqual(['new-sighting-form']);
-    expect(keys(filterFlags(withArchived, { showArchived: true }))).toEqual(['new-sighting-form', 'old-feed']);
+  it('leaves archived flags out unless they are asked for', () => {
+    expect(keys(listedFlags(withArchived, { includeArchived: false }))).toEqual(['new-sighting-form', 'photo-id-beta']);
+    expect(keys(listedFlags(withArchived, { includeArchived: true }))).toEqual([
+      'new-sighting-form',
+      'old-feed',
+      'photo-id-beta',
+    ]);
   });
 
-  it('searches and filters archived flags too while they are shown', () => {
-    expect(keys(filterFlags(withArchived, { showArchived: true, search: 'old', tag: 'birdwatch' }))).toEqual([
-      'old-feed',
-    ]);
-    expect(filterFlags(withArchived, { search: 'old' })).toEqual([]);
+  it('lets the search and tag filter find archived flags once they are listed', () => {
+    const listed = listedFlags(withArchived, { includeArchived: true });
+    expect(keys(filterFlags(listed, { search: 'old', tag: 'birdwatch' }))).toEqual(['old-feed']);
   });
 });
 

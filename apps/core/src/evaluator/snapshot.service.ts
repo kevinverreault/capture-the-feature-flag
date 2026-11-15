@@ -1,6 +1,7 @@
 import type { EnvironmentSnapshot, Variation } from '@ctff/evaluation';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
+import { notArchived } from '../flags/archived.js';
 import { toTargetingSnapshot } from '../targeting/targeting-snapshot.js';
 import { type JsonWithEtag, toJsonWithEtag } from './json-with-etag.js';
 
@@ -14,7 +15,7 @@ export class SnapshotService {
 
     const targeting = await this.prisma.targeting.findMany({
       // Archived flags are left out, so they evaluate as not found.
-      where: { environmentId: environment.id, flag: { archivedAt: null } },
+      where: { environmentId: environment.id, flag: notArchived },
       include: { flag: true },
       orderBy: { flag: { key: 'asc' } },
     });
