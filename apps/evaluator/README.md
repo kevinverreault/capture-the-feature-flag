@@ -6,16 +6,18 @@ The Evaluator answers evaluation requests from SDKs. It holds no database connec
 
 `docker compose up` at the repository root starts it on <http://localhost:3001>, polling Core every 2 seconds. It takes all of its configuration from environment variables:
 
-| Variable                      | Default   | Meaning                                                                       |
-| :---------------------------- | :-------- | :---------------------------------------------------------------------------- |
-| `CORE_URL`                    | required  | Core's base URL, such as `http://core:3000`                                   |
-| `PORT`                        | `3000`    | HTTP port (`0` picks a free one)                                              |
-| `HOST`                        | `0.0.0.0` | Interface to listen on                                                        |
-| `LOG_LEVEL`                   | `info`    | pino log level; logs are JSON lines on stdout                                 |
-| `POLL_INTERVAL_MS`            | `5000`    | The pause between the end of one poll of Core and the next one                |
-| `CORE_TIMEOUT_MS`             | `5000`    | How long one request to Core may take                                         |
-| `TELEMETRY_FLUSH_INTERVAL_MS` | `60000`   | The pause between one telemetry flush to Core and the next                    |
-| `TELEMETRY_MAX_SEEN_CONTEXTS` | `1000`    | The most seen contexts per environment held between flushes (the most recent) |
+| Variable                      | Default   | Meaning                                                                                             |
+| :---------------------------- | :-------- | :-------------------------------------------------------------------------------------------------- |
+| `CORE_URL`                    | required  | Core's base URL, such as `http://core:3000`                                                         |
+| `PORT`                        | `3000`    | HTTP port (`0` picks a free one)                                                                    |
+| `HOST`                        | `0.0.0.0` | Interface to listen on                                                                              |
+| `LOG_LEVEL`                   | `info`    | pino log level; logs are JSON lines on stdout                                                       |
+| `POLL_INTERVAL_MS`            | `5000`    | The pause between the end of one poll of Core and the next one                                      |
+| `CORE_TIMEOUT_MS`             | `5000`    | How long one request to Core may take                                                               |
+| `TELEMETRY_FLUSH_INTERVAL_MS` | `60000`   | The pause between one telemetry flush to Core and the next                                          |
+| `TELEMETRY_MAX_SEEN_CONTEXTS` | `1000`    | The most seen contexts per environment held between flushes (the most recent)                       |
+| `TELEMETRY_TIMEOUT_MS`        | `45000`   | How long one telemetry request to Core may take (longer than Core's 40 s limit for storing a batch) |
+| `TELEMETRY_MAX_BATCH_BYTES`   | `1000000` | The most bytes of JSON in one telemetry request; a larger flush is split                            |
 
 Outside Docker: `pnpm nx run @ctff/evaluator:build`, then `CORE_URL=http://localhost:3000 PORT=3001 pnpm --filter @ctff/evaluator start`.
 
@@ -28,7 +30,7 @@ Each poll fetches `GET /api/v1/evaluator/environments` (every environment of eve
 
 ## Telemetry
 
-The Evaluator adds up evaluation telemetry in memory and sends it to Core's `POST /api/v1/evaluator/telemetry` every `TELEMETRY_FLUSH_INTERVAL_MS`, and once more when it shuts down. Each evaluation that served a variation adds one to its flag's count for that variation and minute. Each context evaluated, other than a malformed one or one without attributes, becomes a seen context with its last-seen time. Past `TELEMETRY_MAX_SEEN_CONTEXTS` in an environment, the least recently seen are dropped. A batch Core doesn't accept is logged and dropped, so a Core outage can't make memory grow. As [ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md) accepts, a crash loses the telemetry since the last flush.
+The Evaluator adds up evaluation telemetry in memory and sends it to Core's `POST /api/v1/evaluator/telemetry` every `TELEMETRY_FLUSH_INTERVAL_MS`, and once more when it shuts down. Each evaluation that served a variation adds one to its flag's count for that variation and minute. Each context evaluated, other than a malformed one or one without attributes, becomes a seen context with its last-seen time. Past `TELEMETRY_MAX_SEEN_CONTEXTS` in an environment, the least recently seen are dropped. A flush is sent in requests of at most `TELEMETRY_MAX_BATCH_BYTES`, splitting an environment across requests when it must; Core adds the parts up. A request Core doesn't accept is logged and not sent again, so a Core outage can't make memory grow. The flush at shutdown uses `CORE_TIMEOUT_MS`, so stopping stays quick. As [ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md) accepts, a crash loses the telemetry since the last flush.
 
 ## API
 

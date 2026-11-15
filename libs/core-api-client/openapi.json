@@ -874,7 +874,7 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "description": "From this moment, inclusive. Defaults to 24 hours ago.",
+            "description": "From this moment, inclusive. Defaults to 24 hours before `to`; at most 7 days before it.",
             "schema": {
               "type": "string"
             }
@@ -927,6 +927,18 @@
             "in": "path",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "How many of the most recently seen to list.",
+            "schema": {
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 100,
+              "type": "number"
             }
           }
         ],

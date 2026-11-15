@@ -25,11 +25,13 @@ Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --fi
 
 Evaluators send what they added up to `POST /api/v1/evaluator/telemetry` about once a minute ([ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md)), as a `TelemetryBatch` from `@ctff/evaluation`: per SDK key, evaluation counts per flag, variation and minute, and seen contexts with their last-seen time. Core adds the counts to its 1-minute count buckets and records each seen context once per environment, keeping the later last-seen. It then keeps only the newest seen contexts up to the seen-context cap in each environment. Telemetry for an SDK key, flag or variation that no longer exists is skipped. A malformed batch gets `400` and none of it is stored.
 
-- `GET /api/v1/projects/{projectKey}/evaluation-counts` lists the count buckets, oldest first: the last 24 hours, or `from` (inclusive) to `to` (exclusive), optionally for one `environment`.
-- `GET /api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts` lists the seen contexts, most recently seen first.
+- `GET /api/v1/projects/{projectKey}/evaluation-counts` lists the count buckets, oldest first: the last 24 hours, or `from` (inclusive) to `to` (exclusive), at most 7 days apart, optionally for one `environment`.
+- `GET /api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts` lists the seen contexts, most recently seen first: the newest 100, or `limit` (up to 1,000).
 - `GET /api/v1/settings` and `PATCH /api/v1/settings` read and change the install-wide settings: `metricRetentionDays` (default 30), `seenContextRetentionDays` (30), `seenContextCap` (1,000 per environment) and `staleFlagThresholdDays` (7). The admin app's Settings page edits them.
 
-The retention job deletes count buckets older than the metric retention and seen contexts last seen before the seen-context retention, and trims each environment to the cap. It runs when Core starts, every `RETENTION_INTERVAL_MS`, and whenever the settings change, so a change applies at once, without a redeploy.
+The retention job deletes count buckets older than the metric retention and seen contexts last seen before the seen-context retention, and trims each environment to the cap. It runs in the background when Core starts, every `RETENTION_INTERVAL_MS`, and whenever the settings change, so a change applies at once, without a redeploy (the `PATCH` answers once it has run).
+
+Several Evaluators and Core replicas can write telemetry at once. Each batch is stored in one transaction, which holds the environments and flags it names so none is deleted under it; one being deleted at that moment is skipped with its telemetry. Writes to an environment's seen contexts, by ingestion and by retention alike, take a per-environment lock in a fixed order, so they wait for each other instead of deadlocking.
 
 ## The admin app
 

@@ -8,7 +8,7 @@ describe('routes', () => {
     expect(routes.environments('birdwatch')).toBe('/projects/birdwatch/environments');
     expect(routes.environment('birdwatch', 'production')).toBe('/projects/birdwatch/environments/production');
     expect(routes.settings('birdwatch')).toBe('/projects/birdwatch/settings');
-    expect(routes.installSettings()).toBe('/settings');
+    expect(routes.telemetrySettings()).toBe('/settings');
   });
 
   it('encodes each key as one path segment', () => {

@@ -1,30 +1,43 @@
-import type { Context, EnvironmentTelemetry, EvaluationCount, SeenContext, TelemetryBatch } from '@ctff/evaluation';
+import {
+  type Context,
+  type EnvironmentTelemetry,
+  type EvaluationCount,
+  minuteStartMs,
+  type SeenContext,
+  seenContextKey,
+  type TelemetryBatch,
+} from '@ctff/evaluation';
 import type { OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import type { Logger } from 'pino';
 import type { EvaluatorConfig } from '../config.js';
 
 export type TelemetryRecorderOptions = Pick<
   EvaluatorConfig,
-  'coreUrl' | 'coreTimeoutMs' | 'telemetryFlushIntervalMs' | 'telemetryMaxSeenContexts'
+  | 'coreUrl'
+  | 'coreTimeoutMs'
+  | 'telemetryFlushIntervalMs'
+  | 'telemetryMaxSeenContexts'
+  | 'telemetryTimeoutMs'
+  | 'telemetryMaxBatchBytes'
 > & { logger: Logger };
 
-/** What one environment has gathered since the last flush. */
-interface Gathered {
+/** The telemetry of one environment gathered since the last flush, not yet sent to Core. */
+interface PendingTelemetry {
   /** By flag key, variation index and minute. */
   counts: Map<string, { flagKey: string; variationIndex: number; minuteMs: number; count: number }>;
-  /** By context, least recently seen first, so the oldest is the one dropped past the limit. */
+  /** By `seenContextKey()`, least recently seen first, so the oldest is the one dropped past the limit. */
   seen: Map<string, { context: Context; lastSeenMs: number }>;
 }
 
 /**
  * Adds up evaluation telemetry in memory and sends it to Core every flush interval, and once more when the app
  * shuts down (ADR 0001). Each evaluation that served a variation adds one to its flag's count for that variation
- * and minute; each context evaluated becomes a seen context with its last-seen time. A batch Core doesn't accept
- * is dropped rather than kept, so a Core outage can't make the Evaluator's memory grow; the dashboard loses those
- * minutes, which is acceptable for telemetry.
+ * and minute; each context evaluated becomes a seen context with its last-seen time. A flush is sent in requests
+ * of at most `telemetryMaxBatchBytes`. A request Core doesn't accept is dropped rather than kept, so a Core outage
+ * can't make the Evaluator's memory grow; the dashboard loses those minutes, which is acceptable for telemetry.
  */
 export class TelemetryRecorder implements OnApplicationBootstrap, OnApplicationShutdown {
-  private gathered = new Map<string, Gathered>();
+  private pending = new Map<string, PendingTelemetry>();
   private timer: NodeJS.Timeout | undefined;
   private stopped = true;
 
@@ -32,30 +45,29 @@ export class TelemetryRecorder implements OnApplicationBootstrap, OnApplicationS
 
   /** Records one evaluation: counted when it served a variation, and its context seen when it was valid. */
   record(sdkKey: string, flagKey: string, variationIndex: number | null, context: Context | null): void {
-    if (variationIndex === null && context === null) return;
+    const contextKey = context === null ? null : seenContextKey(context);
+    if (variationIndex === null && contextKey === null) return;
     const nowMs = Date.now();
-    let gathered = this.gathered.get(sdkKey);
-    if (!gathered) {
-      gathered = { counts: new Map(), seen: new Map() };
-      this.gathered.set(sdkKey, gathered);
+    let pending = this.pending.get(sdkKey);
+    if (!pending) {
+      pending = { counts: new Map(), seen: new Map() };
+      this.pending.set(sdkKey, pending);
     }
 
     if (variationIndex !== null) {
-      const minuteMs = nowMs - (nowMs % 60_000);
+      const minuteMs = minuteStartMs(nowMs);
       const key = `${flagKey}\n${variationIndex}\n${minuteMs}`;
-      const bucket = gathered.counts.get(key);
+      const bucket = pending.counts.get(key);
       if (bucket) bucket.count += 1;
-      else gathered.counts.set(key, { flagKey, variationIndex, minuteMs, count: 1 });
+      else pending.counts.set(key, { flagKey, variationIndex, minuteMs, count: 1 });
     }
 
-    // A context without attributes describes no one to inspect, so it isn't recorded.
-    if (context !== null && (context.user_id !== undefined || context.country !== undefined)) {
-      const key = `${context.user_id ?? ''}\n${context.country ?? ''}`;
-      gathered.seen.delete(key);
-      gathered.seen.set(key, { context, lastSeenMs: nowMs });
-      if (gathered.seen.size > this.options.telemetryMaxSeenContexts) {
-        const oldest = gathered.seen.keys().next();
-        if (!oldest.done) gathered.seen.delete(oldest.value);
+    if (context !== null && contextKey !== null) {
+      pending.seen.delete(contextKey);
+      pending.seen.set(contextKey, { context, lastSeenMs: nowMs });
+      if (pending.seen.size > this.options.telemetryMaxSeenContexts) {
+        const oldest = pending.seen.keys().next();
+        if (!oldest.done) pending.seen.delete(oldest.value);
       }
     }
   }
@@ -65,11 +77,11 @@ export class TelemetryRecorder implements OnApplicationBootstrap, OnApplicationS
     this.schedule();
   }
 
-  /** Sends what is left, so a graceful shutdown loses nothing. */
+  /** Sends what is left, so a graceful shutdown loses nothing, within the shorter Core timeout. */
   async onApplicationShutdown(): Promise<void> {
     this.stopped = true;
     clearTimeout(this.timer);
-    await this.flush();
+    await this.flush(this.options.coreTimeoutMs);
   }
 
   private schedule(): void {
@@ -80,46 +92,87 @@ export class TelemetryRecorder implements OnApplicationBootstrap, OnApplicationS
   }
 
   /** Sends everything gathered since the last flush to Core, and starts over. It never throws. */
-  async flush(): Promise<void> {
-    const gathered = this.gathered;
-    this.gathered = new Map();
-    const batch = toBatch(gathered);
-    if (batch.environments.length === 0) return;
-
-    const { coreUrl, coreTimeoutMs, logger } = this.options;
-    try {
-      const response = await fetch(`${coreUrl}/api/v1/evaluator/telemetry`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(batch),
-        signal: AbortSignal.timeout(coreTimeoutMs),
-      });
-      if (!response.ok) throw new Error(`Core answered ${response.status} to POST /api/v1/evaluator/telemetry`);
-    } catch (error) {
-      logger.warn(
-        { err: error, environments: batch.environments.length },
-        'Sending telemetry to Core failed; this batch is dropped',
-      );
+  async flush(timeoutMs = this.options.telemetryTimeoutMs): Promise<void> {
+    const pending = this.pending;
+    this.pending = new Map();
+    const { coreUrl, logger, telemetryMaxBatchBytes } = this.options;
+    for (const batch of toBatches(toEnvironmentTelemetry(pending), telemetryMaxBatchBytes)) {
+      try {
+        const response = await fetch(`${coreUrl}/api/v1/evaluator/telemetry`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(batch),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        if (!response.ok) throw new Error(`Core answered ${response.status} to POST /api/v1/evaluator/telemetry`);
+      } catch (error) {
+        // After a timeout Core may still have stored it; either way it isn't sent again.
+        logger.warn(
+          { err: error, environments: batch.environments.length },
+          'Sending telemetry to Core failed; this batch is not sent again',
+        );
+      }
     }
   }
 }
 
-function toBatch(gathered: Map<string, Gathered>): TelemetryBatch {
-  const environments: EnvironmentTelemetry[] = [];
-  for (const [sdkKey, { counts, seen }] of gathered) {
-    environments.push({
-      sdkKey,
-      counts: [...counts.values()].map(({ flagKey, variationIndex, minuteMs, count }): EvaluationCount => ({
-        flagKey,
-        variationIndex,
-        minute: new Date(minuteMs).toISOString(),
-        count,
-      })),
-      seenContexts: [...seen.values()].map(({ context, lastSeenMs }): SeenContext => ({
-        context,
-        lastSeen: new Date(lastSeenMs).toISOString(),
-      })),
-    });
+function toEnvironmentTelemetry(pending: Map<string, PendingTelemetry>): EnvironmentTelemetry[] {
+  return [...pending].map(([sdkKey, { counts, seen }]) => ({
+    sdkKey,
+    counts: [...counts.values()].map(({ flagKey, variationIndex, minuteMs, count }): EvaluationCount => ({
+      flagKey,
+      variationIndex,
+      minute: new Date(minuteMs).toISOString(),
+      count,
+    })),
+    seenContexts: [...seen.values()].map(({ context, lastSeenMs }): SeenContext => ({
+      context,
+      lastSeen: new Date(lastSeenMs).toISOString(),
+    })),
+  }));
+}
+
+/**
+ * Packs the environments' telemetry into batches of at most `maxBytes` of JSON each (unless a single count or
+ * seen context is larger). An environment that doesn't fit is split across batches; Core adds the parts up.
+ */
+export function toBatches(environments: EnvironmentTelemetry[], maxBytes: number): TelemetryBatch[] {
+  const batches: TelemetryBatch[] = [];
+  const size = (value: unknown) => Buffer.byteLength(JSON.stringify(value)) + 1;
+  const emptyBatchBytes = size({ environments: [] });
+  let current: EnvironmentTelemetry[] = [];
+  let bytes = emptyBatchBytes;
+  const close = () => {
+    if (current.some((part) => part.counts.length > 0 || part.seenContexts.length > 0)) {
+      batches.push({ environments: current });
+    }
+    current = [];
+    bytes = emptyBatchBytes;
+  };
+
+  for (const { sdkKey, counts, seenContexts } of environments) {
+    const partBytes = size({ sdkKey, counts: [], seenContexts: [] });
+    let part: EnvironmentTelemetry | undefined;
+    const open = () => {
+      if (bytes + partBytes > maxBytes) close();
+      part = { sdkKey, counts: [], seenContexts: [] };
+      current.push(part);
+      bytes += partBytes;
+      return part;
+    };
+    const add = <T>(item: T, list: (target: EnvironmentTelemetry) => T[]) => {
+      const itemBytes = size(item);
+      let target = part ?? open();
+      if (bytes + itemBytes > maxBytes && (target.counts.length > 0 || target.seenContexts.length > 0)) {
+        close();
+        target = open();
+      }
+      list(target).push(item);
+      bytes += itemBytes;
+    };
+    for (const count of counts) add(count, (target) => target.counts);
+    for (const seen of seenContexts) add(seen, (target) => target.seenContexts);
   }
-  return { environments };
+  close();
+  return batches;
 }

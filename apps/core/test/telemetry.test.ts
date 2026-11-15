@@ -6,6 +6,8 @@ import { startCore, type RunningCore } from './support/core.js';
 const minutes = (n: number) => n * 60_000;
 const days = (n: number) => n * 24 * 60 * 60_000;
 /** The start of the minute `ago` ms before now, as Evaluators send it. */
+/** The moment `ago` ms before now, as an ISO timestamp. */
+const at = (ago: number) => new Date(Date.now() - ago).toISOString();
 const minuteAgo = (ago: number) => new Date(Math.floor((Date.now() - ago) / 60_000) * 60_000).toISOString();
 
 /** A project with `development` and `production` and the flags given, returning the SDK key of each. */
@@ -103,6 +105,9 @@ describe('evaluation count ingestion', () => {
     expect((await counts(projectKey, '?from=yesterday')).status).toBe(400);
     expect((await counts(projectKey, '?environment=staging')).status).toBe(404);
     expect((await counts('no-such-project')).status).toBe(404);
+    // At most a week, the dashboard's longest chart.
+    const weekAndAMinute = encodeURIComponent(at(days(7) + minutes(1)));
+    expect((await counts(projectKey, `?from=${weekAndAMinute}`)).status).toBe(400);
   });
 
   it('skips counts for unknown SDK keys, flags and variations, and stores the rest', async () => {
@@ -167,6 +172,30 @@ describe('evaluation count ingestion', () => {
     expect([before, after]).toContain(stored[0].minute);
   });
 
+  it('stores the rest of a batch when one of its flags is deleted while it arrives', async () => {
+    const { projectKey, production } = await project(api, ['rare-bird-alerts', 'short-lived']);
+    const minute = minuteAgo(0);
+    const batch = {
+      environments: [
+        environment(production, {
+          counts: [
+            { flagKey: 'rare-bird-alerts', variationIndex: 0, minute, count: 1 },
+            { flagKey: 'short-lived', variationIndex: 0, minute, count: 1 },
+          ],
+          seenContexts: [{ context: { user_id: 'alice' }, lastSeen: at(0) }],
+        }),
+      ],
+    };
+    const [responses] = await Promise.all([
+      Promise.all(Array.from({ length: 20 }, () => send(api, batch))),
+      api.delete(`/projects/${projectKey}/flags/short-lived`),
+    ]);
+    expect(responses.map((response) => response.status)).toEqual(Array(20).fill(204));
+    const stored = (await counts(projectKey)).body;
+    expect(stored.map((row: { flagKey: string }) => row.flagKey)).toEqual(['rare-bird-alerts']);
+    expect(stored[0].count).toBe(20);
+  });
+
   it('deletes the counts of a flag that is deleted', async () => {
     const { projectKey, production } = await project(api, ['short-lived']);
     await send(api, {
@@ -193,7 +222,6 @@ describe('seen context ingestion', () => {
 
   const seenContexts = (projectKey: string, environmentKey = 'production') =>
     api.get(`/projects/${projectKey}/environments/${environmentKey}/seen-contexts`);
-  const at = (ago: number) => new Date(Date.now() - ago).toISOString();
 
   it('records each context once per environment with when it was last seen, most recent first', async () => {
     const { projectKey, development, production } = await project(api);
@@ -236,6 +264,12 @@ describe('seen context ingestion', () => {
     expect(Date.parse(response.body[3].lastSeen)).toBeGreaterThan(Date.now() - minutes(5));
     expect((await seenContexts(projectKey, 'development')).body).toHaveLength(1);
     expect((await seenContexts(projectKey, 'staging')).status).toBe(404);
+    const newest = await api.get(`/projects/${projectKey}/environments/production/seen-contexts?limit=2`);
+    expect(newest.body.map((entry: { context: object }) => entry.context)).toEqual([
+      { user_id: 'alice', country: 'CA' },
+      { user_id: 'alice' },
+    ]);
+    expect((await api.get(`/projects/${projectKey}/environments/production/seen-contexts?limit=0`)).status).toBe(400);
   });
 
   it('skips contexts without attributes, and rejects malformed ones', async () => {
@@ -322,16 +356,13 @@ describe('seen context ingestion', () => {
       lastSeen: at(index),
     }));
     expect((await send(api, { environments: [environment(production, { seenContexts: seen })] })).status).toBe(204);
-    const stored = (await seenContexts(projectKey)).body;
+    const stored = (await api.get(`/projects/${projectKey}/environments/production/seen-contexts?limit=1000`)).body;
     expect(stored).toHaveLength(1000);
     expect(stored[0].context.user_id).toBe('birder-with-a-long-identifier-0');
   });
 });
 
 describe('telemetry retention', () => {
-  const at = (ago: number) => new Date(Date.now() - ago).toISOString();
-  const countsSince = (api: ApiClient, projectKey: string, ago: number) =>
-    api.get(`/projects/${projectKey}/evaluation-counts?from=${encodeURIComponent(at(ago))}`);
   const seenContexts = (api: ApiClient, projectKey: string) =>
     api.get(`/projects/${projectKey}/environments/production/seen-contexts`);
 
@@ -355,8 +386,20 @@ describe('telemetry retention', () => {
     return { lapsed, recent };
   }
 
-  const minutesOf = async (api: ApiClient, projectKey: string) =>
-    (await countsSince(api, projectKey, days(60))).body.map((row: { minute: string }) => row.minute);
+  /** The minutes of the count buckets of the last 63 days, oldest first, read a week at a time as the API allows. */
+  async function minutesOf(api: ApiClient, projectKey: string): Promise<string[]> {
+    const now = Date.now();
+    const found: string[] = [];
+    for (let week = 8; week >= 0; week -= 1) {
+      const end = now + minutes(1) - week * days(7);
+      const from = encodeURIComponent(new Date(end - days(7)).toISOString());
+      const to = encodeURIComponent(new Date(end).toISOString());
+      const response = await api.get(`/projects/${projectKey}/evaluation-counts?from=${from}&to=${to}`);
+      expect(response.status).toBe(200);
+      found.push(...response.body.map((row: { minute: string }) => row.minute));
+    }
+    return found;
+  }
   const usersOf = async (api: ApiClient, projectKey: string) =>
     (await seenContexts(api, projectKey)).body.map((entry: { context: { user_id: string } }) => entry.context.user_id);
 
@@ -381,13 +424,16 @@ describe('telemetry retention', () => {
     try {
       const api = apiClient(core.baseUrl);
       const { projectKey, production } = await project(api);
+      // Retention runs in the background when Core starts; let it finish before anything is sent.
+      await expect
+        .poll(() => core.logs.some((entry) => entry['msg'] === 'Retention ran'), { timeout: 5000 })
+        .toBe(true);
       const { recent } = await sendOldAndRecent(api, production);
       await send(api, {
         environments: [
           environment(production, { seenContexts: [{ context: { user_id: 'newest' }, lastSeen: at(0) }] }),
         ],
       });
-      // Retention ran when Core started, before any of this was sent.
       expect(await minutesOf(api, projectKey)).toHaveLength(3);
       expect(await usersOf(api, projectKey)).toEqual(['newest', 'recent', 'lapsed', 'gone']);
 

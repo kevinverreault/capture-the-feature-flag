@@ -158,7 +158,9 @@ describe('evaluation telemetry', () => {
     await expect.poll(() => core.requests.some((request) => request.path === '/api/v1/evaluator/telemetry')).toBe(true);
     await expect
       .poll(() =>
-        evaluator.logs.some((entry) => entry['msg'] === 'Sending telemetry to Core failed; this batch is dropped'),
+        evaluator.logs.some(
+          (entry) => entry['msg'] === 'Sending telemetry to Core failed; this batch is not sent again',
+        ),
       )
       .toBe(true);
 
@@ -167,5 +169,28 @@ describe('evaluation telemetry', () => {
     await expect
       .poll(() => [...seen(core.telemetry, 'ctff-env-production').keys()])
       .toEqual([JSON.stringify({ user_id: 'kept' })]);
+  });
+
+  it('sends a large flush in several batches of at most the configured size, adding up to the whole', async () => {
+    const { core, evaluator } = await start({
+      TELEMETRY_FLUSH_INTERVAL_MS: '60000',
+      TELEMETRY_MAX_BATCH_BYTES: '2000',
+    });
+    const production = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-production' });
+    const development = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-development' });
+    const minute = await withinOneMinute(async () => {
+      for (let i = 0; i < 60; i += 1) await production.variation('rare-bird-alerts', { user_id: `birder-${i}` }, false);
+      for (let i = 0; i < 5; i += 1) await development.variation('rare-bird-alerts', { user_id: `dev-${i}` }, false);
+    });
+
+    await evaluator.stop();
+    expect(core.telemetry.length).toBeGreaterThan(1);
+    for (const batch of core.telemetry) expect(Buffer.byteLength(JSON.stringify(batch))).toBeLessThanOrEqual(2000);
+    expect(totals(core.telemetry)).toEqual({
+      [`ctff-env-production rare-bird-alerts 0 ${minute}`]: 60,
+      [`ctff-env-development rare-bird-alerts 1 ${minute}`]: 5,
+    });
+    expect(seen(core.telemetry, 'ctff-env-production').size).toBe(60);
+    expect(seen(core.telemetry, 'ctff-env-development').size).toBe(5);
   });
 });

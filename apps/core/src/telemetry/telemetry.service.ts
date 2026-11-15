@@ -1,15 +1,21 @@
-import { minuteOf, normalizeContext } from '@ctff/evaluation';
+import { minuteOf, normalizeContext, seenContextKey } from '@ctff/evaluation';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
+import type { Prisma } from '../generated/prisma/client.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { lockSeenContexts, trimSeenContexts } from './seen-context-cap.js';
-import type {
-  EvaluationCountBucketDto,
-  EvaluationCountsQueryDto,
-  StoredSeenContextDto,
-  TelemetryBatchDto,
+import { dayMs } from './time.js';
+import { invalidBody } from '../common/validation.js';
+import {
+  defaultSeenContextsListed,
+  type EvaluationCountBucketDto,
+  type EvaluationCountsQueryDto,
+  maxCountRangeDays,
+  type SeenContextsQueryDto,
+  type StoredSeenContextDto,
+  type TelemetryBatchDto,
 } from './telemetry.dto.js';
 
 interface CountRow {
@@ -28,7 +34,27 @@ interface SeenRow {
   lastSeen: string;
 }
 
-const day = 24 * 60 * 60_000;
+/** How long ingesting one batch may wait for a database connection, then take; the Evaluator waits longer. */
+const ingestMaxWaitMs = 10_000;
+const ingestTimeoutMs = 30_000;
+
+/**
+ * Takes a key-share lock on each environment and flag that still exists, until the transaction ends, so none is
+ * deleted under the batch, and returns the ids it locked. A row being deleted (or locked by a delete) right now is
+ * skipped rather than waited for, so ingestion never deadlocks with a delete.
+ */
+async function lockExisting(
+  tx: Prisma.TransactionClient,
+  environmentIds: string[],
+  flagIds: string[],
+): Promise<Set<string>> {
+  const rows = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id::text FROM environments WHERE id = ANY(${environmentIds}::uuid[])
+      ORDER BY id FOR KEY SHARE SKIP LOCKED`;
+  const flags = await tx.$queryRaw<{ id: string }[]>`
+    SELECT id::text FROM flags WHERE id = ANY(${flagIds}::uuid[]) ORDER BY id FOR KEY SHARE SKIP LOCKED`;
+  return new Set([...rows, ...flags].map((row) => row.id));
+}
 
 /** Evaluation telemetry: ingesting what Evaluators send (ADR 0001), and reading it back. */
 @Injectable()
@@ -78,10 +104,10 @@ export class TelemetryService {
 
       for (const { context, lastSeen } of entry.seenContexts) {
         const normalized = normalizeContext(context);
-        if (!normalized || (normalized.user_id === undefined && normalized.country === undefined)) continue;
+        const contextKey = normalized && seenContextKey(normalized);
+        if (!normalized || !contextKey) continue;
         const userId = normalized.user_id ?? null;
         const country = normalized.country ?? null;
-        const contextKey = JSON.stringify([userId, country]);
         // A clock running ahead mustn't keep a context at the top of the list.
         const seenAt = new Date(Math.min(Date.parse(lastSeen), now)).toISOString();
         const key = `${environment.id} ${contextKey}`;
@@ -94,15 +120,24 @@ export class TelemetryService {
     // Sorted, so concurrent batches from several Evaluators lock rows in the same order and can't deadlock.
     const sorted = <T>(rows: Map<string, T>) =>
       [...rows.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, row]) => row);
-    const countRows = sorted(counts);
-    const seenRows = sorted(seen);
-    const environmentIds = [...new Set(seenRows.map((row) => row.environmentId))];
     const { seenContextCap } = await this.settings.get();
 
     // One transaction, so a batch is stored whole or not at all. Batches for the same environment wait for each
     // other's lock, so they get longer than Prisma's default limits to get a connection and to finish.
     await this.prisma.$transaction(
       async (tx) => {
+        // The environments and flags may have been deleted since they were looked up, or be being deleted now.
+        // Holding them until the end keeps them from going away mid-batch; those already going away are skipped
+        // with their telemetry, rather than failing the whole batch on a foreign key.
+        const kept = await lockExisting(
+          tx,
+          [...new Set([...counts.values(), ...seen.values()].map((row) => row.environmentId))],
+          [...new Set([...counts.values()].map((row) => row.flagId))],
+        );
+        const countRows = sorted(counts).filter((row) => kept.has(row.environmentId) && kept.has(row.flagId));
+        const seenRows = sorted(seen).filter((row) => kept.has(row.environmentId));
+        const environmentIds = [...new Set(seenRows.map((row) => row.environmentId))];
+
         if (countRows.length > 0) {
           await tx.$executeRaw`
           INSERT INTO evaluation_counts (environment_id, flag_id, variation_index, minute, count)
@@ -132,16 +167,22 @@ export class TelemetryService {
           for (const environmentId of environmentIds) await trimSeenContexts(tx, seenContextCap, environmentId);
         }
       },
-      { maxWait: 10_000, timeout: 30_000 },
+      { maxWait: ingestMaxWaitMs, timeout: ingestTimeoutMs },
     );
   }
 
-  /** The count buckets of a project from `from` (default: 24 hours ago) until `to` (default: now). */
+  /**
+   * The count buckets of a project from `from` (default: 24 hours before `to`) until `to` (default: now), for at
+   * most a week.
+   */
   async counts(projectKey: string, query: EvaluationCountsQueryDto): Promise<EvaluationCountBucketDto[]> {
     const project = await this.projects.find(projectKey);
     const environment = query.environment ? await this.environments.find(project, query.environment) : undefined;
     const to = query.to ? new Date(query.to) : new Date();
-    const from = query.from ? new Date(query.from) : new Date(to.getTime() - day);
+    const from = query.from ? new Date(query.from) : new Date(to.getTime() - dayMs);
+    if (to.getTime() - from.getTime() > maxCountRangeDays * dayMs) {
+      throw invalidBody({ from: [`from must be at most ${maxCountRangeDays} days before to`] });
+    }
     const rows = await this.prisma.evaluationCount.findMany({
       where: {
         environment: { projectId: project.id },
@@ -171,13 +212,18 @@ export class TelemetryService {
     }));
   }
 
-  /** The seen contexts of an environment, most recently seen first. */
-  async seenContexts(projectKey: string, environmentKey: string): Promise<StoredSeenContextDto[]> {
+  /** The seen contexts of an environment, most recently seen first, up to `limit` (default 100). */
+  async seenContexts(
+    projectKey: string,
+    environmentKey: string,
+    query: SeenContextsQueryDto,
+  ): Promise<StoredSeenContextDto[]> {
     const project = await this.projects.find(projectKey);
     const environment = await this.environments.find(project, environmentKey);
     const rows = await this.prisma.seenContext.findMany({
       where: { environmentId: environment.id },
       orderBy: [{ lastSeen: 'desc' }, { id: 'asc' }],
+      take: query.limit ?? defaultSeenContextsListed,
     });
     return rows.map((row) => ({
       context: {

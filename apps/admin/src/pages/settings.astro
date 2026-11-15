@@ -51,7 +51,7 @@ const post = await handlePost(Astro, {
         settings.map(({ name }) => [name, Number(textField(form, name) || Number.NaN)]),
       ) as Settings;
       await unwrap(core.PATCH('/api/v1/settings', { body }));
-      return { location: routes.installSettings(), flash: 'Settings saved. They apply right away.' };
+      return { location: routes.telemetrySettings(), flash: 'Settings saved. They apply right away.' };
     },
   },
 });

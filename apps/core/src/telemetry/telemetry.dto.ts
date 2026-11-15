@@ -22,6 +22,11 @@ import { IsOmittable } from '../common/keys.js';
 
 /** Bounds each list in a batch, so one request can't hold the database for long. */
 const maxEntries = 100_000;
+/** The longest time range the count buckets are listed for: the dashboard's longest chart. */
+export const maxCountRangeDays = 7;
+/** How many seen contexts are listed at most, and by default. */
+const maxSeenContextsListed = 1000;
+export const defaultSeenContextsListed = 100;
 /** The most evaluations one count may report: far beyond any Evaluator's minute, and well inside a 4-byte column. */
 const maxCount = 1_000_000_000;
 
@@ -126,7 +131,10 @@ export class EvaluationCountsQueryDto {
   @IsString()
   environment?: string;
 
-  @ApiProperty({ required: false, description: 'From this moment, inclusive. Defaults to 24 hours ago.' })
+  @ApiProperty({
+    required: false,
+    description: `From this moment, inclusive. Defaults to 24 hours before \`to\`; at most ${maxCountRangeDays} days before it.`,
+  })
   @IsOptional()
   @IsISO8601({ strict: true })
   from?: string;
@@ -135,6 +143,22 @@ export class EvaluationCountsQueryDto {
   @IsOptional()
   @IsISO8601({ strict: true })
   to?: string;
+}
+
+export class SeenContextsQueryDto {
+  @ApiProperty({
+    required: false,
+    minimum: 1,
+    maximum: maxSeenContextsListed,
+    default: defaultSeenContextsListed,
+    description: 'How many of the most recently seen to list.',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(maxSeenContextsListed)
+  limit?: number;
 }
 
 /** One stored seen context. */

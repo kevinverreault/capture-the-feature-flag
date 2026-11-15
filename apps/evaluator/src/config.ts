@@ -16,6 +16,13 @@ export interface EvaluatorConfig {
    * Bounds memory and the size of a batch.
    */
   telemetryMaxSeenContexts: number;
+  /**
+   * How long one telemetry request to Core may take. Longer than Core's own limit for storing a batch (40 s), so a
+   * batch Core stores isn't reported as lost. Sending at shutdown uses `coreTimeoutMs` instead, to stop promptly.
+   */
+  telemetryTimeoutMs: number;
+  /** The most bytes of JSON in one telemetry request; a flush that holds more is sent in several requests. */
+  telemetryMaxBatchBytes: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): EvaluatorConfig {
@@ -32,6 +39,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): EvaluatorConfi
     coreTimeoutMs: integer(env, 'CORE_TIMEOUT_MS', 5000, 1),
     telemetryFlushIntervalMs: integer(env, 'TELEMETRY_FLUSH_INTERVAL_MS', 60_000, 1),
     telemetryMaxSeenContexts: integer(env, 'TELEMETRY_MAX_SEEN_CONTEXTS', 1000, 1),
+    telemetryTimeoutMs: integer(env, 'TELEMETRY_TIMEOUT_MS', 45_000, 1),
+    // Core accepts up to 10 MB; staying well below it leaves room for a single large environment.
+    telemetryMaxBatchBytes: integer(env, 'TELEMETRY_MAX_BATCH_BYTES', 1_000_000, 1024, 10_000_000),
   };
 }
 
