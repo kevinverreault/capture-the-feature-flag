@@ -1,0 +1,41 @@
+/* Page-level layout shared by the admin pages; components come from the design system. */
+
+h1,
+h2 {
+  margin: 0 0 var(--space-sm);
+}
+
+/* A form laid out as one column of fields, its submit button at its natural width. */
+.stack {
+  display: grid;
+  gap: var(--space-sm);
+  max-width: 30rem;
+}
+
+.stack > button,
+.stack > a {
+  justify-self: start;
+}
+
+/* A grid of cards. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.danger-zone {
+  display: grid;
+  gap: var(--space-sm);
+  justify-items: start;
+  padding: var(--space-sm);
+  border: 1px solid hsl(var(--color-error) / 0.5);
+  border-radius: var(--border);
+}
+
+.danger-zone p {
+  margin: 0;
+}

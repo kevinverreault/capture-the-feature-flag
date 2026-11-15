@@ -1,0 +1,58 @@
+---
+import Input from '@ds/components/form/Input.astro';
+import Button from '@ds/components/ui/Button.astro';
+
+interface Props {
+  sdkKey: string;
+  /** The environment's name, for the accessible names of the field and the button. */
+  environmentName: string;
+}
+
+const { sdkKey, environmentName } = Astro.props;
+---
+
+<sdk-key class="sdk-key">
+  <Input value={sdkKey} readonly size="small" aria-label={`SDK key of ${environmentName}`} class="sdk-key-value" />
+  <Button type="button" variant="secondary" size="small" aria-label={`Copy the SDK key of ${environmentName}`}>
+    Copy
+  </Button>
+</sdk-key>
+
+<script>
+  import { toast } from '@ds/components/feedback/toast';
+
+  /** Copies the SDK key to the clipboard, or selects it to copy by hand where the clipboard is unavailable. */
+  class SdkKey extends HTMLElement {
+    connectedCallback() {
+      const input = this.querySelector('input');
+      const button = this.querySelector('button');
+      if (!input || !button) return;
+      button.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(input.value);
+          toast('SDK key copied', { variant: 'success' });
+        } catch {
+          input.select();
+          toast('Copying is not available here: the SDK key is selected, copy it with Ctrl+C or ⌘C', {
+            variant: 'warning',
+          });
+        }
+      });
+    }
+  }
+  customElements.define('sdk-key', SdkKey);
+</script>
+
+<style>
+  .sdk-key {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+  }
+
+  .sdk-key :global(.sdk-key-value) {
+    flex: 1;
+    min-width: 0;
+    font-family: monospace;
+  }
+</style>

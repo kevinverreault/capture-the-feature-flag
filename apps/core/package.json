@@ -4,17 +4,19 @@
   "private": true,
   "type": "module",
   "description": "Core: owns all admin data and its schema, and exposes the versioned REST API used by the admin app, Terraform and Evaluators.",
+  "exports": "./dist/main.js",
   "files": [
     "dist",
     "prisma/migrations"
   ],
   "scripts": {
     "generate": "prisma generate",
-    "build": "tsc -p tsconfig.app.json",
+    "build": "tsc -p tsconfig.app.json && node dist/export-openapi.js --check ../../libs/core-api-client/openapi.json",
     "typecheck": "tsc -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
     "start": "node dist/main.js",
+    "openapi": "tsc -p tsconfig.app.json && node dist/export-openapi.js ../../libs/core-api-client/openapi.json",
     "docker-build": "docker build -f Dockerfile -t ctff-core:local ../.."
   },
   "nx": {
@@ -40,12 +42,29 @@
         ]
       },
       "build": {
+        "inputs": [
+          "production",
+          "^production",
+          "{workspaceRoot}/libs/core-api-client/openapi.json"
+        ],
+        "dependsOn": [
+          "generate",
+          "^build"
+        ]
+      },
+      "openapi": {
+        "cache": false,
         "dependsOn": [
           "generate",
           "^build"
         ]
       },
       "test": {
+        "inputs": [
+          "default",
+          "^production",
+          "{workspaceRoot}/libs/core-api-client/openapi.json"
+        ],
         "dependsOn": [
           "build",
           "^build"
@@ -54,6 +73,7 @@
     }
   },
   "dependencies": {
+    "@ctff/admin": "workspace:*",
     "@ctff/evaluation": "workspace:*",
     "@nestjs/common": "^11.2.10",
     "@nestjs/core": "^11.2.10",

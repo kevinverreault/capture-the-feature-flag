@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { startCore, type RunningCore } from './support/core.js';
 
@@ -30,6 +31,15 @@ describe('OpenAPI document', () => {
     expect(Object.keys(document.paths['/api/v1/projects/{projectKey}/flags/{flagKey}'] ?? {})).toEqual(
       expect.arrayContaining(['get', 'patch', 'delete']),
     );
+  });
+
+  it('matches the copy the core-api-client is generated from', async () => {
+    const served = await (await fetch(`${core.baseUrl}/api/v1/openapi.json`)).json();
+    const committed = JSON.parse(
+      await readFile(new URL('../../../libs/core-api-client/openapi.json', import.meta.url), 'utf8'),
+    ) as unknown;
+    // When this fails, the API changed: refresh the copy with `pnpm nx run @ctff/core:openapi`.
+    expect(committed).toEqual(served);
   });
 
   it('has a browsable UI', async () => {

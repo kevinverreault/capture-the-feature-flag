@@ -4,6 +4,10 @@ export interface CoreConfig {
   host: string;
   port: number;
   logLevel: string;
+  /** Whether Core serves the admin app (off when the admin app runs in its own container). */
+  adminEnabled: boolean;
+  /** The Core the admin app calls; unset means this one. */
+  adminCoreUrl?: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
@@ -20,5 +24,15 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
     host: env['HOST'] ?? '0.0.0.0',
     port,
     logLevel: env['LOG_LEVEL'] ?? 'info',
+    adminEnabled: parseBoolean('ADMIN_ENABLED', env['ADMIN_ENABLED'], true),
+    adminCoreUrl: env['ADMIN_CORE_URL']?.trim() || undefined,
   };
+}
+
+function parseBoolean(name: string, raw: string | undefined, fallback: boolean): boolean {
+  const value = raw?.trim().toLowerCase();
+  if (!value) return fallback;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  throw new Error(`${name} must be true or false: ${raw}`);
 }

@@ -3,3 +3,4 @@ pnpm-lock.yaml
 dist/
 .nx/
 apps/core/src/generated/
+libs/core-api-client/openapi.json

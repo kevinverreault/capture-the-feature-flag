@@ -1,0 +1,29 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+
+interface Props {
+  /** Messages from Core about the whole form rather than one field. */
+  messages: readonly string[];
+}
+
+const { messages } = Astro.props;
+---
+
+{
+  messages.length > 0 && (
+    <Alert variant="danger" icon="circle-alert" title="Core rejected this change">
+      <ul class="messages">
+        {messages.map((message) => (
+          <li>{message}</li>
+        ))}
+      </ul>
+    </Alert>
+  )
+}
+
+<style>
+  .messages {
+    margin: 0;
+    padding-inline-start: 1.25em;
+  }
+</style>
