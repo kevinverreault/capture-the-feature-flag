@@ -40,6 +40,13 @@ p {
   justify-content: space-between;
 }
 
+/* A row of buttons, such as a page heading's actions. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
 .muted {
   opacity: 0.75;
 }

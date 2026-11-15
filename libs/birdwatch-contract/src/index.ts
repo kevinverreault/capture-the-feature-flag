@@ -1,12 +1,14 @@
-import type { AllFlags } from '@ctff/sdk';
+import type { AllFlags, Context } from '@ctff/sdk';
 
-export type { AllFlags, Context } from '@ctff/sdk';
+export type { AllFlags, Context, EvaluationReason, FlagDetail } from '@ctff/sdk';
 
 /** The flags of the Birdwatch demo, which Core's demo seed creates in the `birdwatch` project. */
 export const birdwatchFlags = {
   /** Kill switch for "Log a sighting": the form, and the endpoint behind it. */
   newSightingForm: 'new-sighting-form',
+  /** The rare-bird alert banner, seeded to serve `true` in Canada (`country in [CA]`). */
   rareBirdAlerts: 'rare-bird-alerts',
+  /** The "Photo ID (beta)" button, seeded to serve `true` to individually targeted birders. */
   photoIdBeta: 'photo-id-beta',
 } as const;
 
@@ -67,10 +69,20 @@ export interface SessionResponse {
   birder: Birder;
 }
 
-/** What every route for the logged-in birder answers with: the birder, and their flags (loaded once). */
+/**
+ * What every route for the logged-in birder answers with: the birder, the context their flags were evaluated for,
+ * and their flags (loaded once), with what the flags turn on.
+ */
 export interface ForBirder {
   birder: Birder;
+  /** The context the flags were evaluated for: the birder's `user_id` and `country`. */
+  context: Context;
   flags: AllFlags;
+  /**
+   * The latest sightings of rare species, for the rare-bird alert banner, while `rare-bird-alerts` serves `true`;
+   * otherwise none.
+   */
+  rareBirdAlerts: FeedSighting[];
 }
 
 /** `GET /api/sightings`. */
@@ -81,6 +93,12 @@ export interface FeedResponse extends ForBirder {
 /** `GET /api/species`. */
 export interface SpeciesResponse extends ForBirder {
   species: readonly Species[];
+}
+
+/** `GET /api/species/{speciesId}`: a species, with its sightings, the most recently observed first. */
+export interface SpeciesPageResponse extends ForBirder {
+  species: Species;
+  sightings: FeedSighting[];
 }
 
 /** `POST /api/sightings`. */

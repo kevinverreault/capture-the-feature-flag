@@ -1,0 +1,42 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import type { FeedSighting } from '../lib/api';
+import { formatObservedAt } from '../lib/format';
+
+interface Props {
+  /** The latest sightings of rare species, from birdwatch-api while rare-bird-alerts serves true. */
+  alerts: FeedSighting[];
+}
+
+const { alerts } = Astro.props;
+---
+
+<Alert variant="danger" icon="triangle-alert" title="Rare bird alert" data-testid="rare-bird-alert">
+  {
+    alerts.length === 0 ? (
+      'No rare birds reported right now. They will show up here as soon as someone logs one.'
+    ) : (
+      <ul class="alerts">
+        {alerts.map((sighting) => (
+          <li>
+            <a href={`/species/${encodeURIComponent(sighting.species.id)}`}>{sighting.species.commonName}</a> at{' '}
+            {sighting.location}, by {sighting.birder.name} ·{' '}
+            <time datetime={sighting.observedAt}>{formatObservedAt(sighting.observedAt)}</time>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</Alert>
+
+<style>
+  .alerts {
+    margin: 0;
+    padding-inline-start: var(--space-md);
+  }
+
+  .alerts a {
+    color: inherit;
+    font-weight: bold;
+  }
+</style>

@@ -75,6 +75,10 @@ services:
     image: ctff-birdwatch-web:local
     environment:
       BIRDWATCH_API_URL: http://birdwatch-api:3000
+      # The flag inspector links each flag to the admin app, as the browser reaches it, in birdwatch/development.
+      CTFF_ADMIN_URL: http://localhost:3000
+      CTFF_PROJECT: birdwatch
+      CTFF_ENVIRONMENT: development
       PORT: '3000'
       LOG_LEVEL: info
     ports:

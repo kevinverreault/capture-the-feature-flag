@@ -9,6 +9,9 @@ import type { NewSighting } from './new-sighting.js';
 /** The most sightings logged while the API runs that it keeps, so a busy demo doesn't grow without bound. */
 const maxLoggedSightings = 500;
 
+/** How many sightings the rare-bird alert banner shows. */
+const maxRareBirdAlerts = 3;
+
 /**
  * The sightings: the mock ones, and those logged since the API started. They are kept in memory only (the image
  * keeps no state), so a restart, or another replica, shows the mock sightings alone.
@@ -34,6 +37,18 @@ export class SightingStore {
           },
         ];
       });
+  }
+
+  /** The sightings of one species, the most recently observed first. */
+  ofSpecies(speciesId: string): FeedSighting[] {
+    return this.feed().filter((sighting) => sighting.speciesId === speciesId);
+  }
+
+  /** The latest sightings of rare species, for the rare-bird alert banner. */
+  rareSightings(): FeedSighting[] {
+    return this.feed()
+      .filter((sighting) => sighting.species.rarity === 'rare')
+      .slice(0, maxRareBirdAlerts);
   }
 
   log(birderId: string, sighting: NewSighting): Sighting {

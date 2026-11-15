@@ -3,16 +3,28 @@ import '@styles/global.css';
 import '../styles/birdwatch.css';
 import Button from '@ds/components/ui/Button.astro';
 import ThemeToggle from '@ds/components/ui/ThemeToggle.astro';
-import type { Birder } from '../lib/api';
+import { birdwatchFlags } from '@ctff/birdwatch-contract';
+import FlagInspector from '../components/FlagInspector.astro';
+import RareBirdAlerts from '../components/RareBirdAlerts.astro';
+import { flagOn, type ForBirder } from '../lib/api';
 import { countryName } from '../lib/format';
 
 interface Props {
   title: string;
-  /** The birder this browser is logged in as, if any. */
-  birder?: Birder | undefined;
+  /**
+   * What birdwatch-api answered for the birder this browser is logged in as, if any: the page then has the
+   * navigation, the rare-bird alert banner (while rare-bird-alerts serves true) and the flag inspector.
+   */
+  page?: ForBirder | undefined;
 }
 
-const { title, birder } = Astro.props;
+const { title, page } = Astro.props;
+const birder = page?.birder;
+const path = Astro.url.pathname;
+const navigation = [
+  { href: '/', label: 'Sightings', current: path === '/' || path.startsWith('/sightings') },
+  { href: '/species', label: 'Species', current: path.startsWith('/species') },
+];
 ---
 
 <!doctype html>
@@ -25,6 +37,17 @@ const { title, birder } = Astro.props;
   <body class="ff-sans-normal">
     <header class="app-header">
       <a href="/" class="brand ff-serif text-xl">Birdwatch</a>
+      {
+        page && (
+          <nav class="app-nav" aria-label="Birdwatch">
+            {navigation.map((item) => (
+              <a href={item.href} aria-current={item.current ? 'page' : undefined}>
+                {item.label}
+              </a>
+            ))}
+          </nav>
+        )
+      }
       <div class="header-actions">
         {
           birder && (
@@ -44,7 +67,9 @@ const { title, birder } = Astro.props;
       </div>
     </header>
     <main class="app-main">
+      {page && flagOn(page.flags, birdwatchFlags.rareBirdAlerts) && <RareBirdAlerts alerts={page.rareBirdAlerts} />}
       <slot />
+      {page && <FlagInspector context={page.context} flags={page.flags} />}
     </main>
     <footer class="app-footer text-sm">
       A demo of Capture The Feature Flag. The birders, species and sightings are made up.
@@ -73,6 +98,23 @@ const { title, birder } = Astro.props;
   .brand {
     color: inherit;
     text-decoration: none;
+  }
+
+  .app-nav {
+    display: flex;
+    gap: var(--space-sm);
+    margin-inline-end: auto;
+  }
+
+  .app-nav a {
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.75;
+  }
+
+  .app-nav a[aria-current='page'] {
+    opacity: 1;
+    text-decoration: underline;
   }
 
   .header-actions {

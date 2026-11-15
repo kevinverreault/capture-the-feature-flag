@@ -1,0 +1,124 @@
+---
+import Badge from '@ds/components/ui/Badge.astro';
+import type { AllFlags, Context } from '../lib/api';
+import { adminFlagUrl, inspectedFlags } from '../lib/inspector';
+
+interface Props {
+  /** The context the flags were evaluated for, as birdwatch-api sent it to the Evaluator. */
+  context: Context;
+  flags: AllFlags;
+}
+
+const { context, flags } = Astro.props;
+const { admin } = Astro.locals;
+const rows = inspectedFlags(flags);
+const variationBadge = (value: boolean | null) => (value === null ? 'outline' : value ? 'primary' : 'muted');
+---
+
+<details class="inspector" data-testid="flag-inspector">
+  <summary class="text-lg">Flag inspector</summary>
+  <div class="inspector-body">
+    <section>
+      <h2 class="text-md">Context</h2>
+      <dl class="context">
+        <dt><code>user_id</code></dt>
+        <dd data-testid="context-user-id"><code>{context.user_id ?? '(none)'}</code></dd>
+        <dt><code>country</code></dt>
+        <dd data-testid="context-country"><code>{context.country ?? '(none)'}</code></dd>
+      </dl>
+    </section>
+    <section>
+      <h2 class="text-md">
+        Flags in <code>{admin.projectKey}</code> / <code>{admin.environmentKey}</code>
+      </h2>
+      {
+        flags.error ? (
+          <p data-testid="flags-error">
+            The flags couldn't be evaluated (<code>{flags.error}</code>), so every flag gets its fallback value,{' '}
+            <code>false</code>.
+          </p>
+        ) : (
+          <table class="flags">
+            <thead>
+              <tr>
+                <th scope="col">Flag</th>
+                <th scope="col">Variation</th>
+                <th scope="col">Evaluation reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const href = adminFlagUrl(admin, row.key);
+                return (
+                  <tr data-testid="inspected-flag" data-flag={row.key}>
+                    <th scope="row">
+                      {href ? (
+                        <a href={href} target="_blank" rel="noopener" title="Open this flag in the admin app">
+                          <code>{row.key}</code>
+                        </a>
+                      ) : (
+                        <code>{row.key}</code>
+                      )}
+                    </th>
+                    <td data-testid="flag-variation">
+                      <Badge variant={variationBadge(row.value)}>{row.value === null ? 'none' : String(row.value)}</Badge>
+                    </td>
+                    <td data-testid="flag-reason" data-reason={row.reasonKind}>
+                      <code>{row.reason}</code>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )
+      }
+      {!admin.url && <p class="muted text-sm">Set CTFF_ADMIN_URL to link each flag to the admin app.</p>}
+    </section>
+  </div>
+</details>
+
+<style>
+  .inspector {
+    border: 1px solid hsl(var(--color-on-background) / 0.15);
+    border-radius: 0.5rem;
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .inspector summary {
+    cursor: pointer;
+  }
+
+  .inspector-body {
+    display: grid;
+    gap: var(--space-md);
+    margin-top: var(--space-sm);
+  }
+
+  .context {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--space-xs) var(--space-sm);
+    margin: 0;
+  }
+
+  .context dd {
+    margin: 0;
+  }
+
+  .flags {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .flags th,
+  .flags td {
+    padding: var(--space-xs) var(--space-sm);
+    border-bottom: 1px solid hsl(var(--color-on-background) / 0.1);
+    text-align: start;
+  }
+
+  .flags a {
+    color: inherit;
+  }
+</style>

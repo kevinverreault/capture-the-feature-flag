@@ -3,12 +3,13 @@ import type {
   BirdersResponse,
   FeedResponse,
   LoggedSightingResponse,
+  SpeciesPageResponse,
   SessionResponse,
   SpeciesResponse,
 } from '@ctff/birdwatch-contract';
 
 // The shapes birdwatch-api answers with come from @ctff/birdwatch-contract, which both apps share.
-export type { AllFlags, Birder, FeedSighting, Rarity, Species } from '@ctff/birdwatch-contract';
+export type { AllFlags, Birder, Context, FeedSighting, ForBirder, Rarity, Species } from '@ctff/birdwatch-contract';
 
 /** What the "log a sighting" form sends, as typed in (birdwatch-api checks it). */
 export interface NewSighting {
@@ -67,6 +68,8 @@ export function birdwatchApi(locals: App.Locals, token?: string) {
     logIn: (birderId: string) => call<SessionResponse>('POST', '/session', { birderId }),
     sightings: () => call<FeedResponse>('GET', '/sightings'),
     species: () => call<SpeciesResponse>('GET', '/species'),
+    /** One species and its sightings; an unknown species is an `ApiError` with status `404`. */
+    speciesPage: (speciesId: string) => call<SpeciesPageResponse>('GET', `/species/${encodeURIComponent(speciesId)}`),
     logSighting: (sighting: NewSighting) => call<LoggedSightingResponse>('POST', '/sightings', sighting),
   };
 }

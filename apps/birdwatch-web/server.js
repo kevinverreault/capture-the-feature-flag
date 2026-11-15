@@ -8,7 +8,8 @@ import { handler } from './dist/server/entry.mjs';
 
 /**
  * Serves Birdwatch: the built client assets, then the server-rendered pages. All configuration comes from
- * environment variables: BIRDWATCH_API_URL (required), PORT, HOST and LOG_LEVEL. Logs are JSON lines on stdout.
+ * environment variables: BIRDWATCH_API_URL (required), CTFF_ADMIN_URL, CTFF_PROJECT, CTFF_ENVIRONMENT, PORT, HOST
+ * and LOG_LEVEL. Logs are JSON lines on stdout.
  */
 const logger = pino({ level: process.env['LOG_LEVEL'] ?? 'info', redact: ['req.headers.cookie'] });
 
@@ -19,6 +20,14 @@ const rawPort = process.env['PORT']?.trim() || '3000';
 const port = Number(rawPort);
 if (!Number.isInteger(port) || port < 0 || port > 65535) fail(`PORT is not a valid port: ${rawPort}`);
 const host = process.env['HOST'] ?? '0.0.0.0';
+// Where the flag inspector links to: the admin app as a browser reaches it, in Birdwatch's project and environment.
+const adminUrl = process.env['CTFF_ADMIN_URL']?.trim().replace(/\/+$/, '') ?? '';
+if (adminUrl && !URL.canParse(adminUrl)) fail(`CTFF_ADMIN_URL is not a URL: ${adminUrl}`);
+const admin = {
+  url: adminUrl,
+  projectKey: process.env['CTFF_PROJECT']?.trim() || 'birdwatch',
+  environmentKey: process.env['CTFF_ENVIRONMENT']?.trim() || 'development',
+};
 
 const clientDir = fileURLToPath(new URL('./dist/client/', import.meta.url));
 const logRequest = pinoHttp({ logger, autoLogging: { ignore: (req) => req.url?.startsWith('/health/') ?? false } });
@@ -39,14 +48,14 @@ const server = createServer((req, res) =>
         return res.end();
       }
       // Without `next`, Astro renders its 404 page for a path no page matches.
-      return handler(req, res, undefined, { apiUrl, logger });
+      return handler(req, res, undefined, { apiUrl, admin, logger });
     }),
   ),
 );
 server.listen(port, host, () => {
   const address = server.address();
   logger.info(
-    { host, port: typeof address === 'object' && address ? address.port : port, apiUrl },
+    { host, port: typeof address === 'object' && address ? address.port : port, apiUrl, adminUrl },
     'birdwatch-web listening',
   );
 });

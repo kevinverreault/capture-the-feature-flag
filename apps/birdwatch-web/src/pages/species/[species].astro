@@ -1,0 +1,69 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import Button from '@ds/components/ui/Button.astro';
+import RarityBadge from '../../components/RarityBadge.astro';
+import SightingCard from '../../components/SightingCard.astro';
+import BirdwatchLayout from '../../layouts/BirdwatchLayout.astro';
+import { ApiError } from '../../lib/api';
+import { asBirder } from '../../lib/page-session';
+
+// A species of the mock data, with its sightings. An unknown species answers 404.
+const speciesId = Astro.params.species ?? '';
+const page = await asBirder(Astro, async (api) => {
+  try {
+    return { found: true, ...(await api.speciesPage(speciesId)) } as const;
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+    return { found: false, ...(await api.species()) } as const;
+  }
+});
+if ('redirect' in page) return page.redirect;
+const loaded = page.loaded;
+if (!loaded.found) Astro.response.status = 404;
+---
+
+<BirdwatchLayout title={loaded.found ? loaded.species.commonName : 'Species not found'} page={loaded}>
+  {
+    loaded.found ? (
+      <article class="species" data-testid="species-page">
+        <div class="title">
+          <h1 class="ff-serif text-2xl">{loaded.species.commonName}</h1>
+          <RarityBadge rarity={loaded.species.rarity} />
+        </div>
+        <p class="muted">
+          <em>{loaded.species.scientificName}</em> · {loaded.species.family}
+        </p>
+        <p>{loaded.species.description}</p>
+        <h2 class="text-xl">Sightings</h2>
+        {loaded.sightings.length === 0 ? (
+          <p class="muted">Nobody has logged one yet.</p>
+        ) : (
+          <ul class="cards">
+            {loaded.sightings.map((sighting) => (
+              <SightingCard sighting={sighting} />
+            ))}
+          </ul>
+        )}
+      </article>
+    ) : (
+      <Alert variant="warning" icon="triangle-alert" title="Species not found">
+        Birdwatch has no species {speciesId}.
+      </Alert>
+    )
+  }
+  <Button href="/species" variant="muted" decoration="ghost">All species</Button>
+</BirdwatchLayout>
+
+<style>
+  .species {
+    display: grid;
+    gap: var(--space-sm);
+  }
+
+  .title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+</style>

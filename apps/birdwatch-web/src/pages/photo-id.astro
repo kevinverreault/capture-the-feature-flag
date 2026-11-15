@@ -1,0 +1,63 @@
+---
+import Alert from '@ds/components/feedback/Alert.astro';
+import FormField from '@ds/components/form/FormField.astro';
+import Input from '@ds/components/form/Input.astro';
+import Button from '@ds/components/ui/Button.astro';
+import BirdwatchLayout from '../layouts/BirdwatchLayout.astro';
+import { birdwatchFlags } from '@ctff/birdwatch-contract';
+import { flagOn, type Species } from '../lib/api';
+import { postedForm } from '../lib/forms';
+import { asBirder } from '../lib/page-session';
+import { suggestSpecies } from '../lib/photo-id';
+
+// "Photo ID (beta)", for the birders photo-id-beta targets: pick a photo, get a species. It is a mock (see
+// suggestSpecies); while photo-id-beta serves false, the page answers 404.
+const maxPhotoBytes = 5 * 1024 * 1024;
+
+const page = await asBirder(Astro, (api) => api.species());
+if ('redirect' in page) return page.redirect;
+const { species, flags } = page.loaded;
+const betaOn = flagOn(flags, birdwatchFlags.photoIdBeta);
+if (!betaOn) Astro.response.status = 404;
+
+let suggestion: Species | undefined;
+let error: string | undefined;
+if (betaOn && Astro.request.method === 'POST') {
+  const photo = (await postedForm(Astro.request)).get('photo');
+  if (!(photo instanceof File) || photo.size === 0) error = 'Choose a photo first.';
+  else if (photo.size > maxPhotoBytes) error = 'That photo is too large: 5 MB at most.';
+  else suggestion = suggestSpecies(new Uint8Array(await photo.arrayBuffer()), species);
+  if (!suggestion) Astro.response.status = 400;
+}
+---
+
+<BirdwatchLayout title="Photo ID (beta)" page={page.loaded}>
+  <h1 class="ff-serif text-2xl">Photo ID (beta)</h1>
+  {
+    betaOn ? (
+      <>
+        <p>Pick a photo of a bird, and Birdwatch suggests a species. It is a beta, for the birders invited to try it.</p>
+        {suggestion && (
+          <Alert variant="success" icon="circle-check" title="It looks like…" data-testid="photo-id-suggestion">
+            <a href={`/species/${encodeURIComponent(suggestion.id)}`}>{suggestion.commonName}</a> (
+            <em>{suggestion.scientificName}</em>). This is a demo: the suggestion comes from the photo's bytes, not a
+            model.
+          </Alert>
+        )}
+        <form method="post" enctype="multipart/form-data" class="stack" data-testid="photo-id-form">
+          <FormField label="Photo" error={error}>
+            <Input name="photo" type="file" accept="image/*" required />
+          </FormField>
+          <Button type="submit" variant="primary">
+            Identify
+          </Button>
+        </form>
+      </>
+    ) : (
+      <Alert variant="warning" icon="triangle-alert" title="Photo ID isn't available to you" data-testid="photo-id-off">
+        The photo-id-beta flag serves false for you right now.
+      </Alert>
+    )
+  }
+  <Button href="/" variant="muted" decoration="ghost">Back to the sightings</Button>
+</BirdwatchLayout>
