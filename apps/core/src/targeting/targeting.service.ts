@@ -1,11 +1,12 @@
-import type { IndividualTarget, Rule } from '@ctff/evaluation';
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { staleVersion } from '../common/conflicts.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
-import { FlagsService, staleVersion } from '../flags/flags.service.js';
+import { FlagsService } from '../flags/flags.service.js';
 import type { Environment, Flag, Targeting } from '../generated/prisma/client.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import type { TargetingDto, UpdateTargetingDto } from './targeting.dto.js';
+import { toTargetingSnapshot } from './targeting-snapshot.js';
 
 @Injectable()
 export class TargetingService {
@@ -66,12 +67,7 @@ function toTargetingDto(flag: Flag, environment: Environment, targeting: Targeti
   return {
     flagKey: flag.key,
     environmentKey: environment.key,
-    on: targeting.on,
-    offVariation: targeting.offVariation,
-    defaultVariation: targeting.defaultVariation,
-    individualTargets: targeting.individualTargets as unknown as IndividualTarget[],
-    rules: targeting.rules as unknown as Rule[],
-    version: targeting.version,
+    ...toTargetingSnapshot(targeting),
     updatedAt: targeting.updatedAt,
   };
 }

@@ -91,6 +91,7 @@ describe('targeting', () => {
 
     expect((await api.patch(production, { on: true })).status).toBe(400);
     expect((await api.patch(production, { version: 1, on: 'yes' })).status).toBe(400);
+    expect((await api.patch(production, { version: 1, on: null })).status).toBe(400);
   });
 
   it('returns 404 for an unknown flag or environment', async () => {

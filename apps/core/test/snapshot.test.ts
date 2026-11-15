@@ -21,8 +21,9 @@ describe('evaluator snapshot', () => {
     return { projectKey, development: development.body.sdkKey, production: production.body.sdkKey };
   }
 
-  const snapshot = (sdkKey: string, headers?: Record<string, string>) =>
-    api.get<EnvironmentSnapshot>(`/evaluator/snapshots/${sdkKey}`, headers);
+  // The SDK key travels in a header, not the URL, so it stays out of access logs.
+  const snapshot = (sdkKey: string, headers: Record<string, string> = {}) =>
+    api.get<EnvironmentSnapshot>('/evaluator/snapshot', { 'x-ctff-sdk-key': sdkKey, ...headers });
 
   it("returns the targeting of every flag in the SDK key's environment", async () => {
     const { projectKey, development, production } = await project();
@@ -99,7 +100,21 @@ describe('evaluator snapshot', () => {
     expect(changed.headers.get('etag')).not.toBe(etag);
   });
 
-  it('returns 404 for an unknown SDK key', async () => {
+  it('returns 404 for an unknown SDK key and 400 without one', async () => {
     expect((await snapshot('ctff-env-unknown')).status).toBe(404);
+    expect((await api.get('/evaluator/snapshot')).status).toBe(400);
+  });
+
+  it('keeps the SDK key out of the logs', async () => {
+    const { production } = await project();
+    const snapshotRequests = () =>
+      core.logs.filter((entry) => (entry['req'] as { url?: string } | undefined)?.url === '/api/v1/evaluator/snapshot')
+        .length;
+    const before = snapshotRequests();
+
+    await snapshot(production);
+
+    await expect.poll(snapshotRequests).toBe(before + 1);
+    expect(JSON.stringify(core.logs)).not.toContain(production);
   });
 });

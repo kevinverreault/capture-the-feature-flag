@@ -1,6 +1,7 @@
 import type { IndividualTarget, Rule } from '@ctff/evaluation';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, Min } from 'class-validator';
+import { IsBoolean, IsInt, Min } from 'class-validator';
+import { IsOmittable } from '../common/keys.js';
 
 export class IndividualTargetDto implements IndividualTarget {
   @ApiProperty({ description: 'Index into the flag variations.' })
@@ -60,7 +61,7 @@ export class UpdateTargetingDto {
   version!: number;
 
   @ApiProperty({ required: false, description: 'Switch targeting on or off.' })
-  @IsOptional()
+  @IsOmittable()
   @IsBoolean()
   on?: boolean;
 }

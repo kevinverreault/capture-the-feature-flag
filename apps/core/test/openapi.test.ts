@@ -24,7 +24,7 @@ describe('OpenAPI document', () => {
         '/api/v1/projects/{projectKey}/flags/{flagKey}',
         '/api/v1/projects/{projectKey}/flags/{flagKey}/targeting',
         '/api/v1/projects/{projectKey}/flags/{flagKey}/targeting/{environmentKey}',
-        '/api/v1/evaluator/snapshots/{sdkKey}',
+        '/api/v1/evaluator/snapshot',
       ]),
     );
     expect(Object.keys(document.paths['/api/v1/projects/{projectKey}/flags/{flagKey}'] ?? {})).toEqual(

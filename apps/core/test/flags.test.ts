@@ -103,6 +103,12 @@ describe('flags', () => {
     expect((await api.get(`${flags()}/${key}`)).body).toMatchObject({ name: 'First edit', version: 2 });
   });
 
+  it.each([['name'], ['description'], ['tags']])('rejects a null %s with 400', async (field) => {
+    const key = uniqueKey('nulled');
+    await api.post(flags(), { key, name: 'Nulled' });
+    expect((await api.patch(`${flags()}/${key}`, { version: 1, [field]: null })).status).toBe(400);
+  });
+
   it('requires the version an edit is based on', async () => {
     const key = uniqueKey('unversioned');
     await api.post(flags(), { key, name: 'Unversioned' });

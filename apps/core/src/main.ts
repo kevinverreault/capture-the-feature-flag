@@ -4,7 +4,8 @@ import { loadConfig } from './config.js';
 import { applyMigrations } from './database/migrate.js';
 
 const config = loadConfig();
-const logger = pino({ level: config.logLevel });
+// SDK keys identify environments and will become credentials, so they never reach the logs.
+const logger = pino({ level: config.logLevel, redact: ['req.headers["x-ctff-sdk-key"]'] });
 
 try {
   await applyMigrations(config.databaseUrl, logger);

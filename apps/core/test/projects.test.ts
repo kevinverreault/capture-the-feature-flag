@@ -74,6 +74,12 @@ describe('projects', () => {
     expect((await api.post('/projects', { key: uniqueKey('blank'), name: '  ' })).status).toBe(400);
   });
 
+  it('rejects a null name with 400', async () => {
+    const key = uniqueKey('nulled');
+    await api.post('/projects', { key, name: 'Nulled' });
+    expect((await api.patch(`/projects/${key}`, { name: null })).status).toBe(400);
+  });
+
   it('returns 404 for an unknown project', async () => {
     expect((await api.get('/projects/no-such-project')).status).toBe(404);
     expect((await api.patch('/projects/no-such-project', { name: 'x' })).status).toBe(404);

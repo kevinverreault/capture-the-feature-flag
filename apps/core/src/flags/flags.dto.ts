@@ -1,24 +1,14 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  ArrayMaxSize,
-  ArrayUnique,
-  IsArray,
-  IsInt,
-  IsOptional,
-  IsString,
-  Matches,
-  MaxLength,
-  Min,
-} from 'class-validator';
-import { ImmutableKey, IsKey, IsName } from '../common/keys.js';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsInt, IsString, Matches, MaxLength, Min } from 'class-validator';
+import { ImmutableKey, IsKey, IsName, IsOmittable } from '../common/keys.js';
 
 const tagPattern = /^\S(?:.*\S)?$/;
 
 function IsDescription(): PropertyDecorator {
   return applyDecorators(
     ApiProperty({ required: false, maxLength: 2000, description: 'What the flag controls.' }),
-    IsOptional(),
+    IsOmittable(),
     IsString(),
     MaxLength(2000),
   );
@@ -27,7 +17,7 @@ function IsDescription(): PropertyDecorator {
 function IsTags(): PropertyDecorator {
   return applyDecorators(
     ApiProperty({ required: false, type: [String], example: ['alerts'], maxItems: 50 }),
-    IsOptional(),
+    IsOmittable(),
     IsArray(),
     ArrayMaxSize(50),
     ArrayUnique(),

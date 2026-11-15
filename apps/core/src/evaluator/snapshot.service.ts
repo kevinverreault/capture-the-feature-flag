@@ -1,7 +1,8 @@
-import type { EnvironmentSnapshot, IndividualTarget, Rule } from '@ctff/evaluation';
+import type { EnvironmentSnapshot, Variation } from '@ctff/evaluation';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { PrismaService } from '../database/prisma.service.js';
+import { toTargetingSnapshot } from '../targeting/targeting-snapshot.js';
 
 export interface SerializedSnapshot {
   /** The snapshot as JSON, exactly as it is sent. */
@@ -29,16 +30,9 @@ export class SnapshotService {
       environmentKey: environment.key,
       flags: targeting.map(({ flag, ...row }) => ({
         key: flag.key,
-        variations: flag.variations as boolean[],
+        variations: flag.variations as Variation[],
         version: flag.version,
-        targeting: {
-          on: row.on,
-          offVariation: row.offVariation,
-          defaultVariation: row.defaultVariation,
-          individualTargets: row.individualTargets as unknown as IndividualTarget[],
-          rules: row.rules as unknown as Rule[],
-          version: row.version,
-        },
+        targeting: toTargetingSnapshot(row),
       })),
     };
 

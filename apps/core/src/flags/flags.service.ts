@@ -1,4 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { staleVersion } from '../common/conflicts.js';
 import { isUniqueViolation } from '../common/prisma-errors.js';
 import { lockProject } from '../database/lock-project.js';
 import { PrismaService } from '../database/prisma.service.js';
@@ -88,10 +89,6 @@ export class FlagsService {
     const { count } = await this.prisma.flag.deleteMany({ where: { projectId: project.id, key } });
     if (count === 0) throw new NotFoundException(`Flag ${key} not found in project ${project.key}`);
   }
-}
-
-export function staleVersion(what: string, version: number): ConflictException {
-  return new ConflictException(`${what} has changed since version ${version}; reload it and try again`);
 }
 
 function toFlagDto(project: Project, flag: Flag): FlagDto {

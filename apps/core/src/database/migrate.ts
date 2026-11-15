@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import type { Logger } from 'pino';
 
-/** The migrations authored with `prisma migrate dev`, shipped next to dist/ in the image. */
+/** The migrations in Prisma Migrate's layout (create new ones with `prisma migrate dev`), shipped next to dist/. */
 export const migrationsDir = fileURLToPath(new URL('../../prisma/migrations', import.meta.url));
 
 /** The advisory lock id Prisma Migrate takes, so Core and the Prisma CLI never migrate at the same time. */
@@ -15,7 +15,8 @@ const migrationLockId = 72707369;
  * Applies pending migrations from prisma/migrations, so Core owns its schema without shipping the Prisma CLI and
  * its native schema engine in the image. Progress is recorded in Prisma's own `_prisma_migrations` table (same
  * checksums), so `prisma migrate status` and `prisma migrate dev` keep working against a database Core migrated.
- * Each migration runs in its own transaction, and concurrent Core replicas serialize on an advisory lock.
+ * Each migration runs in its own transaction (so a migration may not use statements such as
+ * `CREATE INDEX CONCURRENTLY`), and concurrent Core replicas serialize on an advisory lock.
  */
 export async function applyMigrations(databaseUrl: string, logger: Logger, dir = migrationsDir): Promise<void> {
   const client = new pg.Client({ connectionString: databaseUrl });

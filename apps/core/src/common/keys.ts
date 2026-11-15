@@ -1,6 +1,6 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmpty, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { IsEmpty, IsNotEmpty, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
 
 /** Lowercase kebab-case: lowercase letters and digits in groups joined by single hyphens, starting with a letter. */
 export const keyPattern = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -30,10 +30,18 @@ export function ImmutableKey(what: string): PropertyDecorator {
 export function IsName(what: string, { optional = false } = {}): PropertyDecorator {
   return applyDecorators(
     ApiProperty({ description: `The ${what}'s display name.`, maxLength: 200, required: !optional }),
-    ...(optional ? [IsOptional()] : []),
+    ...(optional ? [IsOmittable()] : []),
     IsString(),
     MaxLength(200),
     Matches(/\S/, { message: 'name must not be blank' }),
     IsNotEmpty(),
   );
+}
+
+/**
+ * Lets an update body leave a property out, but not set it to `null` (class-validator's IsOptional accepts both,
+ * and none of these columns is nullable).
+ */
+export function IsOmittable(): PropertyDecorator {
+  return ValidateIf((_object, value) => value !== undefined);
 }
