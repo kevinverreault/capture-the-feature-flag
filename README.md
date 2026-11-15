@@ -107,7 +107,7 @@ The `@ctff/workspace` tests fail if a project is missing either tag, because an 
 
 4. Provide the icon folder. `Icon` loads SVGs from the host's own `src/svg/`. Copy the icons you use from `vendor/design-system/src/svg/`. The integration warns about missing icons that design system components render themselves (listed in `designSystemIcons` in [libs/design-system-host/src/index.ts](libs/design-system-host/src/index.ts)).
 
-5. Render `ThemeInit` in the `<head>` of every layout that renders `ThemeToggle`. It applies the visitor's saved theme, or the system preference, before the page paints; without it each page load starts in the light theme.
+5. Render `ThemeInit` in the `<head>` of every layout. It applies the visitor's saved theme, or the system preference, before the page paints; without it each page load starts in the light theme.
 
    ```astro
    ---

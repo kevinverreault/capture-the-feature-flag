@@ -1,4 +1,11 @@
-import { test as base, expect, type Browser, type Locator, type Page } from '@playwright/test';
+import {
+  test as base,
+  expect,
+  type Browser,
+  type BrowserContextOptions,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 import type { EvaluationReason } from '@ctff/core-api-client';
 import { birders, resetDemo, type BirderId } from './demo.js';
 import { urls, withinPollInterval } from './stack.js';
@@ -29,8 +36,13 @@ export async function reloadUntil(
 export class BirdwatchSession {
   constructor(readonly page: Page) {}
 
-  static async logIn(browser: Browser, birder: BirderId): Promise<BirdwatchSession> {
-    const context = await browser.newContext({ baseURL: urls.birdwatchWeb });
+  /** `options` are the browser context's, such as the `colorScheme` the system prefers. */
+  static async logIn(
+    browser: Browser,
+    birder: BirderId,
+    options: BrowserContextOptions = {},
+  ): Promise<BirdwatchSession> {
+    const context = await browser.newContext({ ...options, baseURL: urls.birdwatchWeb });
     const page = await context.newPage();
     await page.goto('/login');
     await page.getByRole('button', { name: `Log in as ${birders[birder].name}` }).click();

@@ -4,7 +4,8 @@ import { BirdwatchSession } from '../src/fixtures.js';
 import { urls } from '../src/stack.js';
 
 // The system prefers light, so a page only shows dark when it applies the theme the visitor chose.
-test.use({ colorScheme: 'light' });
+const colorScheme = 'light';
+test.use({ colorScheme });
 
 async function chooseDarkTheme(page: Page): Promise<void> {
   await expect(page.locator('html')).not.toHaveClass(/\btheme-dark\b/);
@@ -26,21 +27,22 @@ test('the showcase keeps the dark theme from page to page', async ({ page }) => 
 });
 
 test('the admin app keeps the dark theme from page to page', async ({ page }) => {
-  await page.goto(`${urls.core}/projects`);
+  await page.goto(adminPages.projects());
   await chooseDarkTheme(page);
 
   await page.goto(adminPages.dashboard());
   await expectDarkTheme(page);
 });
 
+// Not the `birdwatch` fixture: it resets the demo's targeting, which the theme doesn't depend on.
 test('Birdwatch keeps the dark theme from page to page', async ({ browser }) => {
-  const { page } = await BirdwatchSession.logIn(browser, 'alice');
+  const session = await BirdwatchSession.logIn(browser, 'alice', { colorScheme });
   try {
-    await chooseDarkTheme(page);
+    await chooseDarkTheme(session.page);
 
-    await page.goto('/species');
-    await expectDarkTheme(page);
+    await session.page.goto('/species');
+    await expectDarkTheme(session.page);
   } finally {
-    await page.context().close();
+    await session.close();
   }
 });
