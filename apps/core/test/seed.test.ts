@@ -55,8 +55,8 @@ describe('the demo seed', () => {
   });
 });
 
-describe('the demo seed on a database that has projects', () => {
-  it('seeds nothing', async () => {
+describe('the demo seed on a database that was never seeded', () => {
+  it('seeds the demo next to the projects already there', async () => {
     const databaseUrl = await createDatabase();
     const unseeded = await startCore({ databaseUrl });
     try {
@@ -67,7 +67,52 @@ describe('the demo seed on a database that has projects', () => {
     const core = await startCore({ databaseUrl, ...seeded });
     try {
       const projects = await apiClient(core.baseUrl).get('/projects');
-      expect(projects.body.map((project: { key: string }) => project.key)).toEqual(['mine']);
+      expect(projects.body.map((project: { key: string }) => project.key)).toEqual(['birdwatch', 'mine']);
+    } finally {
+      await core.stop();
+    }
+  });
+
+  it('finishes a seed that was interrupted halfway', async () => {
+    const databaseUrl = await createDatabase();
+    // What a Core killed during its seed leaves behind: the project and its first environment.
+    const unseeded = await startCore({ databaseUrl });
+    try {
+      const api = apiClient(unseeded.baseUrl);
+      await api.post('/projects', { key: 'birdwatch', name: 'Birdwatch' });
+      await api.post('/projects/birdwatch/environments', { key: 'development', name: 'Development' });
+    } finally {
+      await unseeded.stop();
+    }
+    const core = await startCore({ databaseUrl, ...seeded });
+    try {
+      const api = apiClient(core.baseUrl);
+      const environments = await api.get('/projects/birdwatch/environments');
+      expect(environments.body.map((environment: { key: string }) => environment.key)).toEqual([
+        'development',
+        'production',
+      ]);
+      expect((await api.get('/projects/birdwatch/flags')).body).toHaveLength(3);
+      const targeting = await api.get('/projects/birdwatch/flags/new-sighting-form/targeting');
+      expect(targeting.body.map((environment: { on: boolean }) => environment.on)).toEqual([true, true]);
+    } finally {
+      await core.stop();
+    }
+  });
+});
+
+describe('the demo seed once it has completed', () => {
+  it('does not bring back a demo project that was deleted', async () => {
+    const databaseUrl = await createDatabase();
+    const first = await startCore({ databaseUrl, ...seeded });
+    try {
+      expect((await apiClient(first.baseUrl).delete('/projects/birdwatch')).status).toBe(204);
+    } finally {
+      await first.stop();
+    }
+    const core = await startCore({ databaseUrl, ...seeded });
+    try {
+      expect((await apiClient(core.baseUrl).get('/projects')).body).toEqual([]);
     } finally {
       await core.stop();
     }

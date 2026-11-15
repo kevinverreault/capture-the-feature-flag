@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import pg from 'pg';
 import type { Logger } from 'pino';
+import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
 import { FlagsService } from '../flags/flags.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
@@ -54,34 +55,29 @@ export const birdwatchSeed = {
   ] satisfies SeedFlag[],
 };
 
+/** The name the completed demo seed is recorded under. */
+const seedName = 'birdwatch-demo';
+
 /**
- * Seeds the Birdwatch demo on first start: when the database has no project at all. Otherwise it does nothing, so
- * restarting Core, or an operator who deleted the demo and has projects of their own, never gets it back. It goes
- * through the same services as the API, so the seed has its audit entries and off-state targeting like any change.
- * A seed that fails halfway removes the project it created and fails Core's start.
+ * Seeds the Birdwatch demo once per database: on every start until it has completed, after which it is recorded
+ * and never runs again, so an operator who deletes the demo doesn't get it back. Each step skips what is already
+ * there, so a seed interrupted halfway (Core killed during it) is finished on the next start, and a database that
+ * already holds projects of its own gets the demo next to them. It goes through the same services as the API, so
+ * the seed has its audit entries and off-state targeting like any change.
  */
 export async function seedDemo(app: INestApplication, databaseUrl: string, logger: Logger): Promise<void> {
   const lock = new pg.Client({ connectionString: databaseUrl });
   await lock.connect();
   try {
     await lock.query('SELECT pg_advisory_lock($1)', [seedLockId]);
-    const projects = app.get(ProjectsService);
-    if ((await projects.list()).length > 0) {
-      logger.info('The database has projects: skipping the demo seed');
+    const prisma = app.get(PrismaService);
+    if (await prisma.completedSeed.findUnique({ where: { name: seedName } })) {
+      logger.debug('The demo seed has already completed');
       return;
     }
-    const { project } = birdwatchSeed;
-    await projects.create(project, seedActor);
-    try {
-      await seedProject(app);
-    } catch (error) {
-      // Removing the half-seeded project lets the next start seed it again; failing that, the seed error matters.
-      await projects
-        .delete(project.key, seedActor)
-        .catch((cleanup: unknown) => logger.error({ err: cleanup }, 'Could not remove the half-seeded demo project'));
-      throw new Error(`The demo seed failed: ${(error as Error).message}`, { cause: error });
-    }
-    logger.info({ project: project.key }, 'Seeded the demo project');
+    await seedProject(app);
+    await prisma.completedSeed.create({ data: { name: seedName } });
+    logger.info({ project: birdwatchSeed.project.key }, 'Seeded the demo project');
   } finally {
     await lock.end();
   }
@@ -89,16 +85,28 @@ export async function seedDemo(app: INestApplication, databaseUrl: string, logge
 
 async function seedProject(app: INestApplication): Promise<void> {
   const { project, environments, flags } = birdwatchSeed;
+  const projectsService = app.get(ProjectsService);
   const environmentsService = app.get(EnvironmentsService);
   const flagsService = app.get(FlagsService);
   const targetingService = app.get(TargetingService);
-  for (const environment of environments) await environmentsService.create(project.key, environment, seedActor);
+
+  const existing = (await projectsService.list()).some((listed) => listed.key === project.key);
+  if (!existing) await projectsService.create(project, seedActor);
+  const environmentKeys = new Set((await environmentsService.list(project.key)).map((listed) => listed.key));
+  for (const environment of environments) {
+    if (!environmentKeys.has(environment.key)) await environmentsService.create(project.key, environment, seedActor);
+  }
+  const listedFlags = await flagsService.list(project.key, { includeArchived: true });
   for (const { on, ...flag } of flags as SeedFlag[]) {
-    await flagsService.create(project.key, flag, seedActor);
-    if (!on) continue;
+    const listed = listedFlags.find((candidate) => candidate.key === flag.key);
+    if (!listed) await flagsService.create(project.key, flag, seedActor);
+    // An archived flag's targeting can't change: it stays as the admin left it.
+    if (!on || listed?.archived) continue;
     for (const environment of environments) {
-      const { version } = await targetingService.get(project.key, flag.key, environment.key);
-      await targetingService.update(project.key, flag.key, environment.key, { version, on }, seedActor);
+      const targeting = await targetingService.get(project.key, flag.key, environment.key);
+      // Version 1 is targeting nobody has changed since the flag was created; anything else is left as it is.
+      if (targeting.version !== 1 || targeting.on === on) continue;
+      await targetingService.update(project.key, flag.key, environment.key, { version: 1, on }, seedActor);
     }
   }
 }
