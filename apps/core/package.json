@@ -94,6 +94,7 @@
     "@testcontainers/postgresql": "^12.2.1",
     "@types/express": "^5.0.6",
     "@types/pg": "^8.23.1",
+    "node-html-parser": "^6.1.13",
     "prisma": "^7.10.1",
     "typescript": "~6.0.3"
   }

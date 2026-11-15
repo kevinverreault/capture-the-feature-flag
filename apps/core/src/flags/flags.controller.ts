@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { ApiConflictResponse, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { FlagListItemDto } from './flag-list.dto.js';
 import { CreateFlagDto, FlagDto, UpdateFlagDto } from './flags.dto.js';
 import { FlagsService } from './flags.service.js';
 
@@ -9,8 +10,8 @@ export class FlagsController {
   constructor(private readonly flags: FlagsService) {}
 
   @Get()
-  @ApiOkResponse({ type: [FlagDto] })
-  list(@Param('projectKey') projectKey: string): Promise<FlagDto[]> {
+  @ApiOkResponse({ type: [FlagListItemDto], description: 'By key, each with its targeting on or off per environment.' })
+  list(@Param('projectKey') projectKey: string): Promise<FlagListItemDto[]> {
     return this.flags.list(projectKey);
   }
 

@@ -48,6 +48,7 @@ Projects, environments and flags are addressed by their keys, which are lowercas
 | `/api/v1/evaluator/snapshot` (header `X-CTFF-SDK-Key`)    | `GET` (for Evaluators)    |
 
 - Each environment gets a generated SDK key (`ctff-env-…`).
+- The flag list (`GET /flags`) gives each flag's `targeting`: whether it is on or off in every environment, in the environments' order, for the admin app's flag list.
 - `DELETE` on a flag deletes it outright for now; archiving, and deleting only archived flags, come with #11.
 - Every flag is stored with the variations `[true, false]` ([ADR 0002](../../docs/adr/0002-boolean-flags-stored-as-variations.md)), and targeting refers to them by index. Creating a flag gives it off-state targeting in every environment: targeting off, off variation `false` (index 1), default variation `true` (index 0). Creating an environment gives every existing flag the same off-state targeting there.
 - A flag carries a "managed by" marker (`managedBy`): `terraform` when the Terraform provider manages it, otherwise `null`. It is informational (the admin app shows a badge and a warning) and locks nothing. A `PATCH` can set it, or clear it with `null`.

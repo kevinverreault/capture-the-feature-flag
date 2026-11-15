@@ -39,3 +39,23 @@ h2 {
 .danger-zone p {
   margin: 0;
 }
+
+/* A section's heading with the section's main action at its end. */
+.section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-heading > h2 {
+  margin: 0;
+}
+
+/* A flag's tags, as badges. */
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+}
