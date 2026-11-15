@@ -1,0 +1,80 @@
+{
+  "name": "@ctff/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Core: owns all admin data and its schema, and exposes the versioned REST API used by the admin app, Terraform and Evaluators.",
+  "files": [
+    "dist",
+    "prisma/migrations"
+  ],
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "tsc -p tsconfig.app.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "start": "node dist/main.js",
+    "docker-build": "docker build -f Dockerfile -t ctff-core:local ../.."
+  },
+  "nx": {
+    "tags": [
+      "type:app",
+      "scope:core"
+    ],
+    "targets": {
+      "generate": {
+        "cache": true,
+        "inputs": [
+          "{projectRoot}/prisma/schema.prisma",
+          "{projectRoot}/prisma.config.ts"
+        ],
+        "outputs": [
+          "{projectRoot}/src/generated"
+        ]
+      },
+      "typecheck": {
+        "dependsOn": [
+          "generate",
+          "^build"
+        ]
+      },
+      "build": {
+        "dependsOn": [
+          "generate",
+          "^build"
+        ]
+      },
+      "test": {
+        "dependsOn": [
+          "build",
+          "^build"
+        ]
+      }
+    }
+  },
+  "dependencies": {
+    "@ctff/evaluation": "workspace:*",
+    "@nestjs/common": "^11.2.10",
+    "@nestjs/core": "^11.2.10",
+    "@nestjs/platform-express": "^11.2.10",
+    "@nestjs/swagger": "^11.4.8",
+    "@prisma/adapter-pg": "^7.10.1",
+    "@prisma/client": "^7.10.1",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "nestjs-pino": "^5.3.1",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^12.2.1",
+    "@types/express": "^5.0.6",
+    "@types/pg": "^8.23.1",
+    "prisma": "^7.10.1",
+    "typescript": "~6.0.3"
+  }
+}

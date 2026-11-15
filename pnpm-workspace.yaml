@@ -5,3 +5,11 @@ packages:
 
 allowBuilds:
   nx: true
+  # Prisma downloads its schema engine (used by `prisma migrate`) for the current platform.
+  '@prisma/engines': true
+  prisma: true
+  '@scarf/scarf': false
+  # Optional native speedups pulled in by Testcontainers' SSH support; the pure JS fallbacks are enough.
+  cpu-features: false
+  ssh2: false
+  protobufjs: false

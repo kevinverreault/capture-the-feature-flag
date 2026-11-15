@@ -1,0 +1,27 @@
+{
+  "name": "@ctff/evaluation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Targeting semantics in one place: the shared types for targeting, environment snapshots and telemetry, and (later) the pure evaluation function.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.lib.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint ."
+  },
+  "nx": {
+    "tags": [
+      "type:lib",
+      "scope:shared"
+    ]
+  }
+}

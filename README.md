@@ -4,7 +4,7 @@ A self-hosted feature flag platform for a single operator: define flags per proj
 
 ## Bootstrap the workspace
 
-Prerequisites: Node 24 (see [.nvmrc](.nvmrc)), Git, and Corepack (it ships with Node). Docker is needed only to build images.
+Prerequisites: Node 24 (see [.nvmrc](.nvmrc)), Git, and Corepack (it ships with Node). Docker is needed to build images and for the Core tests (Testcontainers).
 
 ```bash
 git clone --recurse-submodules https://github.com/kevinverreault/capture-the-feature-flag.git
@@ -16,6 +16,14 @@ corepack enable          # provides the pnpm version pinned in package.json
 pnpm install
 pnpm nx run-many -t lint typecheck test build
 ```
+
+## Run it
+
+```bash
+docker compose up
+```
+
+This starts PostgreSQL 17 and [Core](apps/core/README.md) on <http://localhost:3000>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>.
 
 ## Layout
 
