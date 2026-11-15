@@ -8,4 +8,6 @@ export const routes = {
   environment: (project: string, environment: string) =>
     `/projects/${segment(project)}/environments/${segment(environment)}`,
   settings: (project: string) => `/projects/${segment(project)}/settings`,
+  /** The install-wide Settings page: telemetry retention, the seen-context cap and the stale-flag threshold. */
+  installSettings: () => '/settings',
 };

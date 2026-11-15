@@ -5,6 +5,7 @@ import type { EvaluatorConfig } from './config.js';
 import { EvaluationController } from './evaluation/evaluation.controller.js';
 import { HealthController } from './health/health.controller.js';
 import { SnapshotPoller } from './snapshots/snapshot-poller.js';
+import { TelemetryRecorder } from './telemetry/telemetry-recorder.js';
 
 @Module({})
 export class AppModule {
@@ -21,6 +22,10 @@ export class AppModule {
         {
           provide: SnapshotPoller,
           useValue: new SnapshotPoller({ ...config, logger: logger.child({ component: 'snapshot-poller' }) }),
+        },
+        {
+          provide: TelemetryRecorder,
+          useValue: new TelemetryRecorder({ ...config, logger: logger.child({ component: 'telemetry' }) }),
         },
       ],
     };

@@ -63,9 +63,10 @@ export function evaluate(
 
 /**
  * The context with absent (`undefined` or `null`) attributes left out and `country` in uppercase, or `null` when
- * it is malformed. Context attributes V1 doesn't know are ignored.
+ * it is malformed. Context attributes V1 doesn't know are ignored. `evaluate()` checks contexts with it, and the
+ * Evaluator and Core use it to record seen contexts the same way.
  */
-function normalizeContext(context: unknown): Context | null {
+export function normalizeContext(context: unknown): Context | null {
   if (typeof context !== 'object' || context === null || Array.isArray(context)) return null;
   const { user_id: userId, country } = context as Record<string, unknown>;
   const normalized: Context = {};

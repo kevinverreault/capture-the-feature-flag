@@ -6,19 +6,30 @@ Core owns all admin data and its PostgreSQL schema, and serves the versioned RES
 
 `docker compose up` at the repository root starts PostgreSQL and Core on <http://localhost:3000>, with the admin app at the same address. Core takes all of its configuration from environment variables:
 
-| Variable         | Default     | Meaning                                       |
-| :--------------- | :---------- | :-------------------------------------------- |
-| `DATABASE_URL`   | required    | PostgreSQL connection URL                     |
-| `PORT`           | `3000`      | HTTP port (`0` picks a free one)              |
-| `HOST`           | `0.0.0.0`   | Interface to listen on                        |
-| `LOG_LEVEL`      | `info`      | pino log level; logs are JSON lines on stdout |
-| `ADMIN_ENABLED`  | `true`      | Whether Core serves the admin app             |
-| `ADMIN_CORE_URL` | Core itself | The Core the admin app calls (see below)      |
+| Variable                | Default     | Meaning                                       |
+| :---------------------- | :---------- | :-------------------------------------------- |
+| `DATABASE_URL`          | required    | PostgreSQL connection URL                     |
+| `PORT`                  | `3000`      | HTTP port (`0` picks a free one)              |
+| `HOST`                  | `0.0.0.0`   | Interface to listen on                        |
+| `LOG_LEVEL`             | `info`      | pino log level; logs are JSON lines on stdout |
+| `ADMIN_ENABLED`         | `true`      | Whether Core serves the admin app             |
+| `ADMIN_CORE_URL`        | Core itself | The Core the admin app calls (see below)      |
+| `RETENTION_INTERVAL_MS` | `3600000`   | How often the retention job runs (see below)  |
 
 Outside Docker: `pnpm nx run @ctff/core:build`, then `DATABASE_URL=… pnpm --filter @ctff/core start`.
 
 - `/health/live` answers as long as the process runs. `/health/ready` answers once migrations are applied and while the database is reachable.
 - `/api/v1/openapi.json` (and `.yaml`) is the OpenAPI document generated from the controllers. `/api/docs` is a browsable UI.
+
+## Evaluation telemetry
+
+Evaluators send what they added up to `POST /api/v1/evaluator/telemetry` about once a minute ([ADR 0001](../../docs/adr/0001-evaluator-polls-core-not-the-database.md)), as a `TelemetryBatch` from `@ctff/evaluation`: per SDK key, evaluation counts per flag, variation and minute, and seen contexts with their last-seen time. Core adds the counts to its 1-minute count buckets and records each seen context once per environment, keeping the later last-seen. It then keeps only the newest seen contexts up to the seen-context cap in each environment. Telemetry for an SDK key, flag or variation that no longer exists is skipped. A malformed batch gets `400` and none of it is stored.
+
+- `GET /api/v1/projects/{projectKey}/evaluation-counts` lists the count buckets, oldest first: the last 24 hours, or `from` (inclusive) to `to` (exclusive), optionally for one `environment`.
+- `GET /api/v1/projects/{projectKey}/environments/{environmentKey}/seen-contexts` lists the seen contexts, most recently seen first.
+- `GET /api/v1/settings` and `PATCH /api/v1/settings` read and change the install-wide settings: `metricRetentionDays` (default 30), `seenContextRetentionDays` (30), `seenContextCap` (1,000 per environment) and `staleFlagThresholdDays` (7). The admin app's Settings page edits them.
+
+The retention job deletes count buckets older than the metric retention and seen contexts last seen before the seen-context retention, and trims each environment to the cap. It runs when Core starts, every `RETENTION_INTERVAL_MS`, and whenever the settings change, so a change applies at once, without a redeploy.
 
 ## The admin app
 

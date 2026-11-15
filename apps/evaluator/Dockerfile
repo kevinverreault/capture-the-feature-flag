@@ -1,7 +1,7 @@
 # The Evaluator. Build from the repository root:
 #   docker build -f apps/evaluator/Dockerfile -t ctff-evaluator .
 # All configuration comes from environment variables: CORE_URL (required), PORT, HOST, LOG_LEVEL,
-# POLL_INTERVAL_MS, CORE_TIMEOUT_MS.
+# POLL_INTERVAL_MS, CORE_TIMEOUT_MS, TELEMETRY_FLUSH_INTERVAL_MS, TELEMETRY_MAX_SEEN_CONTEXTS.
 
 FROM node:24-slim AS build
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0

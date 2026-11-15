@@ -6,14 +6,15 @@ It talks to Core only through [`@ctff/core-api-client`](../../libs/core-api-clie
 
 ## Pages
 
-| Path                                     | What it does                                                     |
-| :--------------------------------------- | :--------------------------------------------------------------- |
-| `/projects`                              | Lists the projects; creates one                                  |
-| `/projects/{project}/environments`       | Lists a project's environments with their SDK keys; creates one  |
-| `/projects/{project}/environments/{env}` | Shows and copies the SDK key; renames or deletes the environment |
-| `/projects/{project}/settings`           | Renames or deletes the project                                   |
+| Path                                     | What it does                                                                              |
+| :--------------------------------------- | :---------------------------------------------------------------------------------------- |
+| `/projects`                              | Lists the projects; creates one                                                           |
+| `/projects/{project}/environments`       | Lists a project's environments with their SDK keys; creates one                           |
+| `/projects/{project}/environments/{env}` | Shows and copies the SDK key; renames or deletes the environment                          |
+| `/projects/{project}/settings`           | Renames or deletes the project                                                            |
+| `/settings`                              | Telemetry retention, the seen-context cap and the stale-flag threshold, for every project |
 
-The header's project switcher lists every project. Forms are plain server-rendered posts: on success the page redirects (`303`) and shows a confirmation once; when Core rejects the submission, the form is rendered again with Core's status, and each validation message next to the input for the property Core names (messages about other properties show above the form). Deleting asks for confirmation in a dialog (or, without scripts, through a plain submit button). Each page's actions go through `handlePost` ([src/lib/forms.ts](src/lib/forms.ts)), and page addresses come from [src/lib/routes.ts](src/lib/routes.ts).
+The header's project switcher lists every project, next to a link to the install-wide Settings. Forms are plain server-rendered posts: on success the page redirects (`303`) and shows a confirmation once; when Core rejects the submission, the form is rendered again with Core's status, and each validation message next to the input for the property Core names (messages about other properties show above the form). Deleting asks for confirmation in a dialog (or, without scripts, through a plain submit button). Each page's actions go through `handlePost` ([src/lib/forms.ts](src/lib/forms.ts)), and page addresses come from [src/lib/routes.ts](src/lib/routes.ts).
 
 A form post must come from the admin app's own pages: Astro checks its `Origin` (or `Sec-Fetch-Site`), and one carrying neither is refused. When a page fails (Core unreachable, or answering `5xx`), the admin app logs it and answers with its 500 page, which doesn't call Core.
 

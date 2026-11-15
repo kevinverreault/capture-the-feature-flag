@@ -9,6 +9,13 @@ export interface EvaluatorConfig {
   pollIntervalMs: number;
   /** How long one request to Core may take before the poll counts as failed. */
   coreTimeoutMs: number;
+  /** The pause between the end of one telemetry flush to Core and the start of the next. */
+  telemetryFlushIntervalMs: number;
+  /**
+   * The most seen contexts per environment held between flushes; past it, the least recently seen are dropped.
+   * Bounds memory and the size of a batch.
+   */
+  telemetryMaxSeenContexts: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): EvaluatorConfig {
@@ -23,6 +30,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): EvaluatorConfi
     logLevel: env['LOG_LEVEL'] ?? 'info',
     pollIntervalMs: integer(env, 'POLL_INTERVAL_MS', 5000, 1),
     coreTimeoutMs: integer(env, 'CORE_TIMEOUT_MS', 5000, 1),
+    telemetryFlushIntervalMs: integer(env, 'TELEMETRY_FLUSH_INTERVAL_MS', 60_000, 1),
+    telemetryMaxSeenContexts: integer(env, 'TELEMETRY_MAX_SEEN_CONTEXTS', 1000, 1),
   };
 }
 

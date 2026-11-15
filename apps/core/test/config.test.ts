@@ -20,6 +20,15 @@ describe('configuration', () => {
     expect(() => loadConfig({ DATABASE_URL: databaseUrl, ADMIN_ENABLED: 'no' })).toThrow(/ADMIN_ENABLED/);
   });
 
+  it('runs retention hourly unless RETENTION_INTERVAL_MS says otherwise', () => {
+    expect(loadConfig({ DATABASE_URL: databaseUrl }).retentionIntervalMs).toBe(3_600_000);
+    expect(loadConfig({ DATABASE_URL: databaseUrl, RETENTION_INTERVAL_MS: '' }).retentionIntervalMs).toBe(3_600_000);
+    expect(loadConfig({ DATABASE_URL: databaseUrl, RETENTION_INTERVAL_MS: '500' }).retentionIntervalMs).toBe(500);
+    expect(() => loadConfig({ DATABASE_URL: databaseUrl, RETENTION_INTERVAL_MS: '0' })).toThrow(
+      /RETENTION_INTERVAL_MS/,
+    );
+  });
+
   it('requires DATABASE_URL', () => {
     expect(() => loadConfig({})).toThrow(/DATABASE_URL/);
   });
