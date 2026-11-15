@@ -61,6 +61,34 @@ describe('evaluating through the SDK', () => {
     expect(await development.variation('rare-bird-alerts', alice, false)).toBe(true);
   });
 
+  it('serves a country in [CA] rule to a CA context and the default variation to an NL context', async () => {
+    core.put(
+      'ctff-env-staging',
+      environment('staging', [
+        flag('rare-bird-alerts', {
+          on: true,
+          defaultVariation: 1,
+          individualTargets: [{ variation: 0, userIds: ['bob'] }],
+          rules: [{ attribute: 'country', operator: 'in', values: ['CA'], variation: 0 }],
+        }),
+      ]),
+    );
+    const staging = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-staging' });
+    await expect
+      .poll(() => staging.variationDetail('rare-bird-alerts', alice, false), { timeout: pollIntervalMs * 20 })
+      .toEqual({ value: true, variationIndex: 0, reason: { kind: 'RULE_MATCH', ruleIndex: 0 } });
+    expect(await staging.variationDetail('rare-bird-alerts', { user_id: 'alice', country: 'NL' }, true)).toEqual({
+      value: false,
+      variationIndex: 1,
+      reason: { kind: 'DEFAULT' },
+    });
+    expect(await staging.variationDetail('rare-bird-alerts', { user_id: 'bob', country: 'NL' }, false)).toEqual({
+      value: true,
+      variationIndex: 0,
+      reason: { kind: 'TARGET_MATCH' },
+    });
+  });
+
   it('evaluates contexts with missing attributes', async () => {
     const development = createClient({ evaluatorUrl: evaluator.url, sdkKey: 'ctff-env-development' });
     expect(await development.variationDetail('new-sighting-form', {}, false)).toEqual({
@@ -230,7 +258,7 @@ describe('the fallback value', () => {
 
   it('accepts a served variation with a reason this SDK does not know yet, from a newer Evaluator', async () => {
     const newer = createServer((_request, response) => {
-      const answer = { flagKey: 'rare-bird-alerts', value: true, variationIndex: 0, reason: { kind: 'RULE_MATCH' } };
+      const answer = { flagKey: 'rare-bird-alerts', value: true, variationIndex: 0, reason: { kind: 'ROLLOUT' } };
       response.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(answer));
     });
     await new Promise<void>((resolve) => newer.listen(0, '127.0.0.1', resolve));

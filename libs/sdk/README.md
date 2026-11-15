@@ -23,7 +23,16 @@ const detail = await flags.variationDetail('rare-bird-alerts', context, false);
 // { value: true, variationIndex: 0, reason: { kind: 'DEFAULT' } }
 ```
 
-The context is typed as `{ user_id?: string; country?: string }`, where `country` is an ISO 3166-1 alpha-2 code. Either attribute may be left out.
+The context is typed as `{ user_id?: string; country?: string }`, where `country` is an ISO 3166-1 alpha-2 code. Either attribute may be left out; a rule on a missing attribute never matches, not even a `not in` rule.
+
+When a variation is served, the reason says why:
+
+| Reason                                 | When                                                                  |
+| :------------------------------------- | :-------------------------------------------------------------------- |
+| `{ kind: 'OFF' }`                      | Targeting is off, so the off variation is served                      |
+| `{ kind: 'TARGET_MATCH' }`             | The context's `user_id` is in an individual target                    |
+| `{ kind: 'RULE_MATCH', ruleIndex: n }` | Rule `n` (counting from 0) is the first rule that matched the context |
+| `{ kind: 'DEFAULT' }`                  | Targeting is on and no individual target or rule matched              |
 
 ## The fallback value
 

@@ -1,6 +1,8 @@
+import type { Variation } from '@ctff/evaluation';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { recordAudit, targetingState } from '../audit/audit-entry.js';
 import { updateAtVersion } from '../common/persistence.js';
+import { invalidBody } from '../common/validation.js';
 import { lockAndReload } from '../database/lock-row.js';
 import { PrismaService } from '../database/prisma.service.js';
 import { EnvironmentsService } from '../environments/environments.service.js';
@@ -9,7 +11,8 @@ import { FlagsService } from '../flags/flags.service.js';
 import type { Environment, Flag, Targeting } from '../generated/prisma/client.js';
 import { ProjectsService } from '../projects/projects.service.js';
 import type { TargetingDto, UpdateTargetingDto } from './targeting.dto.js';
-import { toTargetingSnapshot } from './targeting-snapshot.js';
+import { checkTargetingChange } from './check-targeting.js';
+import { toTargetingJsonColumns, toTargetingSnapshot } from './targeting-snapshot.js';
 
 @Injectable()
 export class TargetingService {
@@ -47,6 +50,17 @@ export class TargetingService {
   ): Promise<TargetingDto> {
     const { project, flag, environment, targeting: found } = await this.find(projectKey, flagKey, environmentKey);
     assertNotArchived(flag);
+    const checked = checkTargetingChange(
+      {
+        offVariation: input.offVariation,
+        defaultVariation: input.defaultVariation,
+        individualTargets: input.individualTargets,
+        rules: input.rules,
+      },
+      (flag.variations as Variation[]).length,
+    );
+    if (!checked.valid) throw invalidBody(checked.fields);
+    const { offVariation, defaultVariation, individualTargets, rules } = checked.change;
     const updated = await this.prisma.$transaction(async (tx) => {
       const targeting = await lockAndReload(tx, 'targeting', found.id, () =>
         targetingNotFound(flagKey, environmentKey),
@@ -56,7 +70,13 @@ export class TargetingService {
           tx.targeting.updateMany({
             // Also filtered on the flag, so targeting of a flag archived meanwhile is left as it was archived.
             where: { id: targeting.id, version: input.version, flag: notArchived },
-            data: { on: input.on, version: { increment: 1 } },
+            data: {
+              on: input.on,
+              offVariation,
+              defaultVariation,
+              ...toTargetingJsonColumns({ individualTargets, rules }),
+              version: { increment: 1 },
+            },
           }),
         `Targeting of ${flagKey} in ${environmentKey}`,
         input.version,
