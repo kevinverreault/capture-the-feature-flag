@@ -4,13 +4,14 @@ import { routes } from '../lib/routes';
 
 interface Props {
   project: Project;
-  current: 'flags' | 'environments' | 'settings';
+  current: 'flags' | 'environments' | 'audit' | 'settings';
 }
 
 const { project, current } = Astro.props;
 const sections = [
   { id: 'flags', text: 'Flags', path: routes.flags(project.key) },
   { id: 'environments', text: 'Environments', path: routes.environments(project.key) },
+  { id: 'audit', text: 'Audit log', path: routes.audit(project.key) },
   { id: 'settings', text: 'Settings', path: routes.settings(project.key) },
 ] as const;
 ---

@@ -5,11 +5,13 @@ import TabPanel from '@ds/components/navigation/TabPanel.astro';
 import Tabs from '@ds/components/navigation/Tabs.astro';
 import Badge from '@ds/components/ui/Badge.astro';
 import Button from '@ds/components/ui/Button.astro';
+import AuditEntries from '../../../../../components/AuditEntries.astro';
 import ChangedElsewhere from '../../../../../components/ChangedElsewhere.astro';
 import FormAlert from '../../../../../components/FormAlert.astro';
 import NotFound from '../../../../../components/NotFound.astro';
 import ProjectNav from '../../../../../components/ProjectNav.astro';
 import AdminLayout from '../../../../../layouts/AdminLayout.astro';
+import { flagVariations } from '../../../../../lib/audit';
 import { coreApi } from '../../../../../lib/core';
 import { noFormErrors } from '../../../../../lib/form-errors';
 import { handlePost, orNotFound, textField } from '../../../../../lib/forms';
@@ -46,14 +48,18 @@ const post = await handlePost(Astro, {
 });
 if (post.redirect) return post.redirect;
 
-const [projects, project, environments, flag, targeting] = await Promise.all([
+const historySize = 10;
+const [projects, project, environments, flag, targeting, history] = await Promise.all([
   unwrap(core.GET('/api/v1/projects')),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params: { path: { projectKey } } }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/environments', { params: { path: { projectKey } } }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}', { params }))),
   orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags/{flagKey}/targeting', { params }))),
+  orNotFound(
+    unwrap(core.GET('/api/v1/audit-entries', { params: { query: { projectKey, flagKey, limit: historySize } } })),
+  ),
 ]);
-if (!project || !environments || !flag || !targeting) Astro.response.status = 404;
+if (!project || !environments || !flag || !targeting || !history) Astro.response.status = 404;
 
 /** The environment whose targeting form was just submitted and rejected, if any. */
 const postedEnvironment = post.action === 'targeting' ? post.value('environment') : undefined;
@@ -80,7 +86,7 @@ const unplacedMessages = unplaced
 ---
 
 {
-  project && environments && flag && tabs ? (
+  project && environments && flag && tabs && history ? (
     <AdminLayout title={`${flag.name} · ${project.name}`} projects={projects} project={project}>
       <ProjectNav project={project} current="flags" />
 
@@ -155,6 +161,18 @@ const unplacedMessages = unplaced
         )}
       </section>
 
+      <section aria-labelledby="history" class="history">
+        <h2 id="history" class="text-xl">
+          History
+        </h2>
+        <AuditEntries
+          entries={history.entries}
+          flags={flagVariations([flag])}
+          olderHref={history.nextCursor === null ? undefined : routes.audit(project.key, { flag: flag.key, cursor: history.nextCursor })}
+          empty="No changes yet."
+        />
+      </section>
+
       <Button href={routes.flags(project.key)} variant="muted" decoration="ghost">
         Back to flags
       </Button>
@@ -202,7 +220,8 @@ const unplacedMessages = unplaced
 
 <style>
   .flag-summary,
-  .targeting {
+  .targeting,
+  .history {
     display: grid;
     gap: var(--space-xs);
   }

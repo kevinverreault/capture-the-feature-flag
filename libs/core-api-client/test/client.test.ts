@@ -25,6 +25,12 @@ describe('core-api-client', () => {
   let baseUrl: string;
   beforeAll(async () => {
     server = createServer((req, res) => {
+      if (req.url === '/api/v1/projects/actor') {
+        // Answers with the actor the request was sent as, in a project's name.
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ key: 'actor', name: req.headers['x-ctff-actor'] ?? null }));
+        return;
+      }
       const canned = responses[`${req.method} ${req.url}`] ?? { status: 500 };
       res.writeHead(canned.status, canned.body === undefined ? {} : { 'content-type': 'application/json' });
       res.end(canned.body === undefined ? undefined : JSON.stringify(canned.body));
@@ -75,5 +81,15 @@ describe('core-api-client', () => {
   it('accepts a base URL with a trailing slash', async () => {
     const core = createCoreApiClient({ baseUrl: `${baseUrl}/` });
     await expect(unwrap(core.GET('/api/v1/projects'))).resolves.toHaveLength(1);
+  });
+
+  it('sends the actor it is given, percent-encoded so that any display name fits in a header', async () => {
+    const params = { params: { path: { projectKey: 'actor' } } };
+    const named = createCoreApiClient({ baseUrl, actor: 'Zoë Ørn' });
+    await expect(unwrap(named.GET('/api/v1/projects/{projectKey}', params))).resolves.toMatchObject({
+      name: 'Zo%C3%AB%20%C3%98rn',
+    });
+    const unnamed = createCoreApiClient({ baseUrl, actor: '' });
+    await expect(unwrap(unnamed.GET('/api/v1/projects/{projectKey}', params))).resolves.toMatchObject({ name: null });
   });
 });

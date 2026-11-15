@@ -1,0 +1,82 @@
+---
+import { unwrap } from '@ctff/core-api-client';
+import Button from '@ds/components/ui/Button.astro';
+import AuditEntries from '../../../components/AuditEntries.astro';
+import NotFound from '../../../components/NotFound.astro';
+import ProjectNav from '../../../components/ProjectNav.astro';
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { auditPageSize, flagVariations, pageCursor } from '../../../lib/audit';
+import { coreApi } from '../../../lib/core';
+import { orNotFound } from '../../../lib/forms';
+import { routes } from '../../../lib/routes';
+
+const core = coreApi(Astro.locals);
+const projectKey = Astro.params.project ?? '';
+const flagKey = Astro.url.searchParams.get('flag') || undefined;
+const cursor = pageCursor(Astro.url.searchParams.get('cursor'));
+const params = { path: { projectKey } };
+
+const [projects, project, flags, page] = await Promise.all([
+  unwrap(core.GET('/api/v1/projects')),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}', { params }))),
+  orNotFound(unwrap(core.GET('/api/v1/projects/{projectKey}/flags', { params }))),
+  orNotFound(
+    unwrap(
+      core.GET('/api/v1/audit-entries', {
+        params: { query: { projectKey, flagKey, cursor, limit: auditPageSize } },
+      }),
+    ),
+  ),
+]);
+if (!project || !flags || !page) Astro.response.status = 404;
+const flag = flagKey === undefined ? undefined : flags?.find((listed) => listed.key === flagKey);
+const olderHref =
+  page?.nextCursor == null ? undefined : routes.audit(projectKey, { flag: flagKey, cursor: page.nextCursor });
+---
+
+{
+  project && flags && page ? (
+    <AdminLayout title={`Audit log · ${project.name}`} projects={projects} project={project}>
+      <ProjectNav project={project} current="audit" />
+      <section aria-labelledby="audit-heading" class="audit-log">
+        <div class="section-heading">
+          <h2 id="audit-heading" class="text-xl">
+            {flag ? `Audit log of ${flag.name}` : 'Audit log'}
+          </h2>
+          {flag && (
+            <Button href={routes.audit(project.key)} variant="muted" decoration="ghost" size="small">
+              Every change in the project
+            </Button>
+          )}
+        </div>
+        <p>
+          Every change to {flag ? 'this flag and its targeting' : 'the project, its environments, flags and targeting'},
+          newest first.
+        </p>
+        <AuditEntries
+          entries={page.entries}
+          flags={flagVariations(flags)}
+          olderHref={olderHref}
+          empty={cursor === undefined ? 'No changes yet.' : 'No older changes.'}
+        />
+      </section>
+    </AdminLayout>
+  ) : (
+    <AdminLayout title="Not found" projects={projects} project={project}>
+      <NotFound>
+        {project ? `There is no flag ${flagKey ?? ''} in project ${project.name}.` : `There is no project ${projectKey}.`}
+      </NotFound>
+    </AdminLayout>
+  )
+}
+
+<style>
+  .audit-log {
+    display: grid;
+    gap: var(--space-sm);
+  }
+
+  .audit-log p {
+    margin: 0;
+  }
+</style>

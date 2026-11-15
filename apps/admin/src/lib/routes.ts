@@ -19,4 +19,15 @@ export const routes = {
       ? flagPath(project, flagKey)
       : `${flagPath(project, flagKey)}?${new URLSearchParams({ environment }).toString()}`,
   editFlag: (project: string, flagKey: string) => `${flagPath(project, flagKey)}/edit`,
+  /** The project's audit log, optionally of one flag only, from the page of older entries at `cursor`. */
+  audit: (project: string, { flag, cursor }: { flag?: string; cursor?: number } = {}) => {
+    const query = new URLSearchParams();
+    if (flag !== undefined) query.set('flag', flag);
+    if (cursor !== undefined) query.set('cursor', String(cursor));
+    const search = query.toString();
+    return `/projects/${segment(project)}/audit${search ? `?${search}` : ''}`;
+  },
+  /** The display-name setting, going back to `returnTo` once saved. */
+  displayName: (returnTo?: string) =>
+    returnTo === undefined ? '/display-name' : `/display-name?${new URLSearchParams({ returnTo }).toString()}`,
 };
