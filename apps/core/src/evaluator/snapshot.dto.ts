@@ -1,4 +1,11 @@
-import type { EnvironmentSnapshot, FlagSnapshot, TargetingSnapshot, Variation } from '@ctff/evaluation';
+import type {
+  EnvironmentList,
+  EnvironmentListEntry,
+  EnvironmentSnapshot,
+  FlagSnapshot,
+  TargetingSnapshot,
+  Variation,
+} from '@ctff/evaluation';
 import { ApiProperty } from '@nestjs/swagger';
 import { IndividualTargetDto, RuleDto } from '../targeting/targeting.dto.js';
 
@@ -47,4 +54,20 @@ export class EnvironmentSnapshotDto implements EnvironmentSnapshot {
 
   @ApiProperty({ type: [FlagSnapshotDto], description: 'Every flag of the project, ordered by flag key.' })
   flags!: FlagSnapshotDto[];
+}
+
+export class EnvironmentListEntryDto implements EnvironmentListEntry {
+  @ApiProperty({ example: 'birdwatch' })
+  projectKey!: string;
+
+  @ApiProperty({ example: 'production' })
+  environmentKey!: string;
+
+  @ApiProperty({ example: 'ctff-env-…' })
+  sdkKey!: string;
+}
+
+export class EnvironmentListDto implements EnvironmentList {
+  @ApiProperty({ type: [EnvironmentListEntryDto], description: 'Every environment of every project, by SDK key.' })
+  environments!: EnvironmentListEntryDto[];
 }

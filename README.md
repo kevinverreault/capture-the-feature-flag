@@ -23,7 +23,7 @@ pnpm nx run-many -t lint typecheck test build
 docker compose up
 ```
 
-This starts PostgreSQL 17 and [Core](apps/core/README.md) on <http://localhost:3000>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>.
+This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000> and the [Evaluator](apps/evaluator/README.md) on <http://localhost:3001>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>. Applications evaluate flags through the Evaluator with [`@ctff/sdk`](libs/sdk/README.md).
 
 ## Layout
 
@@ -113,6 +113,6 @@ To move the submodule to a newer design system commit: `git -C vendor/design-sys
 
 - `nx affected -t lint typecheck test build`,
 - `nx affected -t docker-build`, which builds the images of affected projects that define that target.
-- a compose smoke test: `docker compose up --build --wait`, then checks that Core is healthy, runs as non-root and serves its API on the migrated database.
+- a compose smoke test: `docker compose up --build --wait`, then checks that Core and the Evaluator are healthy and run as non-root, and that Core serves its API on the migrated database. It then runs [apps/evaluator/scripts/compose-smoke.ts](apps/evaluator/scripts/compose-smoke.ts): the SDK gets `false` for a new flag, and `true` within one poll interval once targeting is switched on through Core's API, and still `true` after `docker compose stop core`.
 
 Nothing is published: images are built but not pushed, and packages are not released.

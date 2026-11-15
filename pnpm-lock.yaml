@@ -285,6 +285,46 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
 
+  apps/evaluator:
+    dependencies:
+      '@ctff/evaluation':
+        specifier: workspace:*
+        version: link:../../libs/evaluation
+      '@nestjs/common':
+        specifier: ^11.2.10
+        version: 11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0)
+      '@nestjs/core':
+        specifier: ^11.2.10
+        version: 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/platform-express@11.2.10)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/platform-express':
+        specifier: ^11.2.10
+        version: 11.2.10(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.10)(supports-color@7.2.0)
+      nestjs-pino:
+        specifier: ^5.3.1
+        version: 5.3.1(@nestjs/common@11.2.10(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@11.2.10)(pino-http@11.0.0)(pino@10.4.0)(rxjs@7.8.2)
+      pino:
+        specifier: ^10.4.0
+        version: 10.4.0
+      pino-http:
+        specifier: ^11.0.0
+        version: 11.0.0
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+    devDependencies:
+      '@ctff/sdk':
+        specifier: workspace:*
+        version: link:../../libs/sdk
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      typescript:
+        specifier: ~6.0.3
+        version: 6.0.3
+
   libs/design-system-host:
     devDependencies:
       astro:
@@ -298,6 +338,12 @@ importers:
         version: 6.1.13
 
   libs/evaluation: {}
+
+  libs/sdk:
+    dependencies:
+      '@ctff/evaluation':
+        specifier: workspace:*
+        version: link:../evaluation
 
   tools/workspace:
     devDependencies:
