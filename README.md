@@ -4,7 +4,7 @@ A self-hosted feature flag platform for a single operator: define flags per proj
 
 ## Bootstrap the workspace
 
-Prerequisites: Node 24 (see [.nvmrc](.nvmrc)), Git, and Corepack (it ships with Node). Docker is needed only to build images.
+Prerequisites: Node 24 (see [.nvmrc](.nvmrc)), Git, and Corepack (it ships with Node). Docker is needed to build images and for the Core tests (Testcontainers).
 
 ```bash
 git clone --recurse-submodules https://github.com/kevinverreault/capture-the-feature-flag.git
@@ -16,6 +16,14 @@ corepack enable          # provides the pnpm version pinned in package.json
 pnpm install
 pnpm nx run-many -t lint typecheck test build
 ```
+
+## Run it
+
+```bash
+docker compose up
+```
+
+This starts PostgreSQL 17 and [Core](apps/core/README.md) on <http://localhost:3000>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>.
 
 ## Layout
 
@@ -105,5 +113,6 @@ To move the submodule to a newer design system commit: `git -C vendor/design-sys
 
 - `nx affected -t lint typecheck test build`,
 - `nx affected -t docker-build`, which builds the images of affected projects that define that target.
+- a compose smoke test: `docker compose up --build --wait`, then checks that Core is healthy, runs as non-root and serves its API on the migrated database.
 
 Nothing is published: images are built but not pushed, and packages are not released.

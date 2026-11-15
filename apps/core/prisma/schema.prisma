@@ -1,0 +1,78 @@
+generator client {
+  provider               = "prisma-client"
+  output                 = "../src/generated/prisma"
+  moduleFormat           = "esm"
+  importFileExtension    = "js"
+  generatedFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Project {
+  id           String        @id @default(uuid()) @db.Uuid
+  key          String        @unique
+  name         String
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  environments Environment[]
+  flags        Flag[]
+
+  @@map("projects")
+}
+
+model Environment {
+  id        String      @id @default(uuid()) @db.Uuid
+  projectId String      @map("project_id") @db.Uuid
+  key       String
+  name      String
+  sdkKey    String      @unique @map("sdk_key")
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  targeting Targeting[]
+
+  @@unique([projectId, key])
+  @@map("environments")
+}
+
+model Flag {
+  id          String      @id @default(uuid()) @db.Uuid
+  projectId   String      @map("project_id") @db.Uuid
+  key         String
+  name        String
+  description String      @default("")
+  tags        String[]    @default([])
+  /// The ordered list of variations; boolean flags always have [true, false] (ADR 0002).
+  variations  Json
+  version     Int         @default(1)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  project     Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  targeting   Targeting[]
+
+  @@unique([projectId, key])
+  @@map("flags")
+}
+
+/// The targeting of one flag in one environment. Variations are referred to by index into Flag.variations.
+model Targeting {
+  id                String      @id @default(uuid()) @db.Uuid
+  flagId            String      @map("flag_id") @db.Uuid
+  environmentId     String      @map("environment_id") @db.Uuid
+  on                Boolean     @default(false)
+  offVariation      Int         @map("off_variation")
+  defaultVariation  Int         @map("default_variation")
+  individualTargets Json        @default("[]") @map("individual_targets")
+  rules             Json        @default("[]")
+  version           Int         @default(1)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+  flag              Flag        @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  environment       Environment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@unique([flagId, environmentId])
+  @@index([environmentId])
+  @@map("targeting")
+}

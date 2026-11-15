@@ -2,3 +2,4 @@ vendor/
 pnpm-lock.yaml
 dist/
 .nx/
+apps/core/src/generated/

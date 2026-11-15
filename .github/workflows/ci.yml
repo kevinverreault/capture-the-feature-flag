@@ -36,3 +36,25 @@ jobs:
       - uses: ./.github/actions/setup
       # Projects with an image define a `docker-build` target. Images are built, never pushed.
       - run: pnpm nx affected -t docker-build
+
+  compose:
+    name: Compose smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+      # --wait returns once every service with a health check reports healthy (Core: migrated and ready).
+      - run: docker compose up --build --detach --wait --wait-timeout 300
+      - name: Core runs as non-root
+        run: test "$(docker compose exec -T core id -u)" != "0"
+      - name: Core serves its API on the migrated database
+        run: |
+          curl --fail --silent --show-error http://localhost:3000/health/ready
+          curl --fail --silent --show-error http://localhost:3000/api/v1/openapi.json > /dev/null
+          curl --fail --silent --show-error -X POST http://localhost:3000/api/v1/projects \
+            -H 'content-type: application/json' -d '{"key":"smoke-test","name":"Smoke test"}'
+      - if: failure()
+        run: docker compose logs
+      - if: always()
+        run: docker compose down --volumes
