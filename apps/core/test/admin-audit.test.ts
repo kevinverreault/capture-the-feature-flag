@@ -96,14 +96,14 @@ describe('admin app: audit', () => {
     expect(second.querySelector('a[rel="next"]')).toBeNull();
   });
 
-  it('shows a flag’s own history on its detail page', async () => {
+  it('shows a flag’s own audit entries on its detail page', async () => {
     const projectKey = await project();
     await api.post(`/projects/${projectKey}/flags`, { key: 'kill-switch', name: 'Kill switch' });
     await api.post(`/projects/${projectKey}/flags`, { key: 'other-flag', name: 'Other' });
     await api.patch(`/projects/${projectKey}/flags/kill-switch/targeting/production`, { version: 1, on: true });
 
     const detail = await page(await admin.get(`/projects/${projectKey}/flags/kill-switch`));
-    const history = detail.querySelector('#history')?.parentNode;
+    const history = detail.querySelector('#audit-entries')?.parentNode;
     expect(
       history?.querySelectorAll('[data-audit-entry] .audit-summary').map((summary) => summary.textContent.trim()),
     ).toEqual(['Updated targeting of kill-switch in production', 'Created flag kill-switch']);

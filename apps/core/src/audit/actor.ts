@@ -2,6 +2,7 @@ import { applyDecorators, createParamDecorator, type ExecutionContext } from '@n
 import { ApiHeader } from '@nestjs/swagger';
 import type { Request } from 'express';
 
+/** The request header that names who makes a change. */
 export const actorHeader = 'X-CTFF-Actor';
 /** The actor of a change whose request doesn't say who made it. */
 export const anonymousActor = 'anonymous';
@@ -28,7 +29,7 @@ export function actorFrom(header: string | string[] | undefined): string {
 
 /** Injects the actor of the request (see {@link actorFrom}) into a controller method. */
 export const Actor = createParamDecorator((_data: unknown, context: ExecutionContext): string =>
-  actorFrom(context.switchToHttp().getRequest<Request>().headers['x-ctff-actor']),
+  actorFrom(context.switchToHttp().getRequest<Request>().headers[actorHeader.toLowerCase()]),
 );
 
 /** Documents that an endpoint records an audit entry attributed to the `X-CTFF-Actor` header. */

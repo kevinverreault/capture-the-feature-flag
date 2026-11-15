@@ -42,7 +42,10 @@ export function cookiesSet(response: Response): string {
 }
 
 function isDeletion(cookie: string): boolean {
-  const attributes = cookie.split(';').slice(1).map((attribute) => attribute.trim().toLowerCase());
+  const attributes = cookie
+    .split(';')
+    .slice(1)
+    .map((attribute) => attribute.trim().toLowerCase());
   return attributes.some(
     (attribute) =>
       attribute === 'max-age=0' ||

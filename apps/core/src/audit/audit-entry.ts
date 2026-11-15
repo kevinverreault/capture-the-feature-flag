@@ -12,6 +12,7 @@ export type AuditTarget =
   | { type: 'flag'; project: Project; flag: Flag }
   | { type: 'targeting'; project: Project; flag: Flag; environment: Environment; targeting: Targeting };
 
+/** One change to record: what was done, by whom, and the target's state around it. */
 export interface AuditChange {
   action: AuditAction;
   actor: string;
@@ -65,10 +66,12 @@ export function projectState(project: Project): AuditState {
   return { key: project.key, name: project.name };
 }
 
+/** The audited state of an environment: its key, name and SDK key (which identifies it, and is not a secret in V1). */
 export function environmentState(environment: Environment): AuditState {
   return { key: environment.key, name: environment.name, sdkKey: environment.sdkKey };
 }
 
+/** The audited state of a flag: everything but its timestamps. */
 export function flagState(flag: Flag): AuditState {
   return {
     key: flag.key,
@@ -81,6 +84,7 @@ export function flagState(flag: Flag): AuditState {
   };
 }
 
+/** The audited state of targeting, in the shape of the shared snapshot type. */
 export function targetingState(targeting: Targeting): AuditState {
   return toTargetingSnapshot(targeting) as unknown as AuditState;
 }
