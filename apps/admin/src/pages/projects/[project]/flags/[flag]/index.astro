@@ -128,10 +128,12 @@ const flagMessages =
 
       <section aria-labelledby="flag-heading" class="flag-summary">
         <div class="section-heading">
-          <h2 id="flag-heading" class="text-xl flag-title">
-            {flag.name}
+          <div class="flag-title">
+            <h2 id="flag-heading" class="text-xl">
+              {flag.name}
+            </h2>
             <ManagedByBadge managedBy={flag.managedBy} />
-          </h2>
+          </div>
           {flag.archived ? (
             <Badge variant="muted">Archived</Badge>
           ) : (
@@ -314,11 +316,16 @@ const flagMessages =
     gap: var(--space-xs);
   }
 
+  /* The flag's name with its "Managed by" badge, kept out of the heading so the heading is just the name. */
   .flag-title {
     display: inline-flex;
     flex-wrap: wrap;
     gap: var(--space-xs);
     align-items: center;
+  }
+
+  .flag-title h2 {
+    margin: 0;
   }
 
   .flag-summary p {

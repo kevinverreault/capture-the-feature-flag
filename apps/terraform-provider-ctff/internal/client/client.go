@@ -3,6 +3,7 @@ package client
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -247,6 +248,9 @@ type IndividualTarget struct {
 	Variation int64    `json:"variation"`
 	UserIDs   []string `json:"userIds"`
 }
+
+// CompareTargetVariations orders individual targets by their variation, for slices.SortFunc.
+func CompareTargetVariations(a, b IndividualTarget) int { return cmp.Compare(a.Variation, b.Variation) }
 
 // Rule serves its variation to the contexts whose attribute is (operator "in") or isn't ("not_in") one of the
 // values. A missing attribute never matches.

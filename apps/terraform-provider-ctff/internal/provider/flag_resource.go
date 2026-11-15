@@ -126,20 +126,47 @@ func (r *flagResource) Schema(_ context.Context, _ resource.SchemaRequest, resp 
 }
 
 // ModifyPlan plans a new version for any update. Terraform does that by itself when the configuration changed,
-// but not when only the "managed by" marker does (after an import, or when it was cleared outside Terraform).
+// but not when only the "managed by" marker does (after an import, or when it was cleared outside Terraform). It
+// also reports at plan time what archiving means for the apply: an archived flag's details can't change, and
+// neither can its targeting.
 func (r *flagResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
-	if req.State.Raw.IsNull() || req.Plan.Raw.IsNull() {
-		return // Create or destroy.
+	if req.Plan.Raw.IsNull() {
+		return // Destroy.
 	}
 	var plan, state flagModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	if !req.State.Raw.IsNull() {
+		resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
+	}
 	if resp.Diagnostics.HasError() {
+		return
+	}
+	creating := req.State.Raw.IsNull()
+	wasArchived, archive := state.Archived.ValueBool(), plan.Archived.ValueBool()
+
+	if !wasArchived && archive {
+		resp.Diagnostics.AddWarning("The flag will be archived",
+			fmt.Sprintf("Archiving the flag %s stops serving it, and Core keeps its targeting as it is until it is "+
+				"restored, so a change to its ctff_flag_environment targeting in this same apply fails. Change the "+
+				"targeting before archiving the flag, or after restoring it.", plan.Key.ValueString()))
+	}
+	if creating {
+		return
+	}
+	if wasArchived && archive && plan.detailsKnown() && plan.detailsDiffer(state) {
+		archivedFlagEdit(&resp.Diagnostics, plan.Key.ValueString())
 		return
 	}
 	if !plan.ManagedBy.Equal(state.ManagedBy) {
 		resp.Diagnostics.Append(resp.Plan.SetAttribute(ctx, path.Root("version"), types.Int64Unknown())...)
 	}
+}
+
+// archivedFlagEdit reports a planned edit of a flag that is archived and stays archived, which Core rejects.
+func archivedFlagEdit(diags *diag.Diagnostics, key string) {
+	diags.AddError("Cannot edit an archived flag",
+		fmt.Sprintf("The flag %s is archived, and Core keeps an archived flag as it was archived. Set archived = "+
+			"false to restore it with the edit, or leave its details as they are.", key))
 }
 
 func (r *flagResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -218,12 +245,10 @@ func (r *flagResource) Update(ctx context.Context, req resource.UpdateRequest, r
 	}
 	ref := plan.ref()
 	wasArchived, archive := state.Archived.ValueBool(), plan.Archived.ValueBool()
-	editDetails := !plan.Name.Equal(state.Name) || !plan.Description.Equal(state.Description) ||
-		!plan.Tags.Equal(state.Tags) || !plan.ManagedBy.Equal(state.ManagedBy)
+	editDetails := plan.detailsDiffer(state)
 	if wasArchived && archive && editDetails {
-		resp.Diagnostics.AddError("Cannot edit an archived flag",
-			fmt.Sprintf("The flag %s is archived, and Core keeps an archived flag as it was archived. Set archived = "+
-				"false to restore it with the edit, or leave its details as they are.", plan.Key.ValueString()))
+		// Caught at plan time too, unless a detail was only known at apply time.
+		archivedFlagEdit(&resp.Diagnostics, plan.Key.ValueString())
 		return
 	}
 
@@ -294,6 +319,19 @@ func (r *flagResource) Delete(ctx context.Context, req resource.DeleteRequest, r
 // ImportState imports a flag as <project key>/<flag key>. The next apply marks it as managed by Terraform.
 func (r *flagResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	importRef(ctx, req, resp)
+}
+
+// detailsDiffer reports whether the flag's editable details (name, description, tags, "managed by" marker)
+// differ from other's.
+func (m flagModel) detailsDiffer(other flagModel) bool {
+	return !m.Name.Equal(other.Name) || !m.Description.Equal(other.Description) ||
+		!m.Tags.Equal(other.Tags) || !m.ManagedBy.Equal(other.ManagedBy)
+}
+
+// detailsKnown reports whether every editable detail is known, as it is at plan time unless it comes from
+// something not created yet.
+func (m flagModel) detailsKnown() bool {
+	return !m.Name.IsUnknown() && !m.Description.IsUnknown() && !m.Tags.IsUnknown() && !m.ManagedBy.IsUnknown()
 }
 
 func (m flagModel) ref() client.Ref {

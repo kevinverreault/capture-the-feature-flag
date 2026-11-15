@@ -1767,12 +1767,13 @@
             "minimum": 0
           },
           "userIds": {
-            "description": "The user IDs always served this variation while targeting is on. Each is a non-empty string.",
-            "maxItems": 1000,
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 256
+            },
+            "description": "The user IDs always served this variation while targeting is on. Each is a non-empty string.",
+            "maxItems": 1000
           }
         },
         "required": [
@@ -1800,13 +1801,14 @@
             "description": "in: the attribute is one of the values. not_in: it is none of them. A missing attribute never matches."
           },
           "values": {
-            "description": "For country, ISO 3166-1 alpha-2 codes (stored in uppercase); for user_id, non-empty user IDs.",
-            "maxItems": 1000,
-            "minItems": 1,
             "type": "array",
             "items": {
-              "type": "string"
-            }
+              "type": "string",
+              "maxLength": 256
+            },
+            "description": "For country, ISO 3166-1 alpha-2 codes (stored in uppercase); for user_id, non-empty user IDs.",
+            "maxItems": 1000,
+            "minItems": 1
           },
           "variation": {
             "type": "integer",

@@ -62,6 +62,13 @@ func TestAccValidationRulesMatchCore(t *testing.T) {
 	check("UpdateTargetingDto.individualTargets maxItems", get("UpdateTargetingDto", "individualTargets").MaxItems, maxIndividualTargets)
 	check("RuleDto.values maxItems", get("RuleDto", "values").MaxItems, maxListedValues)
 	check("IndividualTargetDto.userIds maxItems", get("IndividualTargetDto", "userIds").MaxItems, maxListedValues)
+	for _, list := range [][2]string{{"RuleDto", "values"}, {"IndividualTargetDto", "userIds"}} {
+		items := get(list[0], list[1]).Items
+		if items == nil {
+			t.Fatalf("Core's OpenAPI document doesn't describe %s.%s items", list[0], list[1])
+		}
+		check(list[0]+"."+list[1]+" items maxLength", items.MaxLength, maxValueLength)
+	}
 	check("RuleDto.attribute enum", get("RuleDto", "attribute").Enum, ruleAttributes)
 	check("RuleDto.operator enum", get("RuleDto", "operator").Enum, ruleOperators)
 }

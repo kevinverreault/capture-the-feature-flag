@@ -1,10 +1,10 @@
 package provider
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
@@ -33,6 +33,7 @@ var (
 	_ resource.ResourceWithConfigure      = (*flagEnvironmentResource)(nil)
 	_ resource.ResourceWithImportState    = (*flagEnvironmentResource)(nil)
 	_ resource.ResourceWithValidateConfig = (*flagEnvironmentResource)(nil)
+	_ resource.ResourceWithModifyPlan     = (*flagEnvironmentResource)(nil)
 )
 
 // NewFlagEnvironmentResource is the ctff_flag_environment resource: a flag's targeting in one environment.
@@ -250,15 +251,15 @@ func (r *flagEnvironmentResource) ValidateConfig(ctx context.Context, req resour
 				userIDs:   knownStrings(ctx, target.UserIDs, &resp.Diagnostics),
 			})
 		}
-		sort.SliceStable(targets, func(i, j int) bool { return targets[i].variation < targets[j].variation })
-		targetOfVariation := map[int64]bool{}
+		slices.SortStableFunc(targets, func(a, b checkedTarget) int { return cmp.Compare(a.variation, b.variation) })
+		targetedVariations := map[int64]bool{}
 		variationOfUserID := map[string]int64{}
 		for _, target := range targets {
-			if targetOfVariation[target.variation] {
+			if targetedVariations[target.variation] {
 				resp.Diagnostics.AddAttributeError(target.at.AtName("variation"), "Invalid individual targets",
 					fmt.Sprintf("variation %d already has an individual target", target.variation))
 			}
-			targetOfVariation[target.variation] = true
+			targetedVariations[target.variation] = true
 			for _, userID := range target.userIDs {
 				if userID == "" {
 					resp.Diagnostics.AddAttributeError(target.at.AtName("user_ids"), "Invalid individual targets",
@@ -335,6 +336,26 @@ func knownStrings(ctx context.Context, set types.Set, diags *diag.Diagnostics) [
 		}
 	}
 	return known
+}
+
+// ModifyPlan warns at plan time when the targeting is to change while its flag is archived: Core keeps an archived
+// flag's targeting as it was archived, so the change fails unless the same apply restores the flag first.
+func (r *flagEnvironmentResource) ModifyPlan(ctx context.Context, req resource.ModifyPlanRequest, resp *resource.ModifyPlanResponse) {
+	if r.client == nil || req.Plan.Raw.IsNull() || req.Plan.Raw.Equal(req.State.Raw) {
+		return // Not configured yet, being destroyed, or not changing.
+	}
+	var plan flagEnvironmentModel
+	resp.Diagnostics.Append(req.Plan.Get(ctx, &plan)...)
+	if resp.Diagnostics.HasError() || plan.ProjectKey.IsUnknown() || plan.FlagKey.IsUnknown() {
+		return
+	}
+	// The flag may not exist yet, or not be readable now; apply reports what is wrong then.
+	if r.flagArchived(ctx, plan.ref()) {
+		resp.Diagnostics.AddWarning("The flag is archived",
+			fmt.Sprintf("The flag %s is archived, and Core keeps an archived flag's targeting as it was archived, so "+
+				"this change to its targeting in %s fails unless this apply restores the flag first (archived = false "+
+				"on its ctff_flag).", plan.FlagKey.ValueString(), plan.EnvironmentKey.ValueString()))
+	}
 }
 
 func (r *flagEnvironmentResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -444,14 +465,13 @@ func (r *flagEnvironmentResource) Delete(ctx context.Context, req resource.Delet
 
 // ImportState imports a flag's targeting as <project key>/<flag key>/<environment key>.
 func (r *flagEnvironmentResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	ref, err := client.ParseTargetingRef(req.ID)
-	if err != nil {
-		resp.Diagnostics.AddError("Invalid import ID", err.Error())
-		return
-	}
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("project_key"), ref.ProjectKey)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("flag_key"), ref.FlagKey)...)
-	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("environment_key"), ref.EnvironmentKey)...)
+	importKeys(ctx, req, resp, client.ParseTargetingRef, func(ref client.TargetingRef) map[string]string {
+		return map[string]string{
+			"project_key":     ref.ProjectKey,
+			"flag_key":        ref.FlagKey,
+			"environment_key": ref.EnvironmentKey,
+		}
+	})
 }
 
 // updateError explains Core's refusal of a targeting change. A 409 is a stale version or an archived flag.
@@ -496,13 +516,11 @@ func targetingInput(ctx context.Context, plan flagEnvironmentModel) (client.Targ
 	for _, target := range targets {
 		var userIDs []string
 		diags.Append(target.UserIDs.ElementsAs(ctx, &userIDs, false)...)
-		sort.Strings(userIDs)
+		slices.Sort(userIDs)
 		input.IndividualTargets = append(input.IndividualTargets,
 			client.IndividualTarget{Variation: target.Variation.ValueInt64(), UserIDs: userIDs})
 	}
-	sort.Slice(input.IndividualTargets, func(i, j int) bool {
-		return input.IndividualTargets[i].Variation < input.IndividualTargets[j].Variation
-	})
+	slices.SortFunc(input.IndividualTargets, client.CompareTargetVariations)
 	var rules []ruleModel
 	diags.Append(plan.Rules.ElementsAs(ctx, &rules, false)...)
 	for index, rule := range rules {
@@ -515,7 +533,7 @@ func targetingInput(ctx context.Context, plan flagEnvironmentModel) (client.Targ
 				diags.AddAttributeError(path.Root("rules").AtListIndex(index).AtName("values"), "Invalid rule value", problem)
 			}
 		}
-		sort.Strings(values)
+		slices.Sort(values)
 		input.Rules = append(input.Rules, client.Rule{
 			Attribute: rule.Attribute.ValueString(),
 			Operator:  rule.Operator.ValueString(),

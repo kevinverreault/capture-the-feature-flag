@@ -100,7 +100,8 @@ jobs:
           docker compose --profile terraform up --build --detach
           docker compose --profile terraform wait terraform || true
           container=$(docker compose --profile terraform ps --all --quiet terraform)
-          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" = 0
+          # Exited, not still running (an ExitCode of 0 alone would also match a running container).
+          test "$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$container")" = 'exited 0'
       - run: docker compose up --detach --wait --wait-timeout 300
       - name: Core holds the seeded project, attributed to terraform
         run: |

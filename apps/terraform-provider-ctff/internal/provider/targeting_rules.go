@@ -3,8 +3,8 @@ package provider
 import "strings"
 
 // Core's targeting rules, repeated so plan catches what apply would be rejected for. TestAccValidationRulesMatchCore
-// checks the list limits and enums against Core's OpenAPI document (which doesn't carry maxValueLength), and
-// TestCountryCodesMatchEvaluationLibrary the country codes against the evaluation library.
+// checks the limits and enums against Core's OpenAPI document, and TestCountryCodesMatchEvaluationLibrary the
+// country codes against the evaluation library.
 const (
 	// booleanVariationCount: every V1 flag is boolean, with the variations [true, false] (ADR 0002).
 	booleanVariationCount = 2

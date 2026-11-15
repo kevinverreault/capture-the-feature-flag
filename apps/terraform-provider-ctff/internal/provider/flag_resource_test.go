@@ -268,13 +268,26 @@ func TestAccFlagResource_archived(t *testing.T) {
 				PlanOnly: true,
 			},
 			{
+				// An archived flag that stays archived can't be edited, which plan reports.
+				Config:      flagConfig(projectKey, flagFixture{key: "photo-id-beta", name: "Renamed while archived", archived: true}),
+				PlanOnly:    true,
+				ExpectError: regexp.MustCompile(`Cannot\s+edit\s+an\s+archived\s+flag`),
+			},
+			{
 				Config: flagConfig(projectKey, restored),
 				Check:  checkFlag(api, projectKey, restored),
 			},
 			{
-				// Destroying an archived flag deletes it too.
 				Config: flagConfig(projectKey, archived),
 				Check:  checkFlag(api, projectKey, archived),
+			},
+			{
+				// Destroying an archived flag deletes it too.
+				Config: projectConfig(projectKey, "Birdwatch"),
+				ConfigPlanChecks: resource.ConfigPlanChecks{
+					PreApply: []plancheck.PlanCheck{plancheck.ExpectResourceAction("ctff_flag.test", plancheck.ResourceActionDestroy)},
+				},
+				Check: checkFlagGone(api, projectKey, "photo-id-beta"),
 			},
 		},
 	})
