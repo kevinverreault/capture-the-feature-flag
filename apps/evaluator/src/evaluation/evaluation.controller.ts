@@ -1,4 +1,6 @@
 import {
+  type BulkEvaluation,
+  type EnvironmentSnapshot,
   evaluate,
   type EvaluationRequest,
   type EvaluatorErrorBody,
@@ -39,6 +41,43 @@ export class EvaluationController {
     @Headers(sdkKeyHeader) sdkKey: string | undefined,
     @Body() body: unknown,
   ): FlagEvaluation {
+    const { key, snapshot } = this.environment(sdkKey);
+    const context = contextOf(body);
+    const result = evaluate(snapshot, flagKey, context);
+    this.telemetry.record(key, flagKey, result.variationIndex, normalizeContext(context));
+    return { flagKey, ...result };
+  }
+
+  /**
+   * Evaluates every flag of the environment for the context in the body, in flag key order. Flags that evaluate as
+   * not found (archived ones) are left out. A malformed or missing context gives every flag the `ERROR` reason.
+   * Telemetry counts each flag's evaluation, as if it had been evaluated alone.
+   */
+  @Post()
+  @HttpCode(200)
+  evaluateAll(@Headers(sdkKeyHeader) sdkKey: string | undefined, @Body() body: unknown): BulkEvaluation {
+    const { key, snapshot } = this.environment(sdkKey);
+    const context = contextOf(body);
+    const flags = snapshot.flags
+      // Each flag against a snapshot of it alone, so evaluate() finds it at once: linear in the number of flags.
+      .map((flag): FlagEvaluation => ({
+        flagKey: flag.key,
+        ...evaluate({ ...snapshot, flags: [flag] }, flag.key, context),
+      }))
+      .filter((evaluation) => evaluation.reason.kind !== 'FLAG_NOT_FOUND')
+      .sort(byFlagKey);
+    const seen = normalizeContext(context);
+    for (const evaluation of flags) this.telemetry.record(key, evaluation.flagKey, evaluation.variationIndex, seen);
+    // A context evaluated in an environment without flags is seen all the same, as with an unknown flag.
+    if (flags.length === 0) this.telemetry.record(key, '', null, seen);
+    return { flags };
+  }
+
+  /**
+   * The SDK key, checked present, and the snapshot of its environment; throws the error answer when there is none
+   * to evaluate from.
+   */
+  private environment(sdkKey: string | undefined): { key: string; snapshot: EnvironmentSnapshot } {
     if (!sdkKey) throw new BadRequestException(`The ${sdkKeyHeader} header is required`);
     const held = this.snapshots.environment(sdkKey);
     if (!this.snapshots.ready || held.kind === 'loading') {
@@ -59,11 +98,19 @@ export class EvaluationController {
       };
       throw new NotFoundException(unknownSdkKey);
     }
-    // Unchecked here: evaluate() validates the context at runtime and reports a malformed one.
-    const request: Partial<EvaluationRequest> =
-      typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {};
-    const result = evaluate(held.snapshot, flagKey, request.context);
-    this.telemetry.record(sdkKey, flagKey, result.variationIndex, normalizeContext(request.context));
-    return { flagKey, ...result };
+    return { key: sdkKey, snapshot: held.snapshot };
   }
+}
+
+/** Orders by flag key, the way Core orders a snapshot's flags (plain code-unit order, independent of locale). */
+function byFlagKey(a: FlagEvaluation, b: FlagEvaluation): number {
+  if (a.flagKey === b.flagKey) return 0;
+  return a.flagKey < b.flagKey ? -1 : 1;
+}
+
+/** The context of a request body, unchecked: evaluate() validates it at runtime and reports a malformed one. */
+function contextOf(body: unknown): EvaluationRequest['context'] | undefined {
+  const request: Partial<EvaluationRequest> =
+    typeof body === 'object' && body !== null && !Array.isArray(body) ? body : {};
+  return request.context;
 }

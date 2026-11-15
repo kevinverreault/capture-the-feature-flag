@@ -23,7 +23,7 @@ pnpm nx run-many -t lint typecheck test build
 docker compose up
 ```
 
-This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000>, where the [admin app](apps/admin/README.md) opens, and the [Evaluator](apps/evaluator/README.md) on <http://localhost:3001>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>. Applications evaluate flags through the Evaluator with [`@ctff/sdk`](libs/sdk/README.md). The Evaluator serves Prometheus metrics at <http://localhost:3001/metrics>, and [a k6 script](apps/evaluator/README.md#load-testing) measures its latency.
+This starts PostgreSQL 17, [Core](apps/core/README.md) on <http://localhost:3000>, where the [admin app](apps/admin/README.md) opens, and the [Evaluator](apps/evaluator/README.md) on <http://localhost:3001>. The API's OpenAPI UI is at <http://localhost:3000/api/docs>. Applications evaluate flags through the Evaluator with [`@ctff/sdk`](libs/sdk/README.md), or in NestJS with [`@ctff/nestjs`](libs/nestjs/README.md). The Evaluator serves Prometheus metrics at <http://localhost:3001/metrics>, and [a k6 script](apps/evaluator/README.md#load-testing) measures its latency.
 
 ## Layout
 

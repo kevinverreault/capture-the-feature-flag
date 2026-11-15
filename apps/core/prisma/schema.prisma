@@ -182,3 +182,27 @@ model Settings {
 
   @@map("settings")
 }
+
+/// The type of a context attribute's values.
+enum ContextAttributeType {
+  /// Any non-empty string.
+  string
+  /// An ISO 3166-1 alpha-2 country code, stored in uppercase.
+  country_code
+}
+
+/// A named, typed field of a context that rules can test. V1 has only the built-in ones (`user_id`, `country`),
+/// which the migration creates and nothing changes; they are stored as data so custom ones can be added later.
+model ContextAttribute {
+  /// The attribute's name in contexts and rules, such as `user_id`.
+  key         String               @id
+  name        String
+  type        ContextAttributeType
+  description String
+  /// Built-in attributes cannot be edited.
+  builtIn     Boolean              @default(false) @map("built_in")
+  /// Where the attribute is listed, ascending.
+  position    Int
+
+  @@map("context_attributes")
+}
