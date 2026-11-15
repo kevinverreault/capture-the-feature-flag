@@ -144,11 +144,11 @@ const blankRule = {
         if (action === 'up' && rule.previousElementSibling) rule.after(rule.previousElementSibling);
         if (action === 'down' && rule.nextElementSibling) rule.before(rule.nextElementSibling);
         this.#renumber(list);
-        if (rule.isConnected) button.focus();
+        (rule.isConnected ? button : add).focus();
       });
     }
 
-    /** A copy of the blank rule, with the rule buttons and ids of its own. */
+    /** A copy of the blank rule, with the rule buttons and ids of its own; left without values, it is not saved. */
     #copy(blank: HTMLLIElement): HTMLLIElement {
       const id = String(this.#nextId++);
       const from = `rule.${blank.dataset['rule']}.`;
@@ -170,7 +170,6 @@ const blankRule = {
         button.value = button.value.replace(/:.*$/, `:${id}`);
       }
       rule.querySelector<HTMLElement>('[data-rule-actions]')?.removeAttribute('hidden');
-      rule.querySelector('[name$=".new"]')?.remove();
       return rule;
     }
 

@@ -1,4 +1,5 @@
 import type { components } from '@ctff/core-api-client';
+import { textField } from './forms.js';
 
 type Targeting = components['schemas']['TargetingDto'];
 type UpdateTargeting = components['schemas']['UpdateTargetingDto'];
@@ -37,13 +38,9 @@ function lines(text: string): string[] {
   return [...new Set(text.split(/\r?\n/).map((line) => line.trim()))].filter((line) => line !== '');
 }
 
-function text(form: FormData, name: string): string {
-  const value = form.get(name);
-  return typeof value === 'string' ? value.trim() : '';
-}
-
-function index(form: FormData, name: string): number {
-  const value = text(form, name);
+/** A variation index field: NaN unless a whole number, for Core to refuse. */
+function variationIndex(form: FormData, name: string): number {
+  const value = textField(form, name);
   return /^\d+$/.test(value) ? Number(value) : Number.NaN;
 }
 
@@ -58,20 +55,20 @@ export function readTargetingDraft(form: FormData, variationCount: number): Targ
     const field = (name: string) => `rule.${id}.${name}`;
     const rule: RuleDraft = {
       id,
-      attribute: text(form, field('attribute')) === 'country' ? 'country' : 'user_id',
-      operator: text(form, field('operator')) === 'not_in' ? 'not_in' : 'in',
-      userIds: text(form, field('userIds')),
+      attribute: textField(form, field('attribute')) === 'country' ? 'country' : 'user_id',
+      operator: textField(form, field('operator')) === 'not_in' ? 'not_in' : 'in',
+      userIds: textField(form, field('userIds')),
       countries: form.getAll(field('countries')).filter((value) => typeof value === 'string'),
-      variation: index(form, field('variation')),
+      variation: variationIndex(form, field('variation')),
     };
     // The editor's blank rule, left blank, is not a rule.
     return form.has(field('new')) && ruleValues(rule).length === 0 ? [] : [rule];
   });
   return {
-    offVariation: index(form, 'offVariation'),
-    defaultVariation: index(form, 'defaultVariation'),
-    targets: Array.from({ length: variationCount }, (_, variation) => text(form, `target.${variation}`)),
-    rules: applyRuleEdit(rules, text(form, 'ruleEdit')),
+    offVariation: variationIndex(form, 'offVariation'),
+    defaultVariation: variationIndex(form, 'defaultVariation'),
+    targets: Array.from({ length: variationCount }, (_, variation) => textField(form, `target.${variation}`)),
+    rules: applyRuleEdit(rules, textField(form, 'ruleEdit')),
   };
 }
 
@@ -118,10 +115,10 @@ export function targetingChange(draft: TargetingDraft): TargetingChange {
 }
 
 /** The parts of a flag's targeting the editor opens with. */
-export type TargetingOf = Pick<Targeting, 'offVariation' | 'defaultVariation' | 'individualTargets' | 'rules'>;
+export type EditableTargeting = Pick<Targeting, 'offVariation' | 'defaultVariation' | 'individualTargets' | 'rules'>;
 
 /** What the editor shows of the targeting as it is, for a flag with `variationCount` variations. */
-export function targetingDraft(targeting: TargetingOf, variationCount: number): TargetingDraft {
+export function targetingDraft(targeting: EditableTargeting, variationCount: number): TargetingDraft {
   return {
     offVariation: targeting.offVariation,
     defaultVariation: targeting.defaultVariation,
@@ -139,7 +136,7 @@ export function targetingDraft(targeting: TargetingOf, variationCount: number): 
   };
 }
 
-/** The most rules, and individual targets, a change may send Core. */
+/** The most rules, and individual targets, a change may send Core (`maxItems` in Core's UpdateTargetingDto). */
 const maxItems = 100;
 const ruleProperties = ['values', 'variation', 'attribute', 'operator'] as const;
 const targetProperties = ['userIds', 'variation'] as const;

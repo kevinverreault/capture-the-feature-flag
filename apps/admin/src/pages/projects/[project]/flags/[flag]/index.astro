@@ -24,6 +24,7 @@ import {
   targetingChangeFields,
   targetingDraft,
   targetingDraftErrors,
+  type TargetingChange,
 } from '../../../../../lib/targeting-form';
 
 const core = coreApi(Astro.locals);
@@ -41,7 +42,7 @@ const flagAction = (call: () => Promise<unknown>, location: string, flash: strin
 /** Saves a targeting change to one environment, then goes back to its tab, saying what was done there. */
 async function saveTargeting(
   environmentKey: string,
-  body: { version: number; on?: boolean } & Partial<ReturnType<typeof targetingChange>>,
+  body: { version: number; on?: boolean } & Partial<TargetingChange>,
   done: (on: boolean) => string,
 ) {
   const targeting = await unwrap(
