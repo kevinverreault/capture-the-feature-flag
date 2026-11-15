@@ -280,7 +280,7 @@ describe('evaluate with rules', () => {
       { value: false, variationIndex: 1, reason: { kind: 'TARGET_MATCH' } },
     ],
     [
-      'rules apply to users no individual target lists',
+      'rules apply to contexts no individual target lists',
       {
         ...on(rule('country', 'in', ['CA'], 0)),
         individualTargets: [{ variation: 1, userIds: ['alice'] }],

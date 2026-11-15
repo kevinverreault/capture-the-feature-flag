@@ -72,9 +72,15 @@ export function evaluate(
 
   const served = decide(flag.targeting, normalized);
   if (!served) return error('MALFORMED_FLAG');
-  const [index, reason] = served;
+  const { variationIndex: index, reason } = served;
   if (!Number.isInteger(index) || index < 0 || index >= flag.variations.length) return error('MALFORMED_FLAG');
   return { value: flag.variations[index] as Variation, variationIndex: index, reason };
+}
+
+/** A variation index the targeting serves, with why. */
+interface Served {
+  variationIndex: number;
+  reason: ServedReason;
 }
 
 /**
@@ -82,15 +88,15 @@ export function evaluate(
  * malformed. While targeting is on: individual targets first, then the ordered rules (first match wins), then the
  * default variation. The index itself is checked against the flag's variations by the caller.
  */
-function decide(targeting: TargetingSnapshot, context: Context): [number, ServedReason] | null {
-  if (!targeting.on) return [targeting.offVariation, { kind: 'OFF' }];
+function decide(targeting: TargetingSnapshot, context: Context): Served | null {
+  if (!targeting.on) return { variationIndex: targeting.offVariation, reason: { kind: 'OFF' } };
 
   const { individualTargets } = targeting;
   if (!Array.isArray(individualTargets)) return null;
   for (const target of individualTargets) {
     if (!isObject(target) || !isStringArray(target.userIds)) return null;
     if (context.user_id !== undefined && target.userIds.includes(context.user_id)) {
-      return [target.variation, { kind: 'TARGET_MATCH' }];
+      return { variationIndex: target.variation, reason: { kind: 'TARGET_MATCH' } };
     }
   }
 
@@ -99,10 +105,10 @@ function decide(targeting: TargetingSnapshot, context: Context): [number, Served
   for (const [ruleIndex, rule] of rules.entries()) {
     const matched = matches(rule, context);
     if (matched === null) return null;
-    if (matched) return [rule.variation, { kind: 'RULE_MATCH', ruleIndex }];
+    if (matched) return { variationIndex: rule.variation, reason: { kind: 'RULE_MATCH', ruleIndex } };
   }
 
-  return [targeting.defaultVariation, { kind: 'DEFAULT' }];
+  return { variationIndex: targeting.defaultVariation, reason: { kind: 'DEFAULT' } };
 }
 
 /**
@@ -132,7 +138,7 @@ function isStringArray(value: unknown): value is string[] {
  * it is malformed. Context attributes V1 doesn't know are ignored.
  */
 function normalizeContext(context: unknown): Context | null {
-  if (typeof context !== 'object' || context === null || Array.isArray(context)) return null;
+  if (!isObject(context)) return null;
   const { user_id: userId, country } = context as Record<string, unknown>;
   const normalized: Context = {};
   if (userId !== undefined && userId !== null) {

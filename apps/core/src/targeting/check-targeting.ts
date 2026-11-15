@@ -1,13 +1,11 @@
-import { isCountryCode, type IndividualTarget, type Rule } from '@ctff/evaluation';
+import { isCountryCode, type TargetingSnapshot } from '@ctff/evaluation';
 import type { FieldMessages } from '../common/validation.js';
 
 /** The parts of targeting a change can set, as they would be stored. */
-export interface TargetingSettings {
-  offVariation: number;
-  defaultVariation: number;
-  individualTargets: IndividualTarget[];
-  rules: Rule[];
-}
+export type TargetingSettings = Pick<
+  TargetingSnapshot,
+  'offVariation' | 'defaultVariation' | 'individualTargets' | 'rules'
+>;
 
 export type CheckedTargeting = { valid: true; targeting: TargetingSettings } | { valid: false; fields: FieldMessages };
 
@@ -29,7 +27,7 @@ export function checkTargeting(targeting: TargetingSettings, variationCount: num
   checkVariation('offVariation', targeting.offVariation);
   checkVariation('defaultVariation', targeting.defaultVariation);
 
-  const targetOf = new Map<string, number>();
+  const variationOfUserId = new Map<string, number>();
   const targetedVariations = new Set<number>();
   const individualTargets = targeting.individualTargets.map((target, index) => {
     const path = `individualTargets.${index}`;
@@ -40,11 +38,11 @@ export function checkTargeting(targeting: TargetingSettings, variationCount: num
     targetedVariations.add(target.variation);
     const userIds = unique(target.userIds);
     for (const userId of userIds) {
-      const other = targetOf.get(userId);
+      const other = variationOfUserId.get(userId);
       if (other !== undefined && other !== target.variation) {
-        fail(`${path}.userIds`, `${userId} is already an individual target of variation ${other}`);
+        fail(`${path}.userIds`, `${userId} is already in the individual target of variation ${other}`);
       }
-      targetOf.set(userId, target.variation);
+      variationOfUserId.set(userId, target.variation);
     }
     return { variation: target.variation, userIds };
   });

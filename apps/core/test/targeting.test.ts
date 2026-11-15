@@ -241,7 +241,7 @@ describe('targeting', () => {
             { variation: 1, userIds: ['bob', 'alice'] },
           ],
         },
-        { 'individualTargets.1.userIds': ['alice is already an individual target of variation 0'] },
+        { 'individualTargets.1.userIds': ['alice is already in the individual target of variation 0'] },
       ],
     ])('%s', async (_case, change, fields) => {
       const projectKey = await project('production');

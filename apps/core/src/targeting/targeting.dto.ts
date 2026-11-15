@@ -19,6 +19,7 @@ import { IsOmittable } from '../common/keys.js';
 
 /** Limits that keep one targeting (and so every snapshot) a reasonable size. */
 const maxRules = 100;
+const maxIndividualTargets = 100;
 const maxListedValues = 1000;
 const maxValueLength = 256;
 
@@ -132,12 +133,12 @@ export class UpdateTargetingDto {
   @ApiProperty({
     type: [IndividualTargetDto],
     required: false,
-    maxItems: maxRules,
+    maxItems: maxIndividualTargets,
     description: 'Replaces the individual targets. At most one per variation, and a user ID in only one of them.',
   })
   @IsOmittable()
   @IsArray()
-  @ArrayMaxSize(maxRules)
+  @ArrayMaxSize(maxIndividualTargets)
   @ValidateNested({ each: true })
   @Type(() => IndividualTargetDto)
   individualTargets?: IndividualTargetDto[];
