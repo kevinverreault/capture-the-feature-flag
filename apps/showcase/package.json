@@ -39,7 +39,7 @@
           "default",
           "^production",
           {
-            "runtime": "terraform version -json || true"
+            "runtime": "CHECKPOINT_DISABLE=1 terraform version -json || true"
           }
         ]
       }
@@ -54,8 +54,6 @@
     "@nestjs/core": "^11.2.10",
     "@types/express": "^5.0.6",
     "astro": "^7.4.12",
-    "cva": "npm:class-variance-authority@^0.7.1",
-    "node-html-parser": "^6.1.13",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "typescript": "~6.0.3"

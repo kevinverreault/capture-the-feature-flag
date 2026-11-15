@@ -483,12 +483,6 @@ importers:
       astro:
         specifier: ^7.4.12
         version: 7.4.12(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.0)
-      cva:
-        specifier: npm:class-variance-authority@^0.7.1
-        version: class-variance-authority@0.7.1
-      node-html-parser:
-        specifier: ^6.1.13
-        version: 6.1.13
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2

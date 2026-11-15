@@ -46,7 +46,8 @@ if (sampleFiles.length === 0) fail(`no .tf files in ${samplesDir}`);
 
 const workDir = mkdtempSync(join(tmpdir(), 'ctff-showcase-tf-'));
 try {
-  // The layout `terraform init` installs from (as in apps/terraform-provider-ctff/Dockerfile).
+  // The layout `terraform init` installs from, as in apps/terraform-provider-ctff/Dockerfile. The version only names
+  // the mirror's directory and file, and nothing constrains it; keep it equal to the Dockerfile's PROVIDER_VERSION.
   const version = '0.1.0';
   const pluginDir = join(workDir, 'plugins/registry.terraform.io/kevinverreault/ctff', version, `${goOs}_${goArch}`);
   mkdirSync(pluginDir, { recursive: true });
@@ -74,17 +75,22 @@ try {
   for (const file of sampleFiles) copyFileSync(join(samplesDir, file), join(configDir, file));
 
   const env = { ...process.env, TF_CLI_CONFIG_FILE: cliConfig, TF_IN_AUTOMATION: '1', CHECKPOINT_DISABLE: '1' };
-  for (const args of [
+  // On a failure, set the exit code rather than exiting, so the `finally` below still removes the working directory.
+  const failed = [
     ['init', '-backend=false', '-input=false', '-no-color'],
     ['validate', '-no-color'],
-  ]) {
+  ].find((args) => {
     const run = spawnSync(terraform, args, { cwd: configDir, env, encoding: 'utf8' });
-    if (run.status !== 0) {
-      process.stderr.write(`${run.stdout ?? ''}${run.stderr ?? ''}`);
-      fail(`\`terraform ${args[0]}\` failed for ${sampleFiles.join(', ')}`);
-    }
+    if (run.status === 0) return false;
+    process.stderr.write(`${run.stdout ?? ''}${run.stderr ?? ''}`);
+    return true;
+  });
+  if (failed) {
+    console.error(`validate-terraform-samples: \`terraform ${failed[0]}\` failed for ${sampleFiles.join(', ')}`);
+    process.exitCode = 1;
+  } else {
+    console.log(`validate-terraform-samples: ${sampleFiles.join(', ')} valid against the provider build`);
   }
-  console.log(`validate-terraform-samples: ${sampleFiles.join(', ')} valid against the provider build`);
 } finally {
   rmSync(workDir, { recursive: true, force: true });
 }
