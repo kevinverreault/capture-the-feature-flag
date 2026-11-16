@@ -1,4 +1,6 @@
 # The whole system on one machine: `docker compose up`.
+# Every service built here has `pull_policy: build`, so `up` rebuilds its image from the current source instead of
+# reusing a `ctff-*:local` image built from an older checkout. After a source change, that reruns the install and build.
 name: ctff
 
 services:
@@ -22,6 +24,7 @@ services:
       context: .
       dockerfile: apps/core/Dockerfile
     image: ctff-core:local
+    pull_policy: build
     environment:
       DATABASE_URL: postgres://ctff:ctff@postgres:5432/ctff
       PORT: '3000'
@@ -39,6 +42,7 @@ services:
       context: .
       dockerfile: apps/evaluator/Dockerfile
     image: ctff-evaluator:local
+    pull_policy: build
     environment:
       CORE_URL: http://core:3000
       PORT: '3000'
@@ -55,6 +59,7 @@ services:
       context: .
       dockerfile: apps/birdwatch-api/Dockerfile
     image: ctff-birdwatch-api:local
+    pull_policy: build
     environment:
       EVALUATOR_URL: http://evaluator:3000
       # The SDK key of birdwatch/development is generated, so the API looks it up in Core (or set CTFF_SDK_KEY).
@@ -73,6 +78,7 @@ services:
       context: .
       dockerfile: apps/birdwatch-web/Dockerfile
     image: ctff-birdwatch-web:local
+    pull_policy: build
     environment:
       BIRDWATCH_API_URL: http://birdwatch-api:3000
       # The flag inspector links each flag to the admin app, as the browser reaches it, in birdwatch/development.
@@ -91,6 +97,7 @@ services:
       context: .
       dockerfile: apps/showcase/Dockerfile
     image: ctff-showcase:local
+    pull_policy: build
     environment:
       PORT: '8080'
     ports:
@@ -106,6 +113,7 @@ services:
       context: .
       dockerfile: apps/terraform-provider-ctff/Dockerfile
     image: ctff-terraform:local
+    pull_policy: build
     environment:
       CTFF_BASE_URL: http://core:3000
     volumes:

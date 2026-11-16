@@ -34,6 +34,11 @@
       "inputs": ["production", "^production"],
       "outputs": ["{projectRoot}/dist"]
     },
+    "dev": {
+      "cache": false,
+      "continuous": true,
+      "dependsOn": ["^build"]
+    },
     "docker-build": {
       "cache": false,
       "dependsOn": ["build"]
