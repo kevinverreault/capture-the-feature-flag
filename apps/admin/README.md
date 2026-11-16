@@ -39,13 +39,13 @@ The dashboard's charts are plain HTML and CSS, server-rendered from the evaluati
 
 ## Hosting it
 
-`@ctff/admin` exports `createAdminMiddleware({ coreBaseUrl, logger })` ([host.js](host.js)): a Connect/Express middleware that serves the built assets in `dist/client`, then renders the pages. It answers every request it gets (with its own 404 page when no page matches), so the host mounts it on the paths it doesn't own. Given a pino `logger`, it logs each request and every failed page as JSON. Core mounts it on everything outside `/api` and `/health`, with Core's logger.
+`@ctff/admin` exports `createAdminMiddleware({ coreBaseUrl, logger })` ([host.js](host.js)): a Connect/Express middleware that serves the built assets in `dist/client`, then renders the pages. It answers every request it gets (with its own 404 page when no page matches), so the host mounts it on the paths it doesn't own. Given a pino `logger`, it logs each request and every failed page as JSON. Core mounts it on everything outside `/api` and `/health`, with Core's logger. The dev server, `pnpm nx run @ctff/admin:dev`, builds the libraries the app uses first.
 
-| Host                                                               | Core base URL                                                       |
-| :----------------------------------------------------------------- | :------------------------------------------------------------------ |
-| Core                                                               | Core's `ADMIN_CORE_URL`, or by default Core itself through loopback |
-| `node standalone.js`                                               | `CORE_URL` (required); `PORT` (default `4321`), `HOST`, `LOG_LEVEL` |
-| `pnpm nx run @ctff/admin:dev` (builds the libraries it uses first) | `CORE_URL`                                                          |
+| Host                          | Core base URL                                                       |
+| :---------------------------- | :------------------------------------------------------------------ |
+| Core                          | Core's `ADMIN_CORE_URL`, or by default Core itself through loopback |
+| `node standalone.js`          | `CORE_URL` (required); `PORT` (default `4321`), `HOST`, `LOG_LEVEL` |
+| `pnpm nx run @ctff/admin:dev` | `CORE_URL`                                                          |
 
 ## Targets
 

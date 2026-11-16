@@ -1,6 +1,6 @@
 # The whole system on one machine: `docker compose up`.
-# Every service built here has `pull_policy: build`, so `up` rebuilds its image from the current source (Docker's
-# layer cache keeps that quick) instead of reusing a `ctff-*:local` image built from an older checkout.
+# Every service built here has `pull_policy: build`, so `up` rebuilds its image from the current source instead of
+# reusing a `ctff-*:local` image built from an older checkout. After a source change, that reruns the install and build.
 name: ctff
 
 services:

@@ -1,9 +1,9 @@
 import type { Page } from '@playwright/test';
 import { adminPages } from '../src/admin.js';
-import { expect, test } from '../src/fixtures.js';
+import { expect, test, type Fixtures } from '../src/fixtures.js';
 import { urls } from '../src/stack.js';
 
-/** The system prefers light unless a scenario says otherwise. While it does, a page shows dark only for a theme the visitor chose. */
+/** The system prefers light unless a scenario says otherwise. While the system prefers light, a page shows dark only for a theme the visitor chose. */
 test.use({ colorScheme: 'light' });
 
 /** The class the design system's theme puts on `<html>` while the dark theme is on. */
@@ -26,48 +26,48 @@ async function expectDarkTheme(page: Page): Promise<void> {
   await expect(themeToggle(page)).toHaveAttribute('aria-pressed', 'true');
 }
 
-/** The apps whose pages anyone can open: a first page, and the next one. */
-const apps = [
-  { name: 'the showcase', from: `${urls.showcase}/`, to: `${urls.showcase}/quickstart/` },
-  { name: 'the admin app', from: adminPages.projects(), to: adminPages.dashboard() },
+/** The fixtures an app's first page opens with. */
+type AppFixtures = { page: Page } & Pick<Fixtures, 'birdwatch'>;
+
+/** Each app: how a visitor opens its first page, and the next page they go to. */
+const apps: { name: string; first: (fixtures: AppFixtures) => Promise<Page>; next: string }[] = [
+  {
+    name: 'the showcase',
+    first: async ({ page }) => (await page.goto(`${urls.showcase}/`), page),
+    next: `${urls.showcase}/quickstart/`,
+  },
+  {
+    name: 'the admin app',
+    first: async ({ page }) => (await page.goto(adminPages.projects()), page),
+    next: adminPages.dashboard(),
+  },
+  {
+    name: 'Birdwatch',
+    first: async ({ birdwatch }) => (await birdwatch('alice')).page,
+    next: '/species',
+  },
 ];
 
 for (const app of apps) {
-  test(`${app.name} keeps the dark theme from page to page`, async ({ page }) => {
-    await page.goto(app.from);
-    await chooseDarkTheme(page);
+  test(`${app.name} keeps the dark theme from page to page`, async ({ page, birdwatch }) => {
+    const first = await app.first({ page, birdwatch });
+    await chooseDarkTheme(first);
 
-    await page.goto(app.to);
-    await expectDarkTheme(page);
+    await first.goto(app.next);
+    await expectDarkTheme(first);
   });
 }
-
-test('Birdwatch keeps the dark theme from page to page', async ({ birdwatch }) => {
-  const { page } = await birdwatch('alice');
-  await chooseDarkTheme(page);
-
-  await page.goto('/species');
-  await expectDarkTheme(page);
-});
 
 test.describe('while the system prefers dark', () => {
   test.use({ colorScheme: 'dark' });
 
   for (const app of apps) {
-    test(`${app.name} shows the dark theme without the toggle`, async ({ page }) => {
-      await page.goto(app.from);
-      await expectDarkTheme(page);
+    test(`${app.name} shows the dark theme without the toggle`, async ({ page, birdwatch }) => {
+      const first = await app.first({ page, birdwatch });
+      await expectDarkTheme(first);
 
-      await page.goto(app.to);
-      await expectDarkTheme(page);
+      await first.goto(app.next);
+      await expectDarkTheme(first);
     });
   }
-
-  test('Birdwatch shows the dark theme without the toggle', async ({ birdwatch }) => {
-    const { page } = await birdwatch('alice');
-    await expectDarkTheme(page);
-
-    await page.goto('/species');
-    await expectDarkTheme(page);
-  });
 });

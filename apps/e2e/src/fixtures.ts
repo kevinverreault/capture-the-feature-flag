@@ -90,7 +90,7 @@ export class BirdwatchSession {
   }
 }
 
-interface Fixtures {
+export interface Fixtures {
   /** Logs in to Birdwatch as a birder; the sessions are closed after the test. */
   birdwatch: (birder: BirderId) => Promise<BirdwatchSession>;
   /** Puts the Birdwatch demo back as seeded before and after each test, as each test changes it. */

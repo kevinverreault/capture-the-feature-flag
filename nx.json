@@ -35,6 +35,8 @@
       "outputs": ["{projectRoot}/dist"]
     },
     "dev": {
+      "cache": false,
+      "continuous": true,
       "dependsOn": ["^build"]
     },
     "docker-build": {
