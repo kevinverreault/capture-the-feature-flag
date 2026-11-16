@@ -3,7 +3,7 @@ import { adminPages } from '../src/admin.js';
 import { expect, test } from '../src/fixtures.js';
 import { urls } from '../src/stack.js';
 
-/** The system prefers light unless a scenario says otherwise: a page then shows dark only for a theme the visitor chose. */
+/** The system prefers light unless a scenario says otherwise. While it does, a page shows dark only for a theme the visitor chose. */
 test.use({ colorScheme: 'light' });
 
 /** The class the design system's theme puts on `<html>` while the dark theme is on. */
@@ -26,7 +26,7 @@ async function expectDarkTheme(page: Page): Promise<void> {
   await expect(themeToggle(page)).toHaveAttribute('aria-pressed', 'true');
 }
 
-/** The apps whose pages anyone can open: the page where the dark theme is chosen, and the next one. */
+/** The apps whose pages anyone can open: a first page, and the next one. */
 const apps = [
   { name: 'the showcase', from: `${urls.showcase}/`, to: `${urls.showcase}/quickstart/` },
   { name: 'the admin app', from: adminPages.projects(), to: adminPages.dashboard() },
@@ -62,4 +62,12 @@ test.describe('while the system prefers dark', () => {
       await expectDarkTheme(page);
     });
   }
+
+  test('Birdwatch shows the dark theme without the toggle', async ({ birdwatch }) => {
+    const { page } = await birdwatch('alice');
+    await expectDarkTheme(page);
+
+    await page.goto('/species');
+    await expectDarkTheme(page);
+  });
 });

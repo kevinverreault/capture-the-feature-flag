@@ -31,7 +31,7 @@ Snippets that aren't code of these packages (shell commands, the Terraform CLI c
 | `pnpm nx run @ctff/showcase:build`     | `astro build` into `dist/`                                                |
 | `pnpm nx run @ctff/showcase:typecheck` | `astro check`, then `tsc` and `terraform validate` on the guides' samples |
 | `pnpm nx run @ctff/showcase:lint`      | `eslint .`                                                                |
-| `pnpm --filter @ctff/showcase dev`     | `astro dev`, after `pnpm nx run @ctff/design-system-host:build`           |
+| `pnpm nx run @ctff/showcase:dev`       | `astro dev`, after building the design system integration                 |
 
 ## Image
 
