@@ -3,7 +3,7 @@ import { adminPages } from '../src/admin.js';
 import { expect, test } from '../src/fixtures.js';
 import { urls } from '../src/stack.js';
 
-/** The system prefers light, so a page only shows dark when it applies the theme the visitor chose. */
+/** The system prefers light unless a scenario says otherwise: a page then shows dark only for a theme the visitor chose. */
 test.use({ colorScheme: 'light' });
 
 /** The class the design system's theme puts on `<html>` while the dark theme is on. */
@@ -48,4 +48,18 @@ test('Birdwatch keeps the dark theme from page to page', async ({ birdwatch }) =
 
   await page.goto('/species');
   await expectDarkTheme(page);
+});
+
+test.describe('while the system prefers dark', () => {
+  test.use({ colorScheme: 'dark' });
+
+  for (const app of apps) {
+    test(`${app.name} shows the dark theme without the toggle`, async ({ page }) => {
+      await page.goto(app.from);
+      await expectDarkTheme(page);
+
+      await page.goto(app.to);
+      await expectDarkTheme(page);
+    });
+  }
 });
